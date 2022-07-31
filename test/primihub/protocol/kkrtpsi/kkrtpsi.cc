@@ -3,6 +3,8 @@
 #include "cryptoTools/Network/Endpoint.h"
 #include "cryptoTools/Network/IOService.h"
 
+#include "libOTe/Tools/DefaultCurve.h"
+
 //using namespace std;
 #include "cryptoTools/Common/Defines.h"
 //#include "cryptoTools/Common/Version.h"
@@ -120,6 +122,8 @@ void benchmark(
         }
         else
         {
+			using namespace DefaultCurve;
+			Curve curve;
             auto thrd = std::thread([&]()
             {
                 auto params2 = params;
