@@ -47,7 +47,9 @@ class LinearRegressionClient(BaseModel):
                                     task_info=self.task_info)
 
         # load dataset
-        selected_column = self.common_params['selected_column']
+        selected_column = self.common_params.get('selected_column')
+        if selected_column is None:
+            selected_column = self.role_params.get('selected_column')
         id = self.common_params['id']
         x = read_data(data_info=self.role_params['data'],
                       selected_column=selected_column,
