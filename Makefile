@@ -11,6 +11,18 @@ ifneq ($(disable_py_task), y)
   BUILD_FLAG += --define enable_py_task=true
 endif
 
+ifneq ($(disable_mpc_task), y)
+  BUILD_FLAG += --define enable_mpc_task=true
+endif
+
+ifneq ($(disable_pir_task), y)
+  BUILD_FLAG += --define enable_pir_task=true
+endif
+
+ifneq ($(disable_psi_task), y)
+  BUILD_FLAG += --define enable_psi_task=true
+endif
+
 ifeq ($(mysql), y)
   BUILD_FLAG += --define enable_mysql_driver=true
 endif

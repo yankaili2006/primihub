@@ -21,12 +21,21 @@
 #include <memory>
 
 #include "src/primihub/task/semantic/task.h"
+#ifdef MPC_TASK_ENABLED
 #include "src/primihub/task/semantic/mpc_task.h"
+#endif  // MPC_TASK_ENABLED
+
 #ifdef PY_TASK_ENABLED
 #include "src/primihub/task/semantic/fl_task.h"
 #endif  // PY_TASK_ENABLED
+
+#ifdef PSI_TASK_ENABLED
 #include "src/primihub/task/semantic/psi_task.h"
+#endif  // PSI_TASK_ENABLED
+
+#ifdef PIR_TASK_ENABLED
 #include "src/primihub/task/semantic/pir_task.h"
+#endif  // PIR_TASK_ENABLED
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/util/log.h"
 #include "src/primihub/util/proto_log_helper.h"
@@ -40,7 +49,8 @@ namespace primihub::task {
 
 class TaskFactory {
  public:
-  static std::shared_ptr<TaskBase> Create(const std::string& node_id,
+  using RetType = std::pair<std::shared_ptr<TaskBase>, std::string>;
+  static RetType Create(const std::string& node_id,
       const PushTaskRequest& request,
       std::shared_ptr<DatasetService> dataset_service,
       void* ra_service = nullptr,
@@ -49,38 +59,54 @@ class TaskFactory {
     const auto& task_info = request.task().task_info();
     std::string task_inof_str = pb_util::TaskInfoToString(task_info);
     auto task_type = request.task().type();
-    std::shared_ptr<TaskBase> task_ptr{nullptr};
+    RetType result_;
     switch (task_language) {
 #ifdef PY_TASK_ENABLED
     case Language::PYTHON:
-      task_ptr = TaskFactory::CreateFLTask(node_id, request, dataset_service);
+      result_ = std::make_pair(
+          TaskFactory::CreateFLTask(node_id, request, dataset_service), "SUCCESS");
       break;
 #endif
     case Language::PROTO: {
       switch (task_type) {
+#ifdef MPC_TASK_ENABLED
       case rpc::TaskType::ACTOR_TASK:
-        task_ptr = TaskFactory::CreateMPCTask(node_id, request, dataset_service);
+        result_ = std::make_pair(
+            TaskFactory::CreateMPCTask(node_id, request, dataset_service), "SUCCESS");
         break;
+#endif  // MPC_TASK_ENABLED
+#ifdef PSI_TASK_ENABLED
       case rpc::TaskType::PSI_TASK:
-        task_ptr =
+        result_ = std::make_pair(
             TaskFactory::CreatePSITask(node_id, request, dataset_service,
-                                       ra_service, executor);
+                                       ra_service, executor), "SUCCESS");
         break;
+#endif // PSI_TASK_ENABLED
+#ifdef PIR_TASK_ENABLED
       case rpc::TaskType::PIR_TASK:
-        task_ptr = TaskFactory::CreatePIRTask(node_id, request, dataset_service);
+        result_ = std::make_pair(
+            TaskFactory::CreatePIRTask(node_id, request, dataset_service), "SUCCESS");;
         break;
-      default:
-        LOG(ERROR) << task_inof_str << "unsupported task type: " << task_type;
+#endif  // PIR_TASK_ENABLED
+      default: {
+        std::string err_msg = "Unsupported task type: " + rpc::TaskType_Name(task_type);
+        LOG(ERROR) << task_inof_str << err_msg;
+        result_ = std::make_pair(nullptr, err_msg);
         break;
+      }
       }
       break;
     }
-    default:
+    default: {
+      std::string err_msg = "Unsupported task type: " + rpc::Language_Name(task_language);
       LOG(ERROR) << task_inof_str << "unsupported language: " << task_language;
+      result_ = std::make_pair(nullptr, err_msg);
       break;
     }
-    return task_ptr;
+    }
+    return result_;
   }
+
 #ifdef PY_TASK_ENABLED
   static std::shared_ptr<TaskBase> CreateFLTask(const std::string& node_id,
       const PushTaskRequest& request,
@@ -90,6 +116,8 @@ class TaskFactory {
                                     request, dataset_service);
   }
 #endif  // PY_TASK_ENABLED
+
+#ifdef MPC_TASK_ENABLED
   static std::shared_ptr<TaskBase> CreateMPCTask(const std::string& node_id,
       const PushTaskRequest& request,
       std::shared_ptr<DatasetService> dataset_service) {
@@ -98,7 +126,9 @@ class TaskFactory {
     return std::make_shared<MPCTask>(node_id, _function_name,
                                     &task_param, dataset_service);
   }
+#endif  // MPC_TASK_ENABLED
 
+#ifdef PSI_TASK_ENABLED
   static std::shared_ptr<TaskBase> CreatePSITask(const std::string& node_id,
       const PushTaskRequest& request,
       std::shared_ptr<DatasetService> dataset_service,
@@ -110,13 +140,16 @@ class TaskFactory {
                                          ra_server, tee_engine);
     return task_ptr;
   }
+#endif  // PSI_TASK_ENABLED
 
+#ifdef PIR_TASK_ENABLED
   static std::shared_ptr<TaskBase> CreatePIRTask(const std::string& node_id,
       const PushTaskRequest& request,
       std::shared_ptr<DatasetService> dataset_service) {
     const auto& task_config = request.task();
     return std::make_shared<PirTask>(&task_config, dataset_service);
   }
+#endif  // PIR_TASK_ENABLED
 
 };
 }  // namespace primihub::task

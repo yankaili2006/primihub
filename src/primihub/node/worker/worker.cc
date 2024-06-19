@@ -84,12 +84,15 @@ retcode Worker::ExecuteTaskByThread(const PushTaskRequest* task_request) {
   auto& executor = nodelet->GetTeeExecutor();
   auto ra_service_ptr = reinterpret_cast<void*>(ra_service.get());
   auto tee_executor_ptr = reinterpret_cast<void*>(executor.get());
-  task_ptr = TaskFactory::Create(this->node_id,
+  auto result = TaskFactory::Create(this->node_id,
       *task_request, dataset_service, ra_service_ptr, tee_executor_ptr);
 #else
-  task_ptr = TaskFactory::Create(this->node_id, *task_request,
+  auto result = TaskFactory::Create(this->node_id, *task_request,
                                  dataset_service);
+
 #endif
+  task_ptr = std::move(result.first);
+  std::string info = std::move(result.second);
   if (task_ptr == nullptr) {
     LOG(ERROR) << TASK_INFO_STR << "Woker create task failed.";
     task_ready_promise_.set_value(false);

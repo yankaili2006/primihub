@@ -28,7 +28,15 @@ build_opt="mysql=y"
 if [[ "$PRIMIHUB_MODE" == "FULL" ]]; then
   build_opt="${build_opt}"
 else
-  build_opt="${build_opt} disable_py_task=y"
+  build_opt="${build_opt} \
+    disable_py_task=y  \
+  "
+  # build_opt="${build_opt} \
+  #   disable_py_task=y  \
+  #   disable_mpc_task=y \
+  #   disable_pir_task=y \
+  #   disable_psi_task=y \
+  # "
 fi
 
 make $build_opt

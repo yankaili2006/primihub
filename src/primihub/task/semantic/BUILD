@@ -22,23 +22,55 @@ config_setting(
   name = "py_task_enabled",
   values = {"define" : "enable_py_task=true"},
 )
+config_setting(
+  name = "mpc_task_enabled",
+  values = {"define" : "enable_mpc_task=true"},
+)
+config_setting(
+  name = "pir_task_enabled",
+  values = {"define" : "enable_pir_task=true"},
+)
+config_setting(
+  name = "psi_task_enabled",
+  values = {"define" : "enable_psi_task=true"},
+)
+
+TASK_DEFINES_OPTS = select({
+    "py_task_enabled": ["PY_TASK_ENABLED"],
+    "//conditions:default": []
+  }) + select({
+    "mpc_task_enabled": ["MPC_TASK_ENABLED"],
+    "//conditions:default": []
+  }) + select({
+    "pir_task_enabled": ["PIR_TASK_ENABLED"],
+    "//conditions:default": []
+  }) + select({
+    "psi_task_enabled": ["PSI_TASK_ENABLED"],
+    "//conditions:default": []
+  })
+
+TASK_DEPS_OPTS = select({
+    "py_task_enabled": [":fl_task"],
+    "//conditions:default": []
+  }) + select({
+    "mpc_task_enabled": [":mpc_task"],
+    "//conditions:default": []
+  }) + select({
+    "pir_task_enabled": [":pir_task"],
+    "//conditions:default": []
+  }) + select({
+    "psi_task_enabled": [":psi_task"],
+    "//conditions:default": []
+  })
 
 #factory for create task
 cc_library(
     name = "task_factory",
     hdrs = ["factory.h"],
-    defines = select({
-      "py_task_enabled": ["PY_TASK_ENABLED"],
-      "//conditions:default": []
-    }),
-    deps = [
-        ":mpc_task",
-        ":pir_task",
-        ":psi_task",
-    ] + select({
-      "py_task_enabled": [":fl_task"],
-      "//conditions:default": []
-    }),
+    defines = TASK_DEFINES_OPTS,
+    deps = TASK_DEPS_OPTS + [
+      ":task_interface",
+    ],
 )
 
 cc_library(
