@@ -64,6 +64,8 @@ class KeywordPirOperatorServer : public BasePirOperator {
   retcode OnExecute(const PirDataType& input, PirDataType* result) override;
 
  protected:
+  retcode ProcessQueryPolicy();
+  retcode WaitForLoopNum();
   // ------------------------Sender----------------------------
   std::unique_ptr<apsi::PSIParams> SetPsiParams();
   /**
@@ -114,6 +116,7 @@ class KeywordPirOperatorServer : public BasePirOperator {
       std::shared_ptr<apsi::sender::SenderDB>;
 
  private:
+  IndexType loop_num_{0};
   int64_t query_data_size_;
   int64_t table_size_;
   std::string psi_params_str_;

@@ -51,7 +51,7 @@ using namespace seal::util;     // NOLINT
 
 namespace primihub::pir {
 using UnlabeledData = std::vector<apsi::Item>;
-
+using DataGroup = std::map<IndexType, std::vector<std::string>>;
 class KeywordPirOperatorClient : public BasePirOperator {
  public:
   explicit KeywordPirOperatorClient(const Options& options) :
@@ -61,17 +61,23 @@ class KeywordPirOperatorClient : public BasePirOperator {
 
 
  protected:
+  retcode AcquireQueryPolicy();
+  retcode ValidataQueryPolicy();
+  retcode ProcessDataByQueryPolicy(const PirDataType& input,
+                                    DataGroup* grouped_data_ptr);
+  retcode NotifyLoopToExecute(const IndexType round_size);
   // ------------------------Receiver----------------------------
   /**
   * Performs a parameter request from sender
   */
-  retcode RequestPSIParams();
+  retcode RequestPSIParams(const IndexType slot_index);
   /**
   * Performs an OPRF request on a vector of items and returns a
     vector of OPRF hashed items of the same size as the input vector.
   */
-  retcode RequestOprf(const std::vector<Item>& items,
-        std::vector<apsi::HashedItem>*, std::vector<apsi::LabelKey>*);
+  retcode RequestOprf(const IndexType slot_index,
+      const std::vector<Item>& items,
+      std::vector<apsi::HashedItem>*, std::vector<apsi::LabelKey>*);
   /**
   * Performs a labeled PSI query. The query is a vector of items,
   * and the result is a same-size vector of MatchRecord objects.
@@ -80,12 +86,13 @@ class KeywordPirOperatorClient : public BasePirOperator {
   * and the `label` field may contain the corresponding
   * label if a sender's data included it.
   */
-  retcode RequestQuery();
+  retcode RequestQuery(const IndexType slot_index);
   retcode ExtractResult(const std::vector<std::string>& orig_vec,
       const std::vector<apsi::receiver::MatchRecord>& query_result,
       PirDataType* result);
 
  private:
+  IndexType slot_size_{-1};
   std::unique_ptr<apsi::receiver::Receiver> receiver_{nullptr};
   std::unique_ptr<apsi::PSIParams> psi_params_{nullptr};
 };

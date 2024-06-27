@@ -627,3 +627,9 @@ def primihub_deps_cn():
         "https://primihub.oss-cn-beijing.aliyuncs.com/protobuf-3.20.0.tar.gz"
       ],
     )
+  if "com_google_cityhash" not in native.existing_rules():
+    git_repository(
+      name = "com_google_cityhash",
+      commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
+      remote = "https://gitee.com/primihub/cityhash.git",
+    )

@@ -15,15 +15,17 @@ DEP_OPTS = [
 ]
 
 cc_library(
-  name = "keyword_pir_server_impl",
+  name = "keyword_pir_client_impl",
   hdrs = ["keyword_pir_client.h"],
   srcs = ["keyword_pir_client.cc"],
   copts = C_OPTS,
-  deps = DEP_OPTS,
+  deps = DEP_OPTS + [
+    "@com_google_cityhash//:cityhash",
+  ],
 )
 
 cc_library(
-  name = "keyword_pir_client_impl",
+  name = "keyword_pir_server_impl",
   hdrs = ["keyword_pir_server.h"],
   srcs = ["keyword_pir_server.cc"],
   copts = C_OPTS,

@@ -22,6 +22,7 @@
 #include "src/primihub/util/network/link_context.h"
 namespace primihub::pir {
 using LinkContext = network::LinkContext;
+using IndexType = int32_t;
 struct Options {
   LinkContext* link_ctx_ref;
   std::map<std::string, Node> party_info;
@@ -67,6 +68,7 @@ class BasePirOperator {
   std::string key_{"pir_key"};
   std::string response_key_{"response_pir_key"};
   std::string key_task_end_{"pir_task_end"};
+  std::string loop_num_key_{"loop_num_key"};
 };
 }  // namespace primihub::pir
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_BASE_PIR_H_

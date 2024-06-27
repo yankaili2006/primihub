@@ -15,7 +15,9 @@ namespace primihub {
 #define SET_THREAD_NAME(name)
 #endif
 #define TO_CHAR(ptr) reinterpret_cast<char*>(ptr)
+#define TO_CCHAR(ptr) reinterpret_cast<const char*>(ptr)
 #define TO_UCHAR(ptr) reinterpret_cast<unsigned char*>(ptr)
+#define TO_CUCHAR(ptr) reinterpret_cast<const unsigned char*>(ptr)
 
 [[maybe_unused]] static uint16_t ABY3_TOTAL_PARTY_NUM = 3;
 [[maybe_unused]] static uint64_t LIMITED_PACKAGE_SIZE = 3 * 1024 * 1024;  // 4M

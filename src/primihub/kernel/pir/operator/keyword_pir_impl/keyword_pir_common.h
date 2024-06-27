@@ -21,6 +21,7 @@ enum class RequestType : uint8_t {
   PsiParam = 0,
   Oprf,
   Query,
+  QueryPolicy,
 };
 struct PirConstant {
   inline static double table_size_factor{0.9};
