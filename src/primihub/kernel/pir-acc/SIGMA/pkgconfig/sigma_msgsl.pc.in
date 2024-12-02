@@ -1,0 +1,8 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license.
+
+Name: Microsoft GSL for Microsoft SIGMA
+Version: @Microsoft.GSL_VERSION@
+Description: Guidelines Support Library
+
+Cflags: -I@SIGMA_PKGCONFIG_MSGSL_INCLUDE_DIR@
