@@ -1,5 +1,6 @@
 // "Copyright [2023] <PrimiHub>"
 #include "src/primihub/algorithm/mpc_statistics.h"
+#include "src/primihub/executor/statistical_tests.h"
 #include <arrow/api.h>
 #include <arrow/csv/api.h>
 #include <arrow/csv/writer.h>
@@ -421,6 +422,21 @@ retcode MPCStatisticsExecutor::InitEngine() {
     case rpc::Algorithm::SUM:
       type_ = MPCStatisticsType::SUM;
       break;
+    case rpc::Algorithm::T_TEST:
+      type_ = MPCStatisticsType::T_TEST;
+      break;
+    case rpc::Algorithm::F_TEST:
+      type_ = MPCStatisticsType::F_TEST;
+      break;
+    case rpc::Algorithm::CHI_SQUARE_TEST:
+      type_ = MPCStatisticsType::CHI_SQUARE_TEST;
+      break;
+    case rpc::Algorithm::REGRESSION:
+      type_ = MPCStatisticsType::REGRESSION;
+      break;
+    case rpc::Algorithm::CORRELATION:
+      type_ = MPCStatisticsType::CORRELATION;
+      break;
     default: {
       std::stringstream ss;
       ss  << "Unknown Algorithm operation type: "
@@ -441,6 +457,22 @@ retcode MPCStatisticsExecutor::InitEngine() {
     break;
   case MPCStatisticsType::MIN:
     executor_ = std::make_unique<MPCMinOrMax>(type_);
+    break;
+  case MPCStatisticsType::T_TEST:
+    executor_ = std::make_unique<MPCTTest>();
+    break;
+  case MPCStatisticsType::F_TEST:
+    executor_ = std::make_unique<MPCFTest>();
+    break;
+  case MPCStatisticsType::CHI_SQUARE_TEST:
+    executor_ = std::make_unique<MPCChiSquareTest>();
+    break;
+  case MPCStatisticsType::CORRELATION:
+    executor_ = std::make_unique<MPCCorrelation>();
+    break;
+  case MPCStatisticsType::REGRESSION:
+    // Regression will be handled separately
+    LOG(INFO) << "Regression analysis will be handled by regression executor";
     break;
   default: {
     std::stringstream ss;

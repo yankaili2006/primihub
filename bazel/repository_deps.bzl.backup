@@ -19,7 +19,7 @@ def primihub_deps_cn():
       name = "pybind11_bazel",
       strip_prefix = "pybind11_bazel-%s" % _PYBIND11_COMMIT,
       urls = [
-        "file:///Users/primihub/github/primihub/local_deps/pybind11_bazel.zip",
+        "https://primihub.oss-cn-beijing.aliyuncs.com/pybind11_bazel-%s.zip" % _PYBIND11_COMMIT,
       ],
     )
 
@@ -124,7 +124,8 @@ def primihub_deps_cn():
       #sha256 = "6a5f67874af66b239b709c572ac1a5a00fdb1b29beaf13c3e6f79b1ba10dc7c4",
       strip_prefix = "upb-0.0.2-dp",
       urls = [
-          "file:///Users/primihub/github/primihub/local_deps/upb.tar.gz",
+          "https://primihub.oss-cn-beijing.aliyuncs.com/tools/v0.0.2-dp.tar.gz",
+          "https://github.com/primihub/upb/archive/refs/tags/v0.0.2-dp.tar.gz",
       ],
     )
   if "snappy" not in native.existing_rules():
@@ -208,14 +209,13 @@ def primihub_deps_cn():
     http_archive(
       name = "boost",
       build_file = "@com_github_nelhage_rules_boost//:BUILD.boost",
-      patches = ["@com_github_nelhage_rules_boost//:0001-json-array-erase-relocate.patch"],
       patch_cmds = ["rm -f doc/pdf/BUILD"],
       patch_cmds_win = ["Remove-Item -Force doc/pdf/BUILD"],
-      sha256 = "273f1be93238a068aba4f9735a4a2b003019af067b9c183ed227780b8f36062c",
-      strip_prefix = "boost_1_79_0",
+      sha256 = "a5800f405508f5df8114558ca9855d2640a2de8f0445f051fa1c7c3383045724",
+      strip_prefix = "boost_1_84_0",
       urls = [
-          #"https://boostorg.jfrog.io/artifactory/main/release/1.79.0/source/boost_1_79_0.tar.gz",
-          "https://primihub.oss-cn-beijing.aliyuncs.com/boost_1_79_0.tar.gz",
+          "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.gz",
+          "https://primihub.oss-cn-beijing.aliyuncs.com/boost_1_84_0.tar.gz",
       ],
     )
 
@@ -627,8 +627,7 @@ def primihub_deps_cn():
       ],
     )
   if "com_google_cityhash" not in native.existing_rules():
-    git_repository(
+    native.local_repository(
       name = "com_google_cityhash",
-      commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
-      remote = "https://gitee.com/primihub/cityhash.git",
+      path = "third_party/cityhash",
     )

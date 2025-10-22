@@ -18,6 +18,7 @@
 #define SRC_PRIMIHUB_DATA_STORE_MYSQL_MYSQL_DRIVER_H_
 #include <glog/logging.h>
 #include <arrow/api.h>
+
 #include <mysql/mysql.h>
 
 #include <iomanip>

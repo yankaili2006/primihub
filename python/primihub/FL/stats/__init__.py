@@ -12,6 +12,7 @@ from .frequent import col_frequent
 from .union import col_union
 from .quantile import col_quantile
 from .sum import col_sum, row_sum
+from .hypothesis_tests import FederatedHypothesisTests
 
 __all__ = [
     "col_mean",
@@ -29,4 +30,5 @@ __all__ = [
     "col_quantile",
     "col_sum",
     "row_sum",
+    "FederatedHypothesisTests",
 ]

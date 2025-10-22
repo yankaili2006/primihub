@@ -28,11 +28,11 @@ load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
 boost_deps()
 
 new_git_repository(
-  name = "lib_function2",
-  build_file = "@com_github_bazel_rules_3rdparty//:BUILD.function2",
-  remote = "https://gitee.com/mirrors_Naios/function2.git",
-  commit = "b8cf935d096a87a645534e5c1015ee80960fe4de",
-  shallow_since = "1616573746 +0100",
+  name = "toolkit_relic",
+  build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
+  remote = "https://gitee.com/primihub/relic.git",
+  # tag 0.6.0
+  commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
 )
 
 
@@ -227,6 +227,13 @@ git_repository(
   remote = "https://gitee.com/primihub/cryptoTools.git",
 )
 
+new_git_repository(
+    name = "lib_function2",
+    build_file = "@com_github_bazel_rules_3rdparty//:BUILD.function2",
+    remote = "https://gitee.com/primihub/function2.git",
+    commit = "b8cf935d096a87a645534e5c1015ee80960fe4de",
+)
+
 git_repository(
   name = "com_github_ladnir_aby3",
   # branch = "bazel_branch_sync",
@@ -251,13 +258,14 @@ new_git_repository(
 )
 
 
-new_git_repository(
-  name = "toolkit_relic",
-  build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
-  remote = "https://gitee.com/primihub/relic.git",
-  # tag 0.6.0
-  commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
-)
+# Temporarily disabled Relic due to macOS build issues
+# new_git_repository(
+#   name = "toolkit_relic",
+#   build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
+#   remote = "https://gitee.com/primihub/relic.git",
+#   # tag 0.6.0
+#   commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
+# )
 
 #PSI
 git_repository(
