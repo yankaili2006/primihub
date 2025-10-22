@@ -48,6 +48,39 @@ grpc_extra_deps()
 load("@com_github_grpc_grpc//bazel:grpc_python_deps.bzl", "grpc_python_deps")
 grpc_python_deps()
 
+
+http_archive(
+  name = "com_github_glog_glog",
+  # sha256 = "cbba86b5a63063999e0fc86de620a3ad22d6fd2aa5948bff4995dcd851074a0b",
+  strip_prefix = "glog-0.6.0",
+  urls = ["https://primihub.oss-cn-beijing.aliyuncs.com/tools/glog-0.6.0.zip"],
+)
+
+http_archive(
+  name = "com_github_google_flatbuffers",
+  url = "https://primihub.oss-cn-beijing.aliyuncs.com/tools/flatbuffers-2.0.0.tar.gz",
+  strip_prefix = "flatbuffers-2.0.0",
+  sha256 = "9ddb9031798f4f8754d00fca2f1a68ecf9d0f83dfac7239af1311e4fd9a565c4",
+)
+
+# gflags Needed for glog
+http_archive(
+  name = "com_github_gflags_gflags",
+  sha256 = "34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf",
+  strip_prefix = "gflags-2.2.2",
+  urls = [
+    "https://primihub.oss-cn-beijing.aliyuncs.com/tools/gflags-2.2.2.tar.gz",
+  ],
+)
+
+# Abseil C++ libraries
+git_repository(
+  name = "com_google_absl",
+  remote = "https://gitee.com/primihub/abseil-cpp.git",
+  commit = "d583a5972641374d3b88b29d919ecd1b22b14ddd",
+  shallow_since = "1603283562 -0400",
+)
+
 # googletest
 
 
