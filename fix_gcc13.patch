@@ -1,0 +1,10 @@
+--- a/external/org_openmined_psi/private_set_intersection/cpp/golomb.cpp
++++ b/external/org_openmined_psi/private_set_intersection/cpp/golomb.cpp
+@@ -17,6 +17,7 @@
+ 
+ #include "private_set_intersection/cpp/golomb.h"
+ 
++#include <cstdint>
+ #include <algorithm>
+ #include <cmath>
+ #include <utility>
