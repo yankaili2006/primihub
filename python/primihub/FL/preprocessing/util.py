@@ -3,7 +3,15 @@ import numbers
 import numpy as np
 from scipy.sparse import issparse
 from itertools import compress
-from sklearn.utils import is_scalar_nan
+# 兼容性处理：不同版本的sklearn可能有不同的is_scalar_nan
+try:
+    from sklearn.utils import is_scalar_nan
+except ImportError:
+    # 如果sklearn版本没有is_scalar_nan，提供一个兼容实现
+    def is_scalar_nan(x):
+        """判断是否为标量NaN"""
+        return isinstance(x, float) and np.isnan(x)
+
 from sklearn.utils._encode import MissingValues, _nandict, _NaNCounter
 from sklearn.utils.validation import check_array, column_or_1d
 from sklearn.utils._array_api import get_namespace
