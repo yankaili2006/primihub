@@ -4,7 +4,15 @@ from sklearn.preprocessing import OneHotEncoder as SKL_OneHotEncoder
 from sklearn.preprocessing import OrdinalEncoder as SKL_OrdinalEncoder
 from sklearn.preprocessing import TargetEncoder as SKL_TargetEncoder
 from sklearn.preprocessing._encoders import _BaseEncoder as _SKL_BaseEncoder
-from sklearn.utils import is_scalar_nan
+# 兼容性处理：不同版本的sklearn可能有不同的is_scalar_nan
+try:
+    from sklearn.utils import is_scalar_nan
+except ImportError:
+    # 如果sklearn版本没有is_scalar_nan，提供一个兼容实现
+    def is_scalar_nan(x):
+        """判断是否为标量NaN"""
+        return isinstance(x, float) and np.isnan(x)
+
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length, _check_y
 from sklearn.utils._encode import _unique
