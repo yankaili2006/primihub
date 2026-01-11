@@ -187,6 +187,125 @@ wget https://primihub.oss-cn-beijing.aliyuncs.com/tools/meta_service_v1.tar.gz
 tar -zxf meta_service_v1.tar.gz
 ```
 
+### 4.5. Docker 镜像构建问题
+
+#### 问题7.1: 无法拉取基础镜像 primihub/primihub-base
+**错误信息**:
+```
+ERROR: failed to resolve source metadata for docker.io/primihub/primihub-base:latest:
+failed to do request: Head "https://registry-1.docker.io/v2/primihub/primihub-base/manifests/latest":
+dial tcp 108.160.170.43:443: i/o timeout
+```
+
+**原因**:
+- Docker Hub 网络连接超时
+- `primihub/primihub-base` 镜像不存在或无法访问
+- Docker daemon 代理配置未生效
+
+**解决方案 (推荐)**: 使用现有版本镜像作为基础
+
+1. **登录阿里云镜像仓库**:
+```bash
+echo "your_password" | docker login --username=primihub --password-stdin registry.cn-beijing.aliyuncs.com
+```
+
+2. **创建 Dockerfile.build**:
+```dockerfile
+FROM registry.cn-beijing.aliyuncs.com/primihub/primihub-node:1.7.0
+
+WORKDIR /app
+
+# 移除旧的构建产物
+RUN rm -rf bazel-bin cli node task_main primihub-cli primihub-node \
+    bazel-bin/cli bazel-bin/node bazel-bin/task_main \
+    bazel-bin/src/primihub/pybind_warpper/*.so \
+    bazel-bin/src/primihub/task/pybind_wrapper/*.so \
+    python/primihub/FL/model/*.so \
+    commit.txt 2>/dev/null || true
+
+# 复制新的构建产物
+ADD bazel-bin.tar.gz ./
+COPY src/primihub/protos/ src/primihub/protos/
+COPY commit.txt ./
+
+# 重新安装 Python 包
+RUN cd python && python3 setup.py develop
+
+WORKDIR /app
+EXPOSE 50050
+```
+
+3. **构建镜像**:
+```bash
+docker build -t primihub/primihub-node:1.8.0 -f Dockerfile.build .
+```
+
+**优势**:
+- ✅ 基于现有镜像增量更新，速度快（约 40 秒）
+- ✅ 避免基础镜像拉取问题
+- ✅ 减少网络依赖
+- ✅ 镜像大小: 4.58GB (磁盘), 1.01GB (内容)
+
+**替代方案**: 配置 Docker 镜像加速器
+
+编辑 `/etc/docker/daemon.json`:
+```json
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1panel.live",
+    "https://hub.rat.dev"
+  ]
+}
+```
+
+重启 Docker:
+```bash
+sudo systemctl restart docker
+```
+
+#### 问题7.2: Docker 构建时 apt/pip 安装失败
+**错误信息**:
+```
+E: Failed to fetch http://archive.ubuntu.com/ubuntu/...
+```
+
+**解决方案**:
+```bash
+# 方案1: 使用国内镜像源
+# 在 Dockerfile 中添加:
+RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+
+# 方案2: 使用代理
+# 构建时传递代理参数:
+docker build --build-arg http_proxy=http://127.0.0.1:7890 \
+             --build-arg https_proxy=http://127.0.0.1:7890 \
+             -t primihub/primihub-node:1.8.0 .
+```
+
+#### 问题7.3: 构建产物不完整
+**错误信息**:
+```
+ADD failed: file not found in build context
+```
+
+**解决方案**:
+```bash
+# 1. 确认构建产物存在
+ls -lh bazel-bin.tar.gz commit.txt
+
+# 2. 检查 tar 包内容
+tar -tzf bazel-bin.tar.gz | head -20
+
+# 3. 重新编译和打包
+make release mysql=y
+tar zcf bazel-bin.tar.gz \
+    bazel-bin/cli bazel-bin/node bazel-bin/task_main \
+    bazel-bin/src/primihub/pybind_warpper/*.so \
+    bazel-bin/src/primihub/task/pybind_wrapper/*.so \
+    python config example data
+```
+
 ### 5. 运行时问题
 
 #### 问题8: CLI连接失败
@@ -356,7 +475,8 @@ GLOG_v=3 ./primihub-cli --task_config_file="example/..."
 - **v1.0** (2026-01-01): 初始版本，基于实际测试经验整理
 - **v1.1** (2026-01-01): 添加网络代理配置和Python环境问题
 - **v2.0** (2026-01-01): 整合到构建脚本和Makefile中
+- **v2.1** (2026-01-09): 添加 Docker 镜像构建问题排查，包括基础镜像拉取失败、增量构建方案等
 
 ---
-*最后更新: $(date)*
+*最后更新: 2026-01-09*
 *基于 PrimiHub 实际构建测试经验*

@@ -28,6 +28,18 @@ http_archive(
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 rules_foreign_cc_dependencies()
 
+# Override gnumake_src to use local file
+http_archive(
+  name = "gnumake_src",
+  url = "file:///home/primihub/local_deps/make-4.3.tar.gz",
+  sha256 = "e05fdde47c5f7ca45cb697e973894ff4f5d79e13b750ed57d7b66d8defc78e19",
+  strip_prefix = "make-4.3",
+  build_file_content = """
+exports_files(["COPYING"], visibility = ["//visibility:public"])
+filegroup(name = "all_srcs", srcs = glob(["**"]), visibility = ["//visibility:public"])
+""",
+)
+
 http_archive(
   name = "openssl",
   url = "https://primihub.oss-cn-beijing.aliyuncs.com/tools/openssl-OpenSSL_1_1_1o.tar.gz",
@@ -92,6 +104,15 @@ http_archive(
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 # Includes boringssl, and other dependencies.
 grpc_deps()
+
+# Override zlib to use local file
+http_archive(
+  name = "zlib",
+  url = "file:///home/primihub/local_deps/zlib-cacf7f1d4e3d44d871b605da3b647f07d718623f.tar.gz",
+  sha256 = "6d4d6640ca3121620995ee255945161821218752b551a1a180f4215f7d124d45",
+  strip_prefix = "zlib-cacf7f1d4e3d44d871b605da3b647f07d718623f",
+  build_file = "@com_github_grpc_grpc//third_party:zlib.BUILD",
+)
 
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 # Loads transitive dependencies of GRPC.
@@ -483,6 +504,14 @@ git_repository(
 
 load("@org_openmined_psi//private_set_intersection:preload.bzl", "psi_preload")
 psi_preload()
+
+# Override private_join_and_compute dependency to use local file
+http_archive(
+    name = "private_join_and_compute",
+    strip_prefix = "private-join-and-compute-master",
+    url = "file:///home/primihub/local_deps/private-join-and-compute-master.zip",
+    sha256 = "f8cbd621aa404ace22b6ba1f578804b5f444433d3965274d13724db3b2760a24",
+)
 
 load("@org_openmined_psi//private_set_intersection:deps.bzl", "psi_deps")
 psi_deps()
