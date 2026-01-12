@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_primihub_UTIL_FILE_UTIL_H_
 #define SRC_primihub_UTIL_FILE_UTIL_H_
 

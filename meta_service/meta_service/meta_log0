@@ -1,0 +1,891 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::        (v2.3.8.RELEASE)
+
+2025-11-03 16:53:14.124  INFO 798303 --- [           main] com.primihub.simple.SimpleApplication    : Starting SimpleApplication v1.0-SNAPSHOT on primihub with PID 798303 (/home/primihub/github/primihub/meta_service/meta_service/meta-server.jar started by primihub in /home/primihub/github/primihub/meta_service/meta_service)
+2025-11-03 16:53:14.128  INFO 798303 --- [           main] com.primihub.simple.SimpleApplication    : No active profile set, falling back to default profiles: default
+2025-11-03 16:53:15.949  INFO 798303 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 7877 (http)
+2025-11-03 16:53:15.970  INFO 798303 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2025-11-03 16:53:15.971  INFO 798303 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.41]
+2025-11-03 16:53:16.046  INFO 798303 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2025-11-03 16:53:16.046  INFO 798303 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1840 ms
+ _ _   |_  _ _|_. ___ _ |    _ 
+| | |\/|_)(_| | |_\  |_)||_|_\ 
+     /               |         
+                        3.4.3.4 
+2025-11-03 16:53:16.903  INFO 798303 --- [           main] com.zaxxer.hikari.HikariDataSource       : sqlite3 - Starting...
+2025-11-03 16:53:17.063  INFO 798303 --- [           main] com.zaxxer.hikari.HikariDataSource       : sqlite3 - Start completed.
+2025-11-03 16:53:17.150  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : [{"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"},{"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"},{"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"},{"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"},{"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"},{"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"},{"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"},{"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"},{"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"},{"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}]
+2025-11-03 16:53:17.152  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/many
+2025-11-03 16:53:17.232  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/many Exception:I/O error on POST request for "http://127.0.0.1:7878/dataset/many": Connection refused (Connection refused); nested exception is java.net.ConnectException: Connection refused (Connection refused)
+2025-11-03 16:53:17.232  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/many end:1762159997232
+2025-11-03 16:53:17.236  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : [{"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"},{"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"},{"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"},{"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"},{"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"},{"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"},{"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"},{"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"},{"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"},{"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}]
+2025-11-03 16:53:17.237  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/many
+2025-11-03 16:53:17.239  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/many Exception:I/O error on POST request for "http://127.0.0.1:7879/dataset/many": Connection refused (Connection refused); nested exception is java.net.ConnectException: Connection refused (Connection refused)
+2025-11-03 16:53:17.240  INFO 798303 --- [           main] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/many end:1762159997239
+2025-11-03 16:53:17.444  INFO 798303 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+2025-11-03 16:53:17.677  INFO 798303 --- [           main] g.s.a.GrpcServerFactoryAutoConfiguration : Detected grpc-netty-shaded: Creating ShadedNettyGrpcServerFactory
+2025-11-03 16:53:17.875  INFO 798303 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 7877 (http) with context path ''
+2025-11-03 16:53:18.018  INFO 798303 --- [           main] n.d.b.g.s.s.AbstractGrpcServerFactory    : Registered gRPC service: primihub.rpc.DataSetService, bean: dataGrpcService, class: com.primihub.grpc.DataGrpcService
+2025-11-03 16:53:18.018  INFO 798303 --- [           main] n.d.b.g.s.s.AbstractGrpcServerFactory    : Registered gRPC service: grpc.health.v1.Health, bean: grpcHealthService, class: io.grpc.protobuf.services.HealthServiceImpl
+2025-11-03 16:53:18.018  INFO 798303 --- [           main] n.d.b.g.s.s.AbstractGrpcServerFactory    : Registered gRPC service: grpc.reflection.v1alpha.ServerReflection, bean: protoReflectionService, class: io.grpc.protobuf.services.ProtoReflectionService
+2025-11-03 16:53:18.200  INFO 798303 --- [           main] n.d.b.g.s.s.GrpcServerLifecycle          : gRPC Server started, listening on address: *, port: 7977
+2025-11-03 16:53:18.217  INFO 798303 --- [           main] com.primihub.simple.SimpleApplication    : Started SimpleApplication in 4.707 seconds (JVM running for 5.298)
+2025-11-03 16:53:19.438  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : get ids:[]
+2025-11-03 16:53:19.603  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "train_party_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/train_party_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:19.612  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:19.613  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:19.759  INFO 798303 --- [nio-7877-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-11-03 16:53:19.760  INFO 798303 --- [nio-7877-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2025-11-03 16:53:19.772  INFO 798303 --- [nio-7877-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 12 ms
+2025-11-03 16:53:19.824  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:19.824  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762159999824
+2025-11-03 16:53:19.825  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:19.825  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.048  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.048  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000048
+2025-11-03 16:53:20.049  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='train_party_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.057  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/test_party_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.063  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.063  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.074  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.074  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000074
+2025-11-03 16:53:20.076  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.077  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.087  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.087  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000087
+2025-11-03 16:53:20.087  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.094  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0_self"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/falcon/dataset/MNIST/input_0\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.100  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.100  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.111  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.111  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000111
+2025-11-03 16:53:20.112  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.112  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.125  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.125  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000125
+2025-11-03 16:53:20.125  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0_self', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.133  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0_next"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/falcon/dataset/MNIST/input_1\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.138  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.138  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.156  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.157  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000157
+2025-11-03 16:53:20.158  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.159  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.169  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.170  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000170
+2025-11-03 16:53:20.170  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0_next', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.174  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "fl_fake_data"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/FL/fake.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0"
+    type: INT64
+  }
+  data_type {
+    name: "1"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.179  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.179  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.190  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.190  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000190
+2025-11-03 16:53:20.192  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.192  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.209  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.209  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000209
+2025-11-03 16:53:20.209  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='fl_fake_data', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.216  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "psi_client_data_db"
+  driver: "SQLITE"
+  access_info: "{\n    \"db_path\": \"data/client_e.db3\",\n    \"tableName\": \"psi_client_data\",\n    \"type\": \"sqlite\"\n}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "company"
+    type: STRING
+  }
+  data_type {
+    name: "id"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.222  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"}
+2025-11-03 16:53:20.222  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.232  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.232  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000232
+2025-11-03 16:53:20.235  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"}
+2025-11-03 16:53:20.235  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.247  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.247  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000247
+2025-11-03 16:53:20.247  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='psi_client_data_db', accessInfo='', driver='SQLITE', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.253  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "psi_client_data"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/client_e.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "id"
+    type: STRING
+  }
+  data_type {
+    name: "mean radius"
+    type: DOUBLE
+  }
+  data_type {
+    name: "mean texture"
+    type: DOUBLE
+  }
+}
+
+2025-11-03 16:53:20.259  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"}
+2025-11-03 16:53:20.259  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.272  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.272  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000272
+2025-11-03 16:53:20.274  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"}
+2025-11-03 16:53:20.274  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.283  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.284  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000284
+2025-11-03 16:53:20.284  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='psi_client_data', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.295  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "mpc_statistics_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/mpc_test.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x_0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_9"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_10"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_11"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_12"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_13"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_14"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_15"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_16"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_17"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_18"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_19"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_20"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_21"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_22"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_23"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_24"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_25"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_26"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_27"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_28"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_29"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.300  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.300  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.309  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.310  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000310
+2025-11-03 16:53:20.311  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.311  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.325  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.325  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000325
+2025-11-03 16:53:20.325  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='mpc_statistics_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.331  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "mpc_arithmetic_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/mpc_arithmetic_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "A"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.335  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"}
+2025-11-03 16:53:20.336  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.344  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.344  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000344
+2025-11-03 16:53:20.348  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"}
+2025-11-03 16:53:20.348  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.362  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.363  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000363
+2025-11-03 16:53:20.363  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='mpc_arithmetic_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.370  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "FAKE_DATA_PARTY_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/FL/fake.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0"
+    type: INT64
+  }
+  data_type {
+    name: "1"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.380  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.380  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.389  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.390  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000390
+2025-11-03 16:53:20.392  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.392  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.407  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.407  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000407
+2025-11-03 16:53:20.407  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='FAKE_DATA_PARTY_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.433  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "train_party_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/train_party_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.438  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.438  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.446  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.447  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000447
+2025-11-03 16:53:20.447  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"train_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.447  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.457  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.457  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000457
+2025-11-03 16:53:20.457  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='train_party_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.474  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/test_party_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.478  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.478  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.485  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.485  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000485
+2025-11-03 16:53:20.486  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x0,DOUBLE;x1,DOUBLE;x2,DOUBLE;x3,DOUBLE;x4,DOUBLE;x5,DOUBLE;x6,DOUBLE;x7,DOUBLE;x8,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.486  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.499  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.499  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000499
+2025-11-03 16:53:20.499  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.520  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0_self"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/falcon/dataset/MNIST/input_0\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.524  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.524  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.533  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.533  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000533
+2025-11-03 16:53:20.534  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_self","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.534  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.541  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.541  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000541
+2025-11-03 16:53:20.541  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0_self', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.562  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "test_party_0_next"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/falcon/dataset/MNIST/input_1\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.567  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.568  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.578  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.578  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000578
+2025-11-03 16:53:20.580  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"test_party_0_next","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\t,STRING"}
+2025-11-03 16:53:20.580  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.588  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.589  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000589
+2025-11-03 16:53:20.589  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='test_party_0_next', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.598  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "fl_fake_data"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/FL/fake.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0"
+    type: INT64
+  }
+  data_type {
+    name: "1"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.602  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.603  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.610  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.610  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000610
+2025-11-03 16:53:20.611  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"fl_fake_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.611  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.624  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.624  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000624
+2025-11-03 16:53:20.624  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='fl_fake_data', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.633  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "psi_client_data_db"
+  driver: "SQLITE"
+  access_info: "{\n    \"db_path\": \"data/client_e.db3\",\n    \"tableName\": \"psi_client_data\",\n    \"type\": \"sqlite\"\n}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "company"
+    type: STRING
+  }
+  data_type {
+    name: "id"
+    type: STRING
+  }
+}
+
+2025-11-03 16:53:20.640  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"}
+2025-11-03 16:53:20.640  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.649  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.649  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000649
+2025-11-03 16:53:20.650  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data_db","accessInfo":"","driver":"SQLITE","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"company,STRING;id,STRING"}
+2025-11-03 16:53:20.650  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.660  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.661  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000660
+2025-11-03 16:53:20.661  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='psi_client_data_db', accessInfo='', driver='SQLITE', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.670  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "psi_client_data"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/client_e.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "id"
+    type: STRING
+  }
+  data_type {
+    name: "mean radius"
+    type: DOUBLE
+  }
+  data_type {
+    name: "mean texture"
+    type: DOUBLE
+  }
+}
+
+2025-11-03 16:53:20.672  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"}
+2025-11-03 16:53:20.673  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.681  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.681  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000681
+2025-11-03 16:53:20.682  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"psi_client_data","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"id,STRING;mean radius,DOUBLE;mean texture,DOUBLE"}
+2025-11-03 16:53:20.682  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.692  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.692  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000692
+2025-11-03 16:53:20.692  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='psi_client_data', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.719  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "mpc_statistics_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/mpc_test.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "x_0"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_1"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_2"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_3"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_4"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_5"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_6"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_7"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_8"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_9"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_10"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_11"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_12"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_13"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_14"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_15"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_16"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_17"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_18"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_19"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_20"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_21"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_22"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_23"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_24"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_25"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_26"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_27"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_28"
+    type: DOUBLE
+  }
+  data_type {
+    name: "x_29"
+    type: DOUBLE
+  }
+  data_type {
+    name: "y"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.723  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.724  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.734  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.734  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000734
+2025-11-03 16:53:20.735  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_statistics_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"x_0,DOUBLE;x_1,DOUBLE;x_2,DOUBLE;x_3,DOUBLE;x_4,DOUBLE;x_5,DOUBLE;x_6,DOUBLE;x_7,DOUBLE;x_8,DOUBLE;x_9,DOUBLE;x_10,DOUBLE;x_11,DOUBLE;x_12,DOUBLE;x_13,DOUBLE;x_14,DOUBLE;x_15,DOUBLE;x_16,DOUBLE;x_17,DOUBLE;x_18,DOUBLE;x_19,DOUBLE;x_20,DOUBLE;x_21,DOUBLE;x_22,DOUBLE;x_23,DOUBLE;x_24,DOUBLE;x_25,DOUBLE;x_26,DOUBLE;x_27,DOUBLE;x_28,DOUBLE;x_29,DOUBLE;y,INT64"}
+2025-11-03 16:53:20.735  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.742  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.742  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000742
+2025-11-03 16:53:20.742  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='mpc_statistics_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.753  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "mpc_arithmetic_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/mpc_arithmetic_0.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "A"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.756  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"}
+2025-11-03 16:53:20.756  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.768  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.769  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000769
+2025-11-03 16:53:20.770  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"mpc_arithmetic_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"A,INT64"}
+2025-11-03 16:53:20.770  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.779  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.780  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000780
+2025-11-03 16:53:20.780  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='mpc_arithmetic_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:20.788  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : request ---- toString:meta_info {
+  id: "FAKE_DATA_PARTY_0"
+  driver: "CSV"
+  access_info: "{\"data_path\":\"data/FL/fake.csv\",\"schema\":\"\",\"type\":\"csv\"}"
+  address: "node0:127.0.0.1:50050:0:"
+  data_type {
+    name: "0"
+    type: INT64
+  }
+  data_type {
+    name: "1"
+    type: INT64
+  }
+}
+
+2025-11-03 16:53:20.791  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.791  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7878/dataset/one
+2025-11-03 16:53:20.798  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.798  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7878/dataset/one end:1762160000798
+2025-11-03 16:53:20.799  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : {"id":"FAKE_DATA_PARTY_0","accessInfo":"","driver":"CSV","address":"node0:127.0.0.1:50050:0:","visibility":"PUBLIC","available":"Available","holder":0,"fields":"0,INT64;1,INT64"}
+2025-11-03 16:53:20.799  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : http://127.0.0.1:7879/dataset/one
+2025-11-03 16:53:20.807  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : baseResultEntity code:0
+2025-11-03 16:53:20.807  INFO 798303 --- [ault-executor-0] c.primihub.simple.service.AsyncService   : addressAndApi api url:http://127.0.0.1:7879/dataset/one end:1762160000807
+2025-11-03 16:53:20.807  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : REGISTER ---- toString:DatSetEntity{id='FAKE_DATA_PARTY_0', accessInfo='', driver='CSV', address='node0:127.0.0.1:50050:0:', visibility='PUBLIC', available='Available', holder=0}
+2025-11-03 16:53:23.968  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data, psi_server_data]
+2025-11-03 16:53:23.991  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data]
+2025-11-03 16:53:58.850  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : get ids:[psi_server_data, psi_client_data]
+2025-11-03 16:53:58.865  INFO 798303 --- [ault-executor-0] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data]
+2025-11-03 17:08:11.339  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data, psi_server_data]
+2025-11-03 17:08:11.356  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data]
+2025-11-03 17:08:16.793  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[test_party_1, train_party_1, test_party_2, train_party_2, test_party_0, train_party_0]
+2025-11-03 17:08:16.814  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[train_party_0]
+2025-11-03 17:08:16.821  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[test_party_0]
+2025-11-03 17:08:32.137  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[iv_filter_guest, iv_filter_host]
+2025-11-03 17:08:36.698  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[FAKE_DATA_PARTY_1, FAKE_DATA_PARTY_0]
+2025-11-03 17:08:36.714  INFO 798303 --- [ault-executor-1] com.primihub.grpc.DataGrpcService        : get ids:[FAKE_DATA_PARTY_0]
+2025-11-03 17:10:10.841  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[test_party_1, mpc_statistics_1, mpc_statistics_0, test_party_0, mpc_statistics_2, test_party_2]
+2025-11-03 17:10:10.867  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[mpc_statistics_0]
+2025-11-03 17:10:10.874  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[test_party_0]
+2025-11-03 17:10:22.564  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data, psi_server_data]
+2025-11-03 17:10:22.574  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data]
+2025-11-03 17:10:53.705  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data, psi_server_data]
+2025-11-03 17:10:53.718  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[psi_client_data]
+2025-11-03 17:10:53.773  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[test_party_0, train_party_0, train_party_1, test_party_1, train_party_2, test_party_2]
+2025-11-03 17:10:53.787  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[train_party_0]
+2025-11-03 17:10:53.796  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[test_party_0]
+2025-11-03 17:10:53.847  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[iv_filter_host, iv_filter_guest]
+2025-11-03 17:10:53.911  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[FAKE_DATA_PARTY_1, FAKE_DATA_PARTY_0]
+2025-11-03 17:10:53.923  INFO 798303 --- [ault-executor-2] com.primihub.grpc.DataGrpcService        : get ids:[FAKE_DATA_PARTY_0]

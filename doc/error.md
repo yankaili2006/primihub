@@ -91,3 +91,81 @@ set proxy
     make: *** [Makefile:177: build_libs] Error 2
     make: Leaving directory '/private/var/tmp/_bazel_liyankai/cb6f6703cfdeb7b1b37d6df6c4eeb127/sandbox/darwin-sandbox/399/execroot/__main__/bazel-out/darwin_arm64-fastbuild/bin/external/openssl/openssl.build_tmpdir'
 
+### 6. Microsoft APSI 编译错误 - digit_t 类型未定义
+
+#### 错误信息
+```
+external/mircrosoft_apsi/common/apsi/fourq/eccp2_core.c:504:49: error: 'digit_t' undeclared
+external/mircrosoft_apsi/common/apsi/fourq/eccp2_core.c:504:57: error: expected ')' before 'scalar'
+```
+
+#### 错误原因
+Microsoft APSI 依赖库中的 FourQ 密码库存在架构兼容性问题，`digit_t` 类型在特定编译环境下未正确定义。
+
+#### 解决方案
+**临时解决方案（开发测试用）：**
+1. 创建简单的 task_main 替代程序：
+```bash
+g++ -std=c++17 -o bazel-bin/task_main simple_task_main.cc
+```
+
+**完整解决方案：**
+1. 修复 Microsoft APSI 依赖库的架构兼容性问题
+2. 确保 FourQ 库正确配置 digit_t 类型定义
+3. 重新构建完整的 task_main
+
+### 7. C++17 兼容性错误
+
+#### 错误信息
+```
+external/ph_communication/network/channel_interface.h:405:49: error: expected unqualified-id before ',' token
+external/ph_communication/network/channel_interface.h:524:23: error: 'string_view' is not a member of 'std'
+```
+
+#### 错误原因
+外部依赖库 `ph_communication` 使用了 C++17 特性（如 `std::string_view`），但在某些编译环境下未正确配置 C++17 标准。
+
+#### 解决方案
+1. 确保编译环境支持 C++17
+2. 在 .bazelrc 中正确配置 C++17 编译选项
+3. 更新外部依赖库以兼容 C++17 标准
+
+### 8. task_main 缺失导致任务执行失败
+
+#### 错误信息
+```
+ERROR: 72
+task execute encountes error
+```
+
+#### 错误原因
+PrimiHub 系统默认使用 PROCESS 模式执行任务，需要调用 `task_main` 可执行文件。当 `task_main` 不存在时，任务执行失败并返回错误码 72。
+
+#### 解决方案
+**方案一：使用 THREAD 模式（推荐用于开发）**
+修改 `src/primihub/node/worker/worker.h`：
+```cpp
+TaskRunMode task_run_mode_{TaskRunMode::THREAD};
+// TaskRunMode task_run_mode_{TaskRunMode::PROCESS};
+```
+
+**方案二：提供 task_main 替代程序**
+创建简单的 task_main 可执行文件作为临时解决方案。
+
+### 9. 文件系统命名空间错误
+
+#### 错误信息
+```
+src/primihub/common/config/config.cc:34:3: error: 'fs' has not been declared
+```
+
+#### 错误原因
+C++17 文件系统库的命名空间使用问题。
+
+#### 解决方案
+修改 `src/primihub/common/config/config.cc`：
+```cpp
+#include <filesystem>
+namespace fs = std::filesystem;
+```
+

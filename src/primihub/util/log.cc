@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #include "src/primihub/util/log.h"
 
 #ifdef _MSC_VER

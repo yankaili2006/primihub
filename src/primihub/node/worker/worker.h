@@ -111,8 +111,8 @@ class Worker {
   std::atomic<bool> scheduler_finished{false};
 
   // task run mode
-  // TaskRunMode task_run_mode_{TaskRunMode::THREAD};
-  TaskRunMode task_run_mode_{TaskRunMode::PROCESS};
+  TaskRunMode task_run_mode_{TaskRunMode::THREAD};
+  // TaskRunMode task_run_mode_{TaskRunMode::PROCESS};
   std::unique_ptr<Poco::ProcessHandle> process_handler_{nullptr};
 };
 }  // namespace primihub

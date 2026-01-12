@@ -119,8 +119,11 @@ int main(int argc, char **argv) {
     FLAGS_colorlogtostderr = true;
     FLAGS_alsologtostderr = true;
     FLAGS_log_dir = "./log";
-    FLAGS_max_log_size = 10;
+    FLAGS_max_log_size = 10; // 10MB per log file
     FLAGS_stop_logging_if_full_disk = true;
+    FLAGS_logbufsecs = 0; // Log immediately
+    FLAGS_minloglevel = 0; // Log everything
+    //     // // FLAGS_log_file_header = "PrimiHub Node Log"; // This flag is not available in glog // This flag is not available in glog // This flag is not available in glog
 
     absl::ParseCommandLine(argc, argv);
     // int service_port = absl::GetFlag(FLAGS_service_port);

@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_primihub_UTIL_NETWORK_SOCKET_COMMON_LOG_H_
 #define SRC_primihub_UTIL_NETWORK_SOCKET_COMMON_LOG_H_
 
@@ -17,17 +17,50 @@ class Log {
   Log(const Log& c) {
     std::lock_guard<std::mutex>l(const_cast<std::mutex&>(c.mLock));
     mMessages = c.mMessages;
+    maxMessages_ = c.maxMessages_;
   }
 
   std::vector<std::pair<uint64_t, std::string>> mMessages;
   std::mutex mLock;
+  size_t maxMessages_ = 10000; // Maximum number of messages to keep
 
   void push(const std::string& msg) {
     std::lock_guard<std::mutex>l(mLock);
     auto now = std::chrono::system_clock::now();
     auto ts = std::chrono::duration_cast<std::chrono::microseconds>(now - gStart).count();
 
+    // Truncate if we exceed the maximum number of messages
+    if (mMessages.size() >= maxMessages_) {
+      // Keep the first 1000 and last 9000 messages (preserve recent logs)
+      const size_t keepFirst = 1000;
+      const size_t keepLast = 9000;
+      if (mMessages.size() > keepFirst + keepLast) {
+        std::vector<std::pair<uint64_t, std::string>> truncated;
+        truncated.reserve(keepFirst + keepLast + 1);
+        
+        // Keep first messages
+        truncated.insert(truncated.end(), 
+                        mMessages.begin(), 
+                        mMessages.begin() + keepFirst);
+        
+        // Add truncation notice
+        truncated.emplace_back(ts, "[LOG TRUNCATED - OLDER MESSAGES REMOVED]");
+        
+        // Keep last messages
+        truncated.insert(truncated.end(), 
+                        mMessages.end() - keepLast, 
+                        mMessages.end());
+        
+        mMessages = std::move(truncated);
+      }
+    }
+
     mMessages.emplace_back(ts, msg);
+  }
+
+  void setMaxMessages(size_t max) {
+    std::lock_guard<std::mutex>l(mLock);
+    maxMessages_ = max;
   }
 };
 

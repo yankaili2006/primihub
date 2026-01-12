@@ -1,4 +1,4 @@
-// Copyright [2022] <primihub>
+// Copyright [2023] <PrimiHub>>
 #ifndef SRC_PRIMIHUB_UTIL_REDIS_HELPER_H_
 #define SRC_PRIMIHUB_UTIL_REDIS_HELPER_H_
 

@@ -1,4 +1,4 @@
-// Copyright [2023] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_PRIMIHUB_COMMON_COMMON_H_
 #define SRC_PRIMIHUB_COMMON_COMMON_H_
 #ifdef __linux__

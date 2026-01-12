@@ -1,4 +1,4 @@
-// Copyright [2022] <primihub>
+// Copyright [2023] <PrimiHub>>
 #include <glog/logging.h>
 #include <string>
 #include "hiredis/hiredis.h"

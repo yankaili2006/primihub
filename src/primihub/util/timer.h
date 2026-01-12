@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_primihub_UTIL_NETWORK_SOCKET_COMMON_TIMER_H_
 #define SRC_primihub_UTIL_NETWORK_SOCKET_COMMON_TIMER_H_
 

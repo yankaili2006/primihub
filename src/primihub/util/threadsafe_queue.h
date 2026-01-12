@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_PRIMIHUB_UTIL_THREADSAFE_QUEUE_H_
 #define SRC_PRIMIHUB_UTIL_THREADSAFE_QUEUE_H_
 
