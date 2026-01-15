@@ -1,0 +1,158 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license.
+
+# Exports target SIGMA::sigma
+#
+# Creates variables:
+#
+#   SIGMA_FOUND : If either a static or a shared Microsoft SIGMA was found
+#   SIGMA_STATIC_FOUND : If a static Microsoft SIGMA library was found
+#   SIGMA_SHARED_FOUND : If a shared Microsoft SIGMA library was found
+#   SIGMA_C_FOUND : If a Microsoft SIGMA C export library was found
+#   SIGMA_VERSION : The full version number
+#   SIGMA_VERSION_MAJOR : The major version number
+#   SIGMA_VERSION_MINOR : The minor version number
+#   SIGMA_VERSION_PATCH : The patch version number
+#   SIGMA_DEBUG : Set to non-zero value if library is compiled with extra debugging code (very slow!)
+#   SIGMA_BUILD_TYPE : The build type (e.g., "Release" or "Debug")
+#
+#   SIGMA_USE_CXX17 : Set to non-zero value if library is compiled as C++17 instead of C++14
+#   SIGMA_USE_STD_FOR_EACH_N : Set to non-zero value if library uses std::for_each_n for SIGMA_ITERATE
+#   SIGMA_USE_STD_BYTE : Set to non-zero value if library uses sigma_byte = std::byte as byte type
+#   SIGMA_USE_IF_CONSTEXPR : Set to non-zero value if library uses if constexpr instead of if
+#   SIGMA_USE_MAYBE_UNUSED : Set to non-zero value if library uses maybe_unused
+#   SIGMA_USE_NODISCARD : Set to non-zero value if library uses nodiscard
+#
+#   SIGMA_THROW_ON_TRANSPARENT_CIPHERTEXT : Set to non-zero value if library is compiled with extra
+#       validation code (little impact on performance)
+#   SIGMA_USE_GAUSSIAN_NOISE : Set to non-zero value if library is compiled to sample noise from a rounded Gaussian
+#       distribution (slower) instead of a centered binomial distribution (faster)
+#   SIGMA_AVOID_BRANCHING : Set to non-zero value if library is compiled to eliminate branching in critical conditional move operations.
+#   SIGMA_DEFAULT_PRNG : The default choice of PRNG (e.g., "Blake2xb" or "Shake256")
+#
+#   SIGMA_USE_MSGSL : Set to non-zero value if library is compiled with Microsoft GSL support
+#   SIGMA_USE_ZLIB : Set to non-zero value if library is compiled with ZLIB support
+#   SIGMA_USE_ZSTD : Set to non-zero value if library is compiled with Zstandard support
+#   SIGMA_USE_INTEL_HEXL: Set to non-zero value if library is compiled with Intel HEXL support
+#   SIGMA_CARRY_DEPS : Set to non-zero value if library is configured with SIGMA_BUILD_DEPS=ON and carries dependencies
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+macro(sigma_find_dependency dep)
+    find_dependency(${dep})
+    if(NOT ${dep}_FOUND)
+        if(NOT SIGMA_FIND_QUIETLY)
+            message(WARNING "Could not find dependency `${dep}` required by this configuration")
+        endif()
+        set(SIGMA_FOUND FALSE)
+        return()
+    endif()
+endmacro()
+
+set(SIGMA_FOUND FALSE)
+set(SIGMA_STATIC_FOUND FALSE)
+set(SIGMA_SHARED_FOUND FALSE)
+set(SIGMA_C_FOUND FALSE)
+set(SIGMA_VERSION @SIGMA_VERSION@)
+set(SIGMA_VERSION_MAJOR @SIGMA_VERSION_MAJOR@)
+set(SIGMA_VERSION_MINOR @SIGMA_VERSION_MINOR@)
+set(SIGMA_VERSION_PATCH @SIGMA_VERSION_PATCH@)
+set(SIGMA_DEBUG @SIGMA_DEBUG@)
+set(SIGMA_BUILD_TYPE @CMAKE_BUILD_TYPE@)
+
+set(SIGMA_USE_CXX17 @SIGMA_USE_CXX17@)
+set(SIGMA_USE_STD_FOR_EACH_N @SIGMA_USE_STD_FOR_EACH_N@)
+set(SIGMA_USE_STD_BYTE @SIGMA_USE_STD_BYTE@)
+set(SIGMA_USE_IF_CONSTEXPR @SIGMA_USE_IF_CONSTEXPR@)
+set(SIGMA_USE_MAYBE_UNUSED @SIGMA_USE_MAYBE_UNUSED@)
+set(SIGMA_USE_NODISCARD @SIGMA_USE_NODISCARD@)
+
+set(SIGMA_THROW_ON_TRANSPARENT_CIPHERTEXT @SIGMA_THROW_ON_TRANSPARENT_CIPHERTEXT@)
+set(SIGMA_USE_GAUSSIAN_NOISE @SIGMA_USE_GAUSSIAN_NOISE@)
+set(SIGMA_AVOID_BRANCHING @SIGMA_AVOID_BRANCHING@)
+set(SIGMA_DEFAULT_PRNG @SIGMA_DEFAULT_PRNG@)
+
+set(SIGMA_USE_MSGSL @SIGMA_USE_MSGSL@)
+set(SIGMA_USE_ZLIB @SIGMA_USE_ZLIB@)
+set(SIGMA_USE_ZSTD @SIGMA_USE_ZSTD@)
+set(SIGMA_USE_INTEL_HEXL @SIGMA_USE_INTEL_HEXL@)
+set(SIGMA_CARRY_DEPS @SIGMA_BUILD_DEPS@)
+
+# If SIGMA does not carry dependencies, we must look for them
+if(NOT SIGMA_CARRY_DEPS)
+    if(SIGMA_USE_MSGSL)
+        sigma_find_dependency(Microsoft.GSL)
+    endif()
+    if(SIGMA_USE_ZLIB)
+        sigma_find_dependency(ZLIB)
+    endif()
+    if(SIGMA_USE_ZSTD)
+        sigma_find_dependency(zstd)
+        if(NOT TARGET zstd::libzstd_static)
+            if(TARGET libzstd)
+                get_target_property(libzstd_type libzstd TYPE)
+                if(libzstd_type STREQUAL "SHARED")
+                    set(zstd_static "libzstd")
+                else()
+                    message(FATAL_ERROR "ZSTD must be static")
+                endif()
+            endif()
+        endif()
+    endif()
+    if(SIGMA_USE_INTEL_HEXL)
+        sigma_find_dependency(HEXL)
+    endif()
+endif()
+
+# Add the current directory to the module search path
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+sigma_find_dependency(Threads)
+
+include(${CMAKE_CURRENT_LIST_DIR}/SIGMATargets.cmake)
+
+if(TARGET SIGMA::sigma)
+    set(SIGMA_FOUND TRUE)
+    set(SIGMA_STATIC_FOUND TRUE)
+endif()
+
+if(TARGET SIGMA::sigma_shared)
+    set(SIGMA_FOUND TRUE)
+    set(SIGMA_SHARED_FOUND TRUE)
+endif()
+
+if(TARGET SIGMA::sigmac)
+    set(SIGMA_FOUND TRUE)
+    set(SIGMA_C_FOUND TRUE)
+endif()
+
+if(SIGMA_FOUND)
+    if(NOT SIGMA_FIND_QUIETLY)
+        message(STATUS "Microsoft SIGMA -> Version ${SIGMA_VERSION} detected")
+    endif()
+    if(SIGMA_DEBUG AND NOT SIGMA_FIND_QUIETLY)
+        message(STATUS "Performance warning: Microsoft SIGMA compiled in debug mode")
+    endif()
+    set(SIGMA_TARGETS_AVAILABLE "Microsoft SIGMA -> Targets available:")
+
+    if(SIGMA_STATIC_FOUND)
+        string(APPEND SIGMA_TARGETS_AVAILABLE " SIGMA::sigma")
+    endif()
+    if(SIGMA_SHARED_FOUND)
+        string(APPEND SIGMA_TARGETS_AVAILABLE " SIGMA::sigma_shared")
+    endif()
+    if(SIGMA_C_FOUND)
+        string(APPEND SIGMA_TARGETS_AVAILABLE " SIGMA::sigmac")
+    endif()
+    if(NOT SIGMA_FIND_QUIETLY)
+        message(STATUS ${SIGMA_TARGETS_AVAILABLE})
+    endif()
+else()
+    if(NOT SIGMA_FIND_QUIETLY)
+        message(STATUS "Microsoft SIGMA -> NOT FOUND")
+    endif()
+endif()

@@ -1,0 +1,18 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license.
+
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=${prefix}/lib
+includedir=${prefix}/@SIGMA_INCLUDES_INSTALL_DIR@
+
+Name: Microsoft SIGMA
+Version: @SIGMA_VERSION@
+Description: An easy-to-use homomorphic encryption library
+
+Requires: @SIGMA_PKGCONFIG_MSGSL_REQUIRES_STRING@
+Requires: @SIGMA_PKGCONFIG_ZLIB_REQUIRES_STRING@
+Requires: @SIGMA_PKGCONFIG_ZSTD_REQUIRES_STRING@
+Requires: @SIGMA_PKGCONFIG_INTEL_HEXL_REQUIRES_STRING@
+
+Libs: -L${libdir} -lsigma-@SIGMA_VERSION_MAJOR@.@SIGMA_VERSION_MINOR@
+Cflags: @SIGMA_LANG_FLAG@ -I${includedir}

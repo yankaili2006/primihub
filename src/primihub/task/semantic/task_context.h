@@ -25,23 +25,39 @@
 #include "src/primihub/util/network/link_factory.h"
 #include "src/primihub/util/network/link_context.h"
 #include "src/primihub/util/threadsafe_queue.h"
-#include "src/primihub/node/server_config.h"
+#include "src/primihub/common/config/server_config.h"
 
 namespace primihub::task {
 // temp data storage
 /**
  * TaskContext
- * contains temperary storage, communication link info
+ * contains temporary storage, communication link info
 */
 class TaskContext {
  public:
   TaskContext() {
     auto link_mode = primihub::network::LinkMode::GRPC;
     link_ctx_ = primihub::network::LinkFactory::createLinkContext(link_mode);
+    auto& server_config = primihub::ServerConfig::getInstance();
+    if (!server_config.IsInitFlag()) {
+      LOG(WARNING) << "instance is not init";
+    }
+
+    auto& host_cfg = server_config.getServiceConfig();
+    if (host_cfg.use_tls()) {
+      LOG(INFO) << "link_ctx_->initCertificate";
+      link_ctx_->initCertificate(server_config.getCertificateConfig());
+    }
   }
 
   explicit TaskContext(primihub::network::LinkMode mode) {
     link_ctx_ = primihub::network::LinkFactory::createLinkContext(mode);
+    auto& server_config = primihub::ServerConfig::getInstance();
+    auto& host_cfg = server_config.getServiceConfig();
+    if (host_cfg.use_tls()) {
+      LOG(ERROR) << "link_ctx_->initCertificate";
+      link_ctx_->initCertificate(server_config.getCertificateConfig());
+    }
   }
 
   void setTaskInfo(const std::string& job_id,

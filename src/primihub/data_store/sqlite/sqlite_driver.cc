@@ -30,16 +30,18 @@
 #include "src/primihub/util/arrow_wrapper_util.h"
 #include "src/primihub/util/util.h"
 #include "src/primihub/util/thread_local_data.h"
+#include "src/primihub/common/value_check_util.h"
 
 namespace primihub {
 // SQLiteAccessInfo implementation
 std::string SQLiteAccessInfo::toString() {
     std::stringstream ss;
     nlohmann::json js;
-    js["type"] = "sqlite";
+    js["type"] = kDriveType[DriverType::SQLITE];
     js["db_path"] = this->db_path_;
     js["tableName"] = this->table_name_;
-    ss << std::setw(4) << js;
+    // ss << std::setw(4) << js;
+    ss << js;
     return ss.str();
 }
 
@@ -52,10 +54,7 @@ retcode SQLiteAccessInfo::ParseFromJsonImpl(const nlohmann::json& access_info) {
     std::stringstream ss;
     ss << "parse sqlite access info failed, " << e.what()
         << " origin access info: [" << access_info << "]";
-    std::string err_msg = ss.str();
-    SetThreadLocalErrorMsg(err_msg);
-    LOG(ERROR) << err_msg;
-    return retcode::FAIL;
+    RaiseException(ss.str());
   }
   return retcode::SUCCESS;
 }
@@ -75,7 +74,7 @@ retcode SQLiteAccessInfo::ParseFromMetaInfoImpl(const DatasetMetaInfo& meta_info
   auto ret{retcode::SUCCESS};
   auto& access_info = meta_info.access_info;
   if (access_info.empty()) {
-    LOG(WARNING) << "access_info is emptry for id: " << meta_info.id;
+    LOG(WARNING) << "access_info is empty for id: " << meta_info.id;
     return retcode::SUCCESS;
   }
   try {
@@ -137,10 +136,7 @@ std::shared_ptr<Dataset> SQLiteCursor::readInternal(const std::string& query_sql
   if (db_connector == nullptr) {
     std::stringstream ss;
     ss << "db connector for sqlite is invalid";
-    std::string err_msg = ss.str();
-    SetThreadLocalErrorMsg(err_msg);
-    LOG(ERROR) << err_msg;
-    return nullptr;
+    RaiseException(ss.str());
   }
   SQLite::Statement sql_query(*db_connector, query_sql);
 
@@ -179,10 +175,7 @@ std::shared_ptr<Dataset> SQLiteCursor::readInternal(const std::string& query_sql
       std::stringstream ss;
       ss << "index out of range, current index: " << i << " "
           << "total colnum fields: " << schema_fields;
-      std::string err_msg = ss.str();
-      SetThreadLocalErrorMsg(err_msg);
-      LOG(ERROR) << err_msg;
-      return nullptr;
+      RaiseException(ss.str());
     }
     i++;
   }
@@ -468,7 +461,7 @@ SQLiteDriver::SQLiteDriver(const std::string &nodelet_addr,
 }
 
 void SQLiteDriver::setDriverType() {
-  driver_type = "SQLITE";
+  driver_type = kDriveType[DriverType::SQLITE];
 }
 
 std::unique_ptr<Cursor> SQLiteDriver::read() {
@@ -484,10 +477,7 @@ std::unique_ptr<Cursor> SQLiteDriver::read() {
       std::stringstream ss;
       ss << "create cursor failed: " << e.what()
           << " db path: " << access_info_ptr->db_path_;
-      std::string err_msg = ss.str();
-      SetThreadLocalErrorMsg(err_msg);
-      LOG(ERROR) << err_msg;
-      return nullptr; // nullptr
+      RaiseException(ss.str());
     }
   }
   if (access_info_ptr->Schema().empty()) {
@@ -513,7 +503,7 @@ std::unique_ptr<Cursor> SQLiteDriver::read(const std::string &conn_str) {
 std::string SQLiteDriver::buildQuerySQL(SQLiteAccessInfo* access_info) {
   auto& schema = access_info->Schema();
   if (schema.empty()) {
-    LOG(ERROR) << "dataset schema is empty";
+    RaiseException("dataset schema is empty");
     return std::string("");
   }
   auto& table_name = access_info->table_name_;
@@ -557,8 +547,7 @@ std::unique_ptr<Cursor> SQLiteDriver::GetCursor(const std::vector<int>& col_inde
   std::vector<std::string> column_names;
   std::string query_sql = BuildQuerySQL(*sqlite_access_info, col_index, &column_names);
   if (query_sql.empty()) {
-    LOG(ERROR) << "get query sql failed";
-    return nullptr;
+    RaiseException("get query sql failed");
   }
   return std::make_unique<SQLiteCursor>(query_sql, col_index, shared_from_this());
 }
@@ -581,17 +570,14 @@ std::unique_ptr<Cursor> SQLiteDriver::initCursor(const std::string &conn_str) {
   } catch (std::exception& e) {
     std::stringstream ss;
     ss << "create cursor failed: " << e.what();
-    std::string err_msg = ss.str();
-    SetThreadLocalErrorMsg(err_msg);
-    LOG(ERROR) << err_msg;
-    return nullptr; // nullptr
+    RaiseException(ss.str());
   }
 
   std::string &query_condition = conn_info[CONN_FIELDS::QUERY_CONDITION];
   auto sql_str = buildQuerySQL(table_name, query_condition);
   return std::make_unique<SQLiteCursor>(sql_str, shared_from_this());
 }
-// write data to specifiy table
+// write data to specify table
 int SQLiteDriver::write(std::shared_ptr<arrow::Table> table,
                         const std::string &table_name) {
   return 0;
@@ -645,10 +631,7 @@ std::string SQLiteDriver::BuildQuerySQL(const SQLiteAccessInfo& access_info,
       std::stringstream ss;
       ss << "query index is out of range, "
           << "index: " << index << " total columns: " << table_cols_.size();
-      std::string err_msg = ss.str();
-      SetThreadLocalErrorMsg(err_msg);
-      LOG(ERROR) << err_msg;
-      return std::string("");
+      RaiseException(ss.str());
     }
   }
   sql_str[sql_str.size()-1] = ' ';

@@ -17,6 +17,7 @@ cc_library(
         "//src/primihub/data_store/csv:csv_driver",
         "//src/primihub/data_store/sqlite:sqlite_driver",
         "//src/primihub/data_store/image:image_driver",
+        "//src/primihub/data_store/parquet:parquet_driver",
     ] + select({
         "enable_mysql_driver": [
             "//src/primihub/data_store/mysql:mysql_driver",
@@ -35,6 +36,7 @@ cc_library(
         "driver.cc",
     ],
     deps = [
+        ":driver_constant",
         "//src/primihub/common:common_defination",
         "//src/primihub/util:arrow_wrapper_util",
         "@com_github_jbeder_yaml_cpp//:yaml-cpp",
@@ -50,4 +52,9 @@ cc_library(
     deps = [
         "//src/primihub/common:data_type_defination",
     ],
+)
+
+cc_library(
+  name = "driver_constant",
+  hdrs = ["driver_constant.h"],
 )

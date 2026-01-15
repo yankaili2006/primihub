@@ -1,10 +1,43 @@
-#include "src/primihub/util/file_util.h"
+/*
+* Copyright (c) 2023 by PrimiHub
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*      https://www.apache.org/licenses/
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
+#include "src/primihub/util/file_util.h"
 #include <unistd.h>
 #include <glog/logging.h>
 #include <cstdio>
+#include <fstream>
+#include "src/primihub/common/config/server_config.h"
 
 namespace primihub {
+retcode ReadFileContents(const std::string& fpath, std::string* contents) {
+  bool exist_flag = primihub::FileExists(fpath);
+  if (!exist_flag) {
+    LOG(ERROR) << "task config file is not exist, path: " << fpath;
+    return retcode::FAIL;
+  }
+  std::ifstream f_in_stream(fpath);
+  std::string contents_((std::istreambuf_iterator<char>(f_in_stream)),
+                      std::istreambuf_iterator<char>());
+  if (contents_.empty()) {
+    LOG(ERROR) << "task config is empty, please check, path: " << fpath;
+    return retcode::FAIL;
+  }
+  *contents = std::move(contents_);
+  return retcode::SUCCESS;
+}
 
 std::vector<std::string> GetFiles(const std::string& path) {
   if (path.empty()) {
@@ -55,6 +88,7 @@ bool FileExists(const std::string& file_path) {
     return false;
   }
 }
+
 bool RemoveFile(const std::string& file_path) {
   if (::remove(file_path.c_str()) == 0) {
     return true;
@@ -63,4 +97,39 @@ bool RemoveFile(const std::string& file_path) {
     return false;
   }
 }
+
+int64_t FileSize(const std::string& file_path) {
+  if (!FileExists(file_path)) {
+    return 0;
+  } else {
+    struct stat file_stat;
+    ::stat(file_path.c_str(), &file_stat);
+    return file_stat.st_size;
+  }
+}
+
+std::string CompletePath(const std::string& default_storage_path,
+                         const std::string& file_path) {
+  if (file_path.empty()) {
+    LOG(ERROR) << "file name is empty";
+    return std::string("");
+  }
+  // if file path start with "/", it is considered as absolute path
+  // or relative path
+  if (file_path[0] == '/') {
+    return file_path;
+  } else {
+    if (default_storage_path.empty()) {
+      return file_path;
+    }
+    return default_storage_path + "/" + file_path;
+  }
+}
+
+std::string CompletePath(const std::string& file_path) {
+  auto& ins = ServerConfig::getInstance();
+  auto& storage_path = ins.StoragePath();
+  return CompletePath(storage_path, file_path);
+}
+
 }  // namespace primihub

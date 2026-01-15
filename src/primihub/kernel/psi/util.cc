@@ -24,6 +24,7 @@
 #include <map>
 #include "src/primihub/util/file_util.h"
 #include "src/primihub/util/util.h"
+#include "src/primihub/common/value_check_util.h"
 
 namespace primihub::psi {
 
@@ -97,7 +98,7 @@ retcode PsiCommonUtil::LoadDatasetFromTable(
 
   col_data->resize(num_rows);
   if (num_cols == 0) {
-    LOG(ERROR) << "no colum selected";
+    LOG(ERROR) << "no column selected";
     return retcode::FAIL;
   }
 
@@ -132,7 +133,7 @@ retcode PsiCommonUtil::LoadDatasetFromTable(
     bool is_string = this->isString(type_id);
     size_t index = 0;
     if (is_numeric) {
-      VLOG(5) << "covert numeric to string";
+      VLOG(5) << "convert numeric to string";
       if (this->isNumeric64Type(type_id)) {
         for (int i = 0; i < chunk_size; i++) {
           auto array = std::static_pointer_cast<
@@ -154,8 +155,9 @@ retcode PsiCommonUtil::LoadDatasetFromTable(
           }
         }
       } else {
-        LOG(ERROR) << "unknown type: " << static_cast<int>(type_id);
-        return retcode::FAIL;
+        std::stringstream ss;
+        ss << "Unknown column type: " << col_ptr->type()->name();
+        RaiseException(ss.str());
       }
     } else if (is_string) {
       for (int i = 0; i < chunk_size; i++) {
@@ -167,8 +169,10 @@ retcode PsiCommonUtil::LoadDatasetFromTable(
         }
       }
     } else {
-      LOG(ERROR) << "unsupported data type for Psi: type: " << type_id;
-      return retcode::FAIL;
+      std::stringstream ss;
+      ss << "Unsupported data type for Psi: type: "
+         << col_ptr->type()->name();
+      RaiseException(ss.str());
     }
   }
   return retcode::SUCCESS;
@@ -208,7 +212,7 @@ retcode PsiCommonUtil::LoadDatasetInternal(
     return retcode::FAIL;
   }
   auto& schema = driver->dataSetAccessInfo()->Schema();
-  // construct new schema and check data type for each selected colums,
+  // construct new schema and check data type for each selected columns,
   // float type is not allowed
   std::decay_t<decltype(schema)> new_schema{};
   for (const auto index : col_index) {
@@ -217,9 +221,9 @@ retcode PsiCommonUtil::LoadDatasetInternal(
     if (!IsValidDataType(static_cast<arrow::Type::type>(type))) {
       auto arrow_schema = driver->dataSetAccessInfo()->ArrowSchema();
       auto data_type = arrow_schema->field(index);
-      LOG(ERROR) << "data type: " << data_type->ToString()
-                 << " is not supported";
-      return retcode::FAIL;
+      std::stringstream ss;
+      ss << data_type->ToString() << " is not supported for PSI";
+      RaiseException(ss.str());
     }
     type = arrow::Type::type::STRING;
     new_schema.push_back(std::move(filed));
@@ -249,13 +253,13 @@ retcode PsiCommonUtil::LoadDatasetInternal(
   auto cursor = driver->read(conn_str);
   auto ds = cursor->read();
   if (ds == nullptr) {
-      return retcode::FAIL;
+    return retcode::FAIL;
   }
   auto& table = std::get<std::shared_ptr<arrow::Table>>(ds->data);
   int col_count = table->num_columns();
   bool all_colum_valid = validationDataColum(data_cols, col_count);
   if (!all_colum_valid) {
-      return retcode::FAIL;
+    return retcode::FAIL;
   }
   return LoadDatasetFromTable(table, data_cols, col_array);
 }
@@ -281,10 +285,10 @@ retcode PsiCommonUtil::SaveDataToCSVFile(
       std::vector<std::string> vec;
       str_split(data[i], &vec, DATA_RECORD_SEP);
       if (vec.size() != col_names.size()) {
-        LOG(ERROR) << "data colum does not match, expected: "
-                   << col_names.size()
-                   << " but get: " << vec.size();
-        return retcode::FAIL;
+        std::stringstream ss;
+        ss << "number of data columns does not match, expected: "
+           << col_names.size() << ", but get: " << vec.size();
+        RaiseException(ss.str());
       }
       for (int j = 0; j < vec.size(); j ++) {
         result_data[j][i] = std::move(vec[j]);
@@ -309,13 +313,15 @@ retcode PsiCommonUtil::SaveDataToCSVFile(
   auto driver = DataDirverFactory::getDriver("CSV", "test address");
   auto csv_driver = std::dynamic_pointer_cast<CSVDriver>(driver);
   if (ValidateDir(file_path)) {
-    LOG(ERROR) << "can't access file path: " << file_path;
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't access file path: " << file_path;
+    RaiseException(ss.str());
   }
   int ret = csv_driver->write(table, file_path);
   if (ret != 0) {
-    LOG(ERROR) << "Save PSI result to file " << file_path << " failed.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Save PSI result to file " << file_path << " failed.";
+    RaiseException(ss.str());
   }
   LOG(INFO) << "Save PSI result to " << file_path << ".";
   return retcode::SUCCESS;
@@ -336,13 +342,15 @@ retcode PsiCommonUtil::saveDataToCSVFile(
   auto driver = DataDirverFactory::getDriver("CSV", "test address");
   auto csv_driver = std::dynamic_pointer_cast<CSVDriver>(driver);
   if (ValidateDir(file_path)) {
-    LOG(ERROR) << "can't access file path: " << file_path;
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't access file path: " << file_path;
+    RaiseException(ss.str());
   }
   int ret = csv_driver->write(table, file_path);
   if (ret != 0) {
-    LOG(ERROR) << "Save PSI result to file " << file_path << " failed.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Save PSI result to file " << file_path << " failed.";
+    RaiseException(ss.str());
   }
   LOG(INFO) << "Save PSI result to " << file_path << ".";
   return retcode::SUCCESS;
@@ -458,6 +466,7 @@ retcode PsiCommonUtil::ExtractDataFromTrunkArray(
       fut.get();
     }
   }
+  return retcode::SUCCESS;
 }
 
 retcode PsiCommonUtil::ExtractDataFromArray(
@@ -546,5 +555,6 @@ retcode PsiCommonUtil::ExtractDataFromArray(
       fut.get();
     }
   }
+  return retcode::SUCCESS;
 }
 }  // namespace primihub::psi

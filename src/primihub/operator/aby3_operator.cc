@@ -15,10 +15,11 @@
  */
 
 #include "src/primihub/operator/aby3_operator.h"
-#include "cryptoTools/Common/Defines.h"
 #include <memory>
-namespace primihub {
+#include <utility>
+#include "cryptoTools/Common/Defines.h"
 
+namespace primihub {
 int MPCOperator::setup(std::string next_ip, std::string prev_ip,
                        u32 next_port, u32 prev_port) {
   return 0;
@@ -37,6 +38,7 @@ int MPCOperator::setup(std::shared_ptr<aby3::CommPkg> comm_pkg) {
 int MPCOperator::setup(aby3::CommPkg* comm_pkg) {
   comm_pkg_ref_ = comm_pkg;
   InitEngine();
+  return 0;
 }
 
 retcode MPCOperator::InitEngine() {
@@ -94,8 +96,8 @@ si64Matrix MPCOperator::createSharesByShape(u64 pIdx) {
 
 // only support val is column vector
 sbMatrix MPCOperator::createBinSharesByShape(i64Matrix &val, u64 bitCount) {
-  std::array<u64, 2> size{static_cast<unsigned long long>(val.rows()),
-                          static_cast<unsigned long long>(bitCount)};
+  std::array<u64, 2> size{static_cast<u64>(val.rows()),
+                          static_cast<u64>(bitCount)};
   this->mNext().asyncSendCopy(size);
   this->mPrev().asyncSendCopy(size);
 
@@ -250,8 +252,13 @@ si64Matrix MPCOperator::MPC_Mul(std::vector<si64Matrix> sharedInt) {
 }
 
 si64Matrix MPCOperator::MPC_Dot_Mul(const si64Matrix &A, const si64Matrix &B) {
-  if (A.cols() != B.cols() || A.rows() != B.rows())
-    throw std::runtime_error(LOCATION);
+  if (A.cols() != B.cols() || A.rows() != B.rows()) {
+    std::stringstream ss;
+    ss << "type: si64Matrix, Shape does not match, "
+        << "A(row, col): (" << A.rows() << ": " << A.cols()<< ") "
+        << "B(row, col): (" << B.rows() << ": " << B.cols()<< ") ";
+    RaiseException(ss.str())
+  }
 
   si64Matrix ret(A.rows(), A.cols());
   eval.asyncDotMul(runtime, A, B, ret).get();
@@ -287,7 +294,7 @@ void MPCOperator::MPC_Compare(i64Matrix &m, sbMatrix &sh_res) {
       else if (partyIdx == (i + 2) % 3)
         this->mNext().recv(shape);
       else
-        throw std::runtime_error("Message recv logic error.");
+        RaiseException("Message recv logic error.");
     }
 
     all_party_shape.emplace_back(shape);
@@ -307,7 +314,7 @@ void MPCOperator::MPC_Compare(i64Matrix &m, sbMatrix &sh_res) {
   for (uint64_t i = 0; i < 3; i++) {
     if (all_party_shape[i][0] == 0 && all_party_shape[i][1] == 0) {
       if (skip_index != -1) {
-        throw std::runtime_error(
+        RaiseException(
             "There are two party that don't provide any value at last, but "
             "compare operator require value from two party.");
       } else {
@@ -317,7 +324,7 @@ void MPCOperator::MPC_Compare(i64Matrix &m, sbMatrix &sh_res) {
   }
 
   if (skip_index == -1)
-    throw std::runtime_error(
+    RaiseException(
         "This operator is binary, can only handle value from two party.");
 
   // Shape of matrix in two party shoubld be the same.
@@ -332,8 +339,10 @@ void MPCOperator::MPC_Compare(i64Matrix &m, sbMatrix &sh_res) {
   }
 
   if ((all_party_shape[0][0] != all_party_shape[1][0]) ||
-      (all_party_shape[0][1] != all_party_shape[1][1]))
-    throw std::runtime_error("Shape of matrix in two party must be the same.");
+      (all_party_shape[0][1] != all_party_shape[1][1])) {
+    RaiseException("Shape of matrix in two party must be the same.");
+  }
+
 
   // Set value to it's negative for some party.
   if (skip_index == 0 || skip_index == 1) {
@@ -394,7 +403,7 @@ void MPCOperator::MPC_Compare(i64Matrix &m, sbMatrix &sh_res) {
       m = m.array() * -1;
   }
 
-  LOG(INFO) << "Finish evalute MSB circuit.";
+  LOG(INFO) << "Finish evaluate MSB circuit.";
 }
 
 void MPCOperator::MPC_Compare(sbMatrix &sh_res) {
@@ -437,8 +446,10 @@ void MPCOperator::MPC_Compare(sbMatrix &sh_res) {
 
   // Shape of matrix in two party shoubld be the same.
   if ((all_party_shape[0][0] != all_party_shape[1][0]) ||
-      (all_party_shape[0][1] != all_party_shape[1][1]))
-    throw std::runtime_error("Shape of matrix in two party must be the same.");
+      (all_party_shape[0][1] != all_party_shape[1][1])) {
+    RaiseException("Shape of matrix in two party must be the same.");
+  }
+
 
   LOG(INFO) << "Party " << (partyIdx + 1) % 3 << " and party "
             << (partyIdx + 2) % 3 << " provide value for MPC compare.";
@@ -471,4 +482,4 @@ void MPCOperator::MPC_Compare(sbMatrix &sh_res) {
   LOG(INFO) << "Finish evaluate MSB circuit.";
 }
 
-} // namespace primihub
+}  // namespace primihub

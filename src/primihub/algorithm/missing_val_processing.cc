@@ -1,5 +1,20 @@
-#include "src/primihub/algorithm/missing_val_processing.h"
+/*
+* Copyright (c) 2023 by PrimiHub
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*      https://www.apache.org/licenses/
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
+#include "src/primihub/algorithm/missing_val_processing.h"
 #include <arrow/api.h>
 #include <arrow/array.h>
 #include <arrow/array/array_binary.h>
@@ -21,6 +36,8 @@
 #include <float.h>
 #include <iostream>
 #include <limits>
+#include <utility>
+#include <unordered_map>
 
 // #include "src/primihub/common/type/fixed_point.h"
 #include "src/primihub/data_store/csv/csv_driver.h"
@@ -28,6 +45,8 @@
 #include "src/primihub/data_store/driver.h"
 #include "src/primihub/data_store/factory.h"
 #include "src/primihub/util/network/message_interface.h"
+#include "src/primihub/util/file_util.h"
+#include "src/primihub/common/value_check_util.h"
 
 using arrow::Array;
 using arrow::DoubleArray;
@@ -35,7 +54,7 @@ using arrow::Int64Array;
 using arrow::StringArray;
 using arrow::Table;
 
-using namespace rapidjson;
+using namespace rapidjson;   // NOLINT
 
 namespace primihub {
 void MissingProcess::_spiltStr(std::string str, const std::string &split,
@@ -57,7 +76,6 @@ void MissingProcess::_spiltStr(std::string str, const std::string &split,
 
 int MissingProcess::_strToInt64(const std::string &str, int64_t &i64_val) {
   try {
-
     VLOG(5) << "Convert string '" << str << "' into int64 value.";
     size_t conv_length = 0;
     i64_val = stoll(str, &conv_length);
@@ -66,14 +84,13 @@ int MissingProcess::_strToInt64(const std::string &str, int64_t &i64_val) {
     }
   } catch (std::invalid_argument const &ex) {
     LOG(ERROR) << "Can't convert string " << str
-               << " to int64 value, invalid numberic string.";
+               << " to int64 value, invalid numeric string.";
     return -1;
   } catch (std::out_of_range const &ex) {
     LOG(ERROR) << "Can't convert string " << str
                << " to int64 value, value in string out of range.";
     return -2;
   }
-
   return 0;
 }
 
@@ -87,14 +104,13 @@ int MissingProcess::_strToDouble(const std::string &str, double &d_val) {
     }
   } catch (std::invalid_argument &ex) {
     LOG(WARNING) << "Can't convert string " << str
-                 << " to double value, invalid numberic string.";
+                 << " to double value, invalid numeric string.";
     return -1;
   } catch (std::out_of_range &ex) {
     LOG(WARNING) << "Can't convert string " << str
                  << " to double value, value in string out of range.";
     return -2;
   }
-
   return 0;
 }
 
@@ -104,7 +120,6 @@ int MissingProcess::_avoidStringArray(std::shared_ptr<arrow::Array> array) {
     LOG(WARNING) << "StringArray is bad, " << result.status() << ".";
     return 1;
   }
-
   return 0;
 }
 
@@ -115,7 +130,6 @@ void MissingProcess::_buildNewColumn(std::vector<std::string> &col_val,
   for (size_t i = 0; i < col_val.size(); i++) {
     builder.Append(col_val[i]);
   }
-
   builder.Finish(&array);
 }
 
@@ -385,12 +399,14 @@ int MissingProcess::loadParams(primihub::rpc::Task &task) {
               << iter->value.GetInt() << ".";
   }
   new_dataset_id_ = doc_ds["newDataSetId"].GetString();
-  if (doc_ds.HasMember("outputFilePath") && doc_ds["outputFilePath"].IsString()) {
+  if (doc_ds.HasMember("outputFilePath") &&
+      doc_ds["outputFilePath"].IsString()) {
     new_dataset_path_ = doc_ds["outputFilePath"].GetString();
   } else {
     new_dataset_path_ = "./" + new_dataset_id_ + ".csv";
     LOG(WARNING) << "using default path: " << new_dataset_path_;
   }
+  new_dataset_path_ = CompletePath(new_dataset_path_);
 
   LOG(INFO) << "New id of new dataset is " << new_dataset_id_ << ". "
             << "new dataset path: " << new_dataset_path_;
@@ -422,7 +438,6 @@ retcode MissingProcess::InitEngine() {
 }
 
 int MissingProcess::execute() {
-
   try {
     int cols_0, cols_1, cols_2;
     for (uint64_t i = 0; i < 3; i++) {
@@ -438,22 +453,20 @@ int MissingProcess::execute() {
         } else {
           std::stringstream ss;
           ss << "Abnormal party id value " << party_id_ << ".";
-
-          LOG(ERROR) << ss.str();
-          throw std::runtime_error(ss.str());
+          RaiseException(ss.str());
         }
       }
     }
 
     if (cols_0 != cols_1 || cols_0 != cols_2 || cols_1 != cols_2) {
-      LOG(ERROR)
-          << "The taget data columns of the three parties are inconsistent!";
+      RaiseException(
+          "The target data columns of the three parties are inconsistent!")
       return -1;
     }
 
-    int *arr_dtype0 = new int[cols_0];
-    int *arr_dtype1 = new int[cols_0];
-    int *arr_dtype2 = new int[cols_0];
+    auto arr_dtype0 = std::make_unique<int[]>(cols_0);
+    auto arr_dtype1 = std::make_unique<int[]>(cols_0);
+    auto arr_dtype2 = std::make_unique<int[]>(cols_0);
 
     int tmp_index = 0;
     for (auto itr = col_and_dtype_.begin(); itr != col_and_dtype_.end();
@@ -463,19 +476,17 @@ int MissingProcess::execute() {
 
     for (uint64_t i = 0; i < 3; i++) {
       if (party_id_ == i) {
-        mpc_op_exec_->mNext().asyncSendCopy(arr_dtype0, cols_0);
-        mpc_op_exec_->mPrev().asyncSendCopy(arr_dtype0, cols_0);
+        mpc_op_exec_->mNext().asyncSendCopy(arr_dtype0.get(), cols_0);
+        mpc_op_exec_->mPrev().asyncSendCopy(arr_dtype0.get(), cols_0);
       } else {
         if (party_id_ == (i + 1) % 3) {
-          mpc_op_exec_->mPrev().recv(arr_dtype1, cols_0);
+          mpc_op_exec_->mPrev().recv(arr_dtype1.get(), cols_0);
         } else if (party_id_ == (i + 2) % 3) {
-          mpc_op_exec_->mNext().recv(arr_dtype2, cols_0);
+          mpc_op_exec_->mNext().recv(arr_dtype2.get(), cols_0);
         } else {
           std::stringstream ss;
           ss << "Abnormal party id value " << party_id_ << ".";
-
-          LOG(ERROR) << ss.str();
-          throw std::runtime_error(ss.str());
+          RaiseException(ss.str());
         }
       }
     }
@@ -484,19 +495,14 @@ int MissingProcess::execute() {
       if ((arr_dtype0[i] != arr_dtype1[i]) ||
           (arr_dtype0[i] != arr_dtype2[i]) ||
           (arr_dtype1[i] != arr_dtype2[i])) {
-        LOG(ERROR)
-            << "The data column types of the three parties are inconsistent!";
+        RaiseException(
+            "The data column types of the three parties are inconsistent!");
         return -1;
       }
     }
 
-    delete arr_dtype0;
-    delete arr_dtype1;
-    delete arr_dtype2;
-
     for (auto iter = col_and_dtype_.begin(); iter != col_and_dtype_.end();
          iter++) {
-
       auto t = std::find(local_col_names.begin(), local_col_names.end(),
                          iter->first);
 
@@ -531,7 +537,6 @@ int MissingProcess::execute() {
 
         // Integer Long
         if (iter->second == 1 || iter->second == 3) {
-
           null_num = 0;
           int_count = 0;
           int_sum = 0;
@@ -583,7 +588,6 @@ int MissingProcess::execute() {
                       << "' in column " << iter->first << ", chunk " << k
                       << ", index " << j << ".";
                 } else {
-
                   int_max = i64_val > int_max ? i64_val : int_max;
                   int_min = i64_val < int_min ? i64_val : int_min;
 
@@ -595,8 +599,7 @@ int MissingProcess::execute() {
                   table->column(col_index)->chunk(k)->data()->GetNullCount();
             }
             int_count = table->num_rows() - null_num - abnormal_num;
-
-          } // double
+          }  // double
 
         } else if (iter->second == 2) {
           null_num = 0;
@@ -632,7 +635,6 @@ int MissingProcess::execute() {
               int ret = 0;
 
               for (int64_t j = 0; j < str_array->length(); j++) {
-
                 if (str_array->IsNull(j)) {
                   LOG(WARNING) << "Find missing value in column " << iter->first
                                << ", chunk " << k << ", index " << j << ".";
@@ -648,7 +650,6 @@ int MissingProcess::execute() {
                       << ", index " << j << ".";
 
                 } else {
-
                   double_max = d_val > double_max ? d_val : double_max;
                   double_min = d_val < double_min ? d_val : double_min;
 
@@ -818,9 +819,7 @@ int MissingProcess::execute() {
                 } else {
                   mpc_op_exec_->MPC_Compare(sh_res2);
                 }
-              }
-              // p0>=p1
-              else {
+              } else {  // p0>=p1
                 flag = 0;
                 // p0-p2
                 if (party_id_ != 1) {
@@ -1033,7 +1032,7 @@ int MissingProcess::execute() {
                 }
               }
               // p0<p1
-              else {
+              else {     // NOLINT
                 flag = 0;
                 // p0-p2
                 if (party_id_ != 1) {
@@ -1183,7 +1182,9 @@ int MissingProcess::execute() {
       }
     }
   } catch (std::exception &e) {
-    LOG(ERROR) << "In party " << party_id_ << ":\n" << e.what();
+    std::stringstream ss;
+    ss << "In party " << party_id_ << ": " << e.what();
+    RaiseException(ss.str());
     return -1;
   }
 
@@ -1205,12 +1206,18 @@ int MissingProcess::finishPartyComm(void) {
 int MissingProcess::saveModel(void) {
   std::vector<std::string> str_vec;
   auto &new_path = new_dataset_path_;
-  std::shared_ptr<DataDriver> driver =
+  auto driver =
       DataDirverFactory::getDriver("CSV", dataset_service_->getNodeletAddr());
-
+  if (driver == nullptr) {
+    LOG(ERROR) << "get driver failed, data path: " << new_path;
+    return -1;
+  }
   auto cursor = driver->initCursor(new_path);
-
-  VLOG(5) << "A brief view of new table:\n" << table->ToString() << ".";
+  if (cursor == nullptr) {
+    LOG(ERROR) << "init cursor failed, data path: " << new_path;
+    return -1;
+  }
+  VLOG(7) << "A brief view of new table: " << table->ToString() << ".";
 
   auto dataset = std::make_shared<primihub::Dataset>(table, driver);
   int ret = cursor->write(dataset);
@@ -1321,8 +1328,6 @@ int MissingProcess::_LoadDatasetFromCSV(std::string &dataset_id) {
       errors = true;
       break;
     }
-
-
   }
   return errors ? -1 : array_len;
 }
@@ -1377,7 +1382,6 @@ int MissingProcess::_LoadDatasetFromDB(std::string &source) {
       errors = true;
       break;
     }
-
   }
   return errors ? -1 : array_len;
 }
@@ -1389,4 +1393,4 @@ int MissingProcess::set_task_info(std::string platform_type, std::string job_id,
   task_id_ = task_id;
   return 0;
 }
-} // namespace primihub
+}  // namespace primihub

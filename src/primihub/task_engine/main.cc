@@ -15,13 +15,10 @@
  */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <Python.h>
 #include <iostream>
 #include <string>
-#include "pybind11/stl.h"
-#include "pybind11/embed.h"
 #include "src/primihub/task_engine/task_executor.h"
-#include "src/primihub/node/server_config.h"
+#include "src/primihub/common/config/server_config.h"
 
 DEFINE_string(node_id, "node0", "unique node_id");
 DEFINE_int32(task_engine_type, 0, "task engine type, 0: python, 1: other");
@@ -30,10 +27,7 @@ DEFINE_string(request, "", "task request, serialized by rpc::Task");
 DEFINE_string(request_id, "", "task request, serialized by rpc::Task");
 DEFINE_string(log_path, "", "log path");
 
-namespace py = pybind11;
 int main(int argc, char **argv) {
-  py::scoped_interpreter python;
-  py::gil_scoped_release release;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string node_id = FLAGS_node_id;
   std::string config_file = FLAGS_config_file;
@@ -56,10 +50,14 @@ int main(int argc, char **argv) {
   VLOG(0) << "";
   VLOG(0) << "start task process main: " << request_id;
   auto& server_cfg = primihub::ServerConfig::getInstance();
-  server_cfg.initServerConfig(config_file);
+  auto ret = server_cfg.initServerConfig(config_file);
+  if (ret != primihub::retcode::SUCCESS) {
+    LOG(ERROR) << "init Server config failed";
+    return -1;
+  }
   auto& service_cfg = server_cfg.getServiceConfig();
   auto task_engine = std::make_unique<primihub::task_engine::TaskEngine>();
-  auto ret = task_engine->Init(service_cfg.id(), config_file, task_request_str);
+  ret = task_engine->Init(service_cfg.id(), config_file, task_request_str);
   if (ret != primihub::retcode::SUCCESS) {
     LOG(ERROR) << "init py executor failed";
     return -1;

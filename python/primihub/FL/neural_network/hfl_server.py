@@ -1,10 +1,9 @@
 from primihub.FL.utils.net_work import MultiGrpcClients
 from primihub.FL.utils.base import BaseModel
-from primihub.FL.utils.file import check_directory_exist
+from primihub.FL.utils.file import save_json_file
 from primihub.utils.logger_util import logger
 from primihub.FL.preprocessing import StandardScaler
 
-import json
 import torch
 from .base import create_model
 
@@ -78,11 +77,7 @@ class NeuralNetworkServer(BaseModel):
 
         # receive final metrics
         trainMetrics = server.get_metrics()
-        metric_path = self.role_params['metric_path']
-        check_directory_exist(metric_path)
-        logger.info(f"metric path: {metric_path}")
-        with open(metric_path, 'w') as file_path:
-            file_path.write(json.dumps(trainMetrics))
+        save_json_file(trainMetrics, self.role_params['metric_path'])
 
 
 class Plaintext_Server:
@@ -124,7 +119,7 @@ class Plaintext_Server:
             if input_shape != cinput_shape:
                 all_input_shapes_same = False
                 error_msg = f"""Not all input shapes are the same,
-                                client {self.client_channel.keys()[idx]}'s
+                                client {list(self.client_channel.Clients.keys())[idx]}'s
                                 input shape is {cinput_shape},
                                 but others' are {input_shape}"""
                 logger.error(error_msg)
@@ -138,7 +133,7 @@ class Plaintext_Server:
 
     def lazy_module_init(self):
         input_shape = list(self.input_shape)
-        # set batch size equals to 1 to initilize lazy module
+        # set batch size equals to 1 to initialize lazy module
         input_shape.insert(0, 1)
         self.model.forward(torch.ones(input_shape).to(self.device))
         self.model.load_state_dict(self.model.state_dict())

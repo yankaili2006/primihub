@@ -16,13 +16,19 @@
 #include "src/primihub/task/pybind_wrapper/mpc_task_wrapper.h"
 #include <glog/logging.h>
 #include <random>
+#include <utility>
 #include "src/primihub/common/common.h"
-#include <google/protobuf/text_format.h>
-#include "uuid.h"
+#include "src/primihub/util/proto_log_helper.h"
+#include "uuid.h"                                                      // NOLINT
 
+namespace pb_util = primihub::proto::util;
 namespace primihub::task {
 MPCExecutor::MPCExecutor(const std::string& task_req_str,
-                         const std::string& protocol) {
+                         const std::string& protocol,
+                         const std::string& root_ca_path,
+                         const std::string& key_path,
+                         const std::string& cert_path) :
+    root_ca_path_(root_ca_path), key_path_(key_path), cert_path_(cert_path) {
   task_req_ptr_ = std::make_unique<primihub::rpc::PushTaskRequest>();
   bool succ_flag = task_req_ptr_->ParseFromString(task_req_str);
   if (!succ_flag) {
@@ -39,6 +45,11 @@ MPCExecutor::MPCExecutor(const std::string& task_req_str,
   this->task_req_ptr_->set_manual_launch(true);
   task_ptr_ = std::make_unique<MPCTask>(this->func_name_,
                                         &(task_req_ptr_->task()));
+  if (!root_ca_path.empty() && !key_path.empty() && !cert_path.empty()) {
+    LOG(INFO) << "link_ctx->initCertificate";
+    auto link_ctx = task_ptr_->getTaskContext().getLinkContext().get();
+    link_ctx->initCertificate(root_ca_path, key_path, cert_path);
+  }
 }
 
 MPCExecutor::~MPCExecutor() {
@@ -60,7 +71,7 @@ void MPCExecutor::StopTask() {
     }
     it = party_access_info.find(AUX_COMPUTE_NODE);
     if (it == party_access_info.end()) {
-      LOG(ERROR) << AUX_COMPUTE_NODE << " access info is not found";
+      // LOG(WARNING) << AUX_COMPUTE_NODE << " access info is not found";
       break;
     }
     auto pb_aux_node = it->second;
@@ -278,7 +289,7 @@ retcode MPCExecutor::BroadcastSubtaskId(const std::string& sub_task_id) {
   for (const auto& receiver : receiver_list) {
     link_ctx->Send("subtask_id", receiver, sub_task_id);
   }
-
+  return retcode::SUCCESS;
 }
 
 retcode MPCExecutor::RecvSubTaskId(std::string* subtask_id) {
@@ -308,6 +319,7 @@ retcode MPCExecutor::RecvSubTaskId(std::string* subtask_id) {
   link_ctx->Recv("subtask_id", proxy_node, &recv_buf);
   *subtask_id = std::move(recv_buf);
   VLOG(7) << "subtask_id: " << *subtask_id;
+  return retcode::SUCCESS;
 }
 
 retcode MPCExecutor::NegotiateSubTaskId(std::string* sub_task_id) {
@@ -334,6 +346,7 @@ retcode MPCExecutor::SetArithmeticOperation(
   algorithm->set_arithmetic_op_type(op_type);
   return retcode::SUCCESS;
 }
+
 retcode MPCExecutor::ExecuteStatisticsTask(
     rpc::Algorithm::StatisticsOpType op_type,
     const std::vector<double>& input,
@@ -341,6 +354,11 @@ retcode MPCExecutor::ExecuteStatisticsTask(
     std::vector<double>* result) {
   auto task_ptr = std::make_unique<MPCTask>(this->func_name_,
                                             &(task_req_ptr_->task()));
+  if (!root_ca_path_.empty() && !key_path_.empty() && !cert_path_.empty()) {
+    LOG(INFO) << "link_ctx->initCertificate";
+    auto link_ctx = task_ptr->getTaskContext().getLinkContext().get();
+    link_ctx->initCertificate(root_ca_path_, key_path_, cert_path_);
+  }
   if (NeedAuxiliaryServer(task_req_ptr_->task())) {
     std::string sub_task_id;
     NegotiateSubTaskId(&sub_task_id);
@@ -359,9 +377,8 @@ retcode MPCExecutor::ExecuteStatisticsTask(
     BroadcastShape(*task_config, input_shape);
     task_ptr->setTaskParam(task_req_ptr_->task());
     if (VLOG_IS_ON(0)) {
-      std::string str;
-      google::protobuf::TextFormat::PrintToString(*task_req_ptr_, &str);
-      VLOG(0) << "MPCExecutor: " << str;
+      std::string str = pb_util::TaskRequestToString(*task_req_ptr_);
+      VLOG(0) << "MPCExecutor request: " << str;
     }
   }
   auto ret = task_ptr->ExecuteTask(input, col_rows, result);
@@ -371,11 +388,13 @@ retcode MPCExecutor::ExecuteStatisticsTask(
   }
   return retcode::SUCCESS;
 }
+
 retcode MPCExecutor::GetSyncFlagKey(const rpc::TaskContext& task_info,
                                     std::string* sync_key) {
   *sync_key = task_info.sub_task_id() + "_SyncFlag";
   return retcode::SUCCESS;
 }
+
 retcode MPCExecutor::GetShapeKey(const rpc::TaskContext& task_info,
                                  std::string* shape_key) {
   *shape_key = task_info.sub_task_id() + "_mpc_shape";

@@ -13,7 +13,6 @@ cc_library(
     "@com_google_absl//absl/flags:parse",
     "@com_google_absl//absl/memory",
     "@com_github_glog_glog//:glog",
-    "@pybind11",
   ],
 )
 
@@ -26,10 +25,12 @@ cc_library(
     "//src/primihub/protos:worker_proto",
     "//src/primihub/util/network:communication_lib",
     "//src/primihub/util:util_lib",
-    "//src/primihub/node:server_config",
+    "//src/primihub/common/config:server_config",
     "//src/primihub/task/semantic:task_factory",
     "//src/primihub/service/dataset/meta_service:meta_service_factory",
     "//src/primihub/service:dataset_service",
+    "//src/primihub/util:log_util",
+    "//src/primihub/util:pb_log_helper",
     "@com_github_base64_cpp//:base64_lib",
   ],
 )

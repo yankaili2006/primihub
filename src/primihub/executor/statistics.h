@@ -22,6 +22,11 @@ public:
     SUM,
     MAX,
     MIN,
+    T_TEST,
+    F_TEST,
+    CHI_SQUARE_TEST,
+    REGRESSION,
+    CORRELATION,
     UNKNOWN,
   };
 
@@ -69,6 +74,21 @@ public:
       break;
     case MPCStatisticsType::MIN:
       str = "MIN";
+      break;
+    case MPCStatisticsType::T_TEST:
+      str = "T_TEST";
+      break;
+    case MPCStatisticsType::F_TEST:
+      str = "F_TEST";
+      break;
+    case MPCStatisticsType::CHI_SQUARE_TEST:
+      str = "CHI_SQUARE_TEST";
+      break;
+    case MPCStatisticsType::REGRESSION:
+      str = "REGRESSION";
+      break;
+    case MPCStatisticsType::CORRELATION:
+      str = "CORRELATION";
       break;
     default:
       str = "UNKNOWN";

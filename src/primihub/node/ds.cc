@@ -15,17 +15,26 @@
  */
 
 #include "src/primihub/node/ds.h"
+#include <unistd.h>
+#include <sys/stat.h>
 #include <algorithm>
 #include <string>
 #include <utility>
+#include <thread>
+#include <future>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include "src/primihub/service/dataset/model.h"
 #include "src/primihub/util/util.h"
 #include "src/primihub/common/common.h"
 #include "src/primihub/util/thread_local_data.h"
+#include "src/primihub/util/proto_log_helper.h"
+#include "src/primihub/common/config/server_config.h"
+#include "src/primihub/util/file_util.h"
 
-using primihub::service::DatasetMeta;
-
+using DatasetMeta = primihub::service::DatasetMeta;
+using DataBlock = primihub::DataServiceImpl::DataBlock;
+namespace pb_util = primihub::proto::util;
 namespace primihub {
 grpc::Status DataServiceImpl::NewDataset(grpc::ServerContext *context,
                                           const rpc::NewDatasetRequest *request,
@@ -33,6 +42,19 @@ grpc::Status DataServiceImpl::NewDataset(grpc::ServerContext *context,
   DatasetMetaInfo meta_info;
   // convert pb to DatasetMetaInfo
   ConvertToDatasetMetaInfo(request->meta_info(), &meta_info);
+  std::set<std::string> dup;
+  for (const auto& info : meta_info.schema) {
+    auto& field_name = std::get<0>(info);
+    if (dup.find(field_name) != dup.end()) {
+      std::string err_msg = "Duplicate Field name: ";
+      err_msg.append(field_name).append(" in dataset Schema");
+      LOG(ERROR) << err_msg;
+      SetResponseErrorMsg(std::move(err_msg), response);
+      return grpc::Status::OK;
+    }
+    dup.insert(field_name);
+  }
+
   auto op_type = request->op_type();
   switch (op_type) {
   case rpc::NewDatasetRequest::REGISTER:
@@ -47,10 +69,163 @@ grpc::Status DataServiceImpl::NewDataset(grpc::ServerContext *context,
   default: {
     std::string err_msg = "unsupported operation type: ";
     err_msg.append(std::to_string(op_type));
+    LOG(ERROR) << err_msg;
     SetResponseErrorMsg(std::move(err_msg), response);
   }
   }
   return grpc::Status::OK;
+}
+
+grpc::Status DataServiceImpl::QueryResult(grpc::ServerContext* context,
+    const rpc::QueryResultRequest* request,
+    rpc::QueryResultResponse* response) {
+  response->set_code(rpc::Status::FAIL);
+  response->set_info("Unimplement");
+  return grpc::Status::OK;
+}
+
+grpc::Status DataServiceImpl::DownloadData(grpc::ServerContext* context,
+    const rpc::DownloadRequest* request,
+    grpc::ServerWriter<rpc::DownloadRespone>* writer) {
+  const auto& file_list = request->file_list();
+  const auto& request_id = request->request_id();
+  if (file_list.empty()) {
+    std::string err_msg = "download list is empty, no data file for download";
+    LOG(ERROR) << pb_util::TaskInfoToString(request_id) << err_msg;
+    rpc::DownloadRespone resp;
+    resp.set_info(err_msg);
+    resp.set_code(rpc::Status::FAIL);
+    writer->Write(resp);
+    return grpc::Status::OK;
+  }
+  // using pipeline mode to read and send data, make sure data sequence: fifo
+  ThreadSafeQueue<DataBlock> resp_queue;
+  std::atomic<bool> error{false};
+  std::string error_msg;
+  auto read_fut = std::async(
+    std::launch::async,
+    [&]() -> retcode {
+      try {
+        auto ret = DownloadDataImpl(*request, &resp_queue);
+        if (ret != retcode::SUCCESS) {
+          LOG(ERROR) << "DownloadDataImpl encountes error";
+          error.store(true);
+          resp_queue.shutdown();
+          return retcode::FAIL;
+        } else {
+          return retcode::SUCCESS;
+        }
+      } catch (std::exception& e) {
+        error_msg = e.what();
+        error.store(true);
+        resp_queue.shutdown();
+      }
+    });
+  // read data from
+  do {
+    DataBlock data_block;
+    resp_queue.wait_and_pop(data_block);
+    if (data_block.is_last_block) {  // read end flag
+      break;
+    }
+    rpc::DownloadRespone resp;
+    if (error.load(std::memory_order::memory_order_relaxed)) {
+      resp.set_info(error_msg);
+      resp.set_code(rpc::Status::FAIL);
+      LOG(ERROR) << pb_util::TaskInfoToString(request_id) << error_msg;
+    } else {
+      resp.set_info("SUCCESS");
+      resp.set_code(rpc::Status::SUCCESS);
+      resp.set_file_name(data_block.file_name);
+      resp.set_data(data_block.data);
+    }
+    writer->Write(resp);
+    if (error.load(std::memory_order::memory_order_relaxed)) {
+      break;
+    }
+  } while (true);
+  read_fut.get();
+  return grpc::Status::OK;
+}
+
+grpc::Status DataServiceImpl::UploadData(grpc::ServerContext* context,
+    grpc::ServerReader<rpc::UploadFileRequest>* reader,
+    rpc::UploadFileResponse* response) {
+  response->set_code(rpc::Status::FAIL);
+  response->set_info("Unimplement");
+  return grpc::Status::OK;
+}
+
+retcode DataServiceImpl::DownloadDataImpl(const rpc::DownloadRequest& request,
+    ThreadSafeQueue<DataBlock>* data_queue) {
+  const auto& request_id = request.request_id();
+  const auto& file_list = request.file_list();
+  for (const auto& file_info : file_list) {
+    std::string file_name = file_info;
+    std::string file_path = CompletePath(file_info);
+    LOG(INFO) << pb_util::TaskInfoToString(request_id)
+              << "begin to read data for " << file_name;
+    if (!FileExists(file_path)) {
+      std::string err_msg = "file: ";
+      err_msg.append(file_path).append(" is not exist");
+      LOG(ERROR) << pb_util::TaskInfoToString(request_id) << err_msg;
+      throw std::runtime_error(err_msg);
+      return retcode::FAIL;
+    }
+    struct stat statbuf;
+    stat(file_path.c_str(), &statbuf);
+    size_t filesize = statbuf.st_size;
+    VLOG(5) << pb_util::TaskInfoToString(request_id)
+            << "file size: " << filesize;
+
+    std::ifstream fin(file_path, std::ios::binary);
+    if (fin) {
+      size_t block_size = LIMITED_PACKAGE_SIZE;
+      size_t block_bum = filesize / block_size;
+      for (size_t i = 0 ; i < block_bum; i++) {
+        DataBlock data_block;
+        data_block.file_name = file_name;
+        data_block.data.resize(block_size);
+        auto& buf = data_block.data;
+        fin.read(&buf[0], block_size);
+        data_queue->push(std::move(data_block));
+      }
+      size_t last_block_size = filesize % block_size;
+      LOG(INFO) << pb_util::TaskInfoToString(request_id)
+                << "last_block_size: " << last_block_size;
+      if (last_block_size) {
+        DataBlock data_block;
+        data_block.file_name = file_name;
+        data_block.data.resize(last_block_size);
+        auto& buf = data_block.data;
+        fin.read(&buf[0], last_block_size);
+        data_queue->push(std::move(data_block));
+      }
+      fin.close();
+      // flag for end read
+      DataBlock data_block;
+      data_block.is_last_block = true;
+      data_queue->push(std::move(data_block));
+    } else {
+      std::string err_msg;
+      err_msg.append("open file ").append(file_path).append(" failed");
+      LOG(ERROR) << pb_util::TaskInfoToString(request_id) << err_msg;
+      throw std::runtime_error(err_msg);
+    }
+  }
+  return retcode::SUCCESS;
+}
+
+retcode DataServiceImpl::UploadDataImpl(const rpc::DownloadRequest& request,
+    ThreadSafeQueue<DataBlock>* data_queue) {
+//
+  return retcode::SUCCESS;
+}
+
+retcode DataServiceImpl::QueryResultImpl(const rpc::QueryResultRequest& request,
+    rpc::QueryResultResponse* response) {
+//
+  return retcode::SUCCESS;
 }
 
 retcode DataServiceImpl::RegisterDatasetProcess(
@@ -64,7 +239,8 @@ retcode DataServiceImpl::RegisterDatasetProcess(
   std::shared_ptr<DataDriver> driver{nullptr};
   std::string access_meta;
   try {
-    auto access_info = this->GetDatasetService()->createAccessInfo(driver_type, meta_info);
+    auto access_info =
+        this->GetDatasetService()->createAccessInfo(driver_type, meta_info);
     if (access_info == nullptr) {
       std::string err_msg = "create access info failed";
       throw std::invalid_argument(err_msg);
@@ -75,32 +251,48 @@ retcode DataServiceImpl::RegisterDatasetProcess(
                                           std::move(access_info));
     this->GetDatasetService()->registerDriver(meta_info.id, driver);
   } catch (std::exception& e) {
-    auto& err_info = ThreadLocalErrorMsg();
+    size_t len = strlen(e.what());
+    len = len > 1024 ? 1024 : len;
+    auto err_msg = std::string(e.what(), len);
     LOG(ERROR) << "Failed to load dataset from: "
             << meta_info.access_info << " "
             << "driver_type: " << driver_type << " "
             << "fid: " << meta_info.id << " "
-            << "exception: " << err_info;
-    SetResponseErrorMsg(err_info, reply);
-    ResetThreadLocalErrorMsg();
+            << "exception: " << err_msg;
+    SetResponseErrorMsg(err_msg, reply);
     return retcode::FAIL;
   }
 
-  DatasetMeta mate;
-  auto dataset = GetDatasetService()->newDataset(
-      driver, meta_info.id, access_meta, &mate);
-  if (dataset == nullptr) {
-    auto& err_msg = ThreadLocalErrorMsg();
+
+  try {
+    DatasetMeta mate;
+    auto dataset = GetDatasetService()->newDataset(
+        driver, meta_info.id, access_meta, &mate);
+    if (dataset == nullptr) {
+      LOG(ERROR) << "register dataset " << meta_info.id << " failed";
+      auto& err_msg = ThreadLocalErrorMsg();
+      SetResponseErrorMsg(err_msg, reply);
+      ResetThreadLocalErrorMsg();
+      this->GetDatasetService()->unRegisterDriver(meta_info.id);
+      return retcode::FAIL;
+    } else {
+      reply->set_ret_code(rpc::NewDatasetResponse::SUCCESS);
+      reply->set_dataset_url(mate.getDataURL());
+      LOG(INFO) << "end of register dataset, dataurl: " << mate.getDataURL();
+    }
+  } catch (std::exception& e) {
+    size_t len = strlen(e.what());
+    len = len > 1024 ? 1024 : len;
+    auto err_msg = std::string(e.what(), len);
+    LOG(ERROR) << "Failed to register dataset from: "
+            << meta_info.access_info << " "
+            << "driver_type: " << driver_type << " "
+            << "fid: " << meta_info.id << " "
+            << "exception: " << err_msg;
     SetResponseErrorMsg(err_msg, reply);
-    ResetThreadLocalErrorMsg();
-    LOG(ERROR) << "register dataset " << meta_info.id << " failed";
-    this->GetDatasetService()->unRegisterDriver(meta_info.id);
     return retcode::FAIL;
-  } else {
-    reply->set_ret_code(rpc::NewDatasetResponse::SUCCESS);
-    reply->set_dataset_url(mate.getDataURL());
-    LOG(INFO) << "end of register dataset, dataurl: " << mate.getDataURL();
   }
+
 
   return retcode::SUCCESS;
 }

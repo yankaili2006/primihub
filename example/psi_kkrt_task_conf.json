@@ -18,12 +18,12 @@
       "value": [0]
     },
     "psiType": {
-      "description": "availabe value: [INTERSECTION = 0; DIFFERENCE = 1;]",
+      "description": "available value: [INTERSECTION = 0; DIFFERENCE = 1;]",
       "type": "INT32",
       "value": 0
     },
     "psiTag": {
-      "description": "availabe value: [ECDH = 0; KKRT = 1;]",
+      "description": "available value: [ECDH = 0; KKRT = 1;]",
       "type": "INT32",
       "value": 1
     },
@@ -41,6 +41,11 @@
       "description": "path for server save intersection result",
       "type": "STRING",
       "value": "data/result/server/psi_result.csv"
+    },
+    "UniqueValues": {
+      "description": "remove duplicate data from origin data. 1: true, 0: false, if 0 is set, the duplication is guaranteed by user, or maybe task run fail",
+      "type": "INT32",
+      "value": 0
     }
   },
   "party_datasets": {

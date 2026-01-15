@@ -27,7 +27,7 @@
 #include "src/primihub/common/config/config.h"
 #include "src/primihub/service/dataset/util.hpp"
 #include "src/primihub/util/redis_helper.h"
-#include "src/primihub/node/server_config.h"
+#include "src/primihub/common/config/server_config.h"
 #include "src/primihub/service/dataset/meta_service/grpc_impl.h"
 
 using DataSetAccessInfoPtr = std::unique_ptr<primihub::DataSetAccessInfo>;
@@ -66,26 +66,31 @@ DatasetService::newDataset(std::shared_ptr<primihub::DataDriver> driver,
                           const std::string& dataset_id,
                           const std::string& dataset_access_info,
                           DatasetMeta* meta) {
-    // Read data using driver for get dataset & datameta
-    // just get meta info from dataset
-    // auto dataset = driver->getCursor()->read();
-    auto cursor = driver->read();
-    if (cursor == nullptr) {
-      LOG(ERROR) << "get cursor for dataset: " << dataset_id << " failed";
-      return nullptr;
-    }
-    auto dataset = cursor->readMeta();
-    if (dataset == nullptr) {
-      LOG(ERROR) << "get dataset meta for dataset id: " << dataset_id << " failed";
-      return nullptr;
-    }
-    *meta = DatasetMeta(dataset,
-                        dataset_id,
-                        DatasetVisbility::PUBLIC,
-                        dataset_access_info);
-    // Save datameta in local storage.& Publish dataset meta on libp2p network.
-    MetaService()->PutMeta(*meta);
-    return dataset;
+  // Read data using driver for get dataset & datameta
+  // just get meta info from dataset
+  // auto dataset = driver->getCursor()->read();
+  auto cursor = driver->read();
+  if (cursor == nullptr) {
+    LOG(ERROR) << "get cursor for dataset: " << dataset_id << " failed";
+    return nullptr;
+  }
+  auto dataset = cursor->readMeta();
+  if (dataset == nullptr) {
+    LOG(ERROR) << "get dataset meta for dataset id: "
+               << dataset_id << " failed";
+    return nullptr;
+  }
+  *meta = DatasetMeta(dataset,
+                      dataset_id,
+                      DatasetVisbility::PUBLIC,
+                      dataset_access_info);
+  // Save datameta in local storage.& Publish dataset meta on libp2p network.
+  auto ret = MetaService()->PutMeta(*meta);
+  if (ret != retcode::SUCCESS) {
+    LOG(ERROR) << "Put Meta data to meta service failed";
+    return nullptr;
+  }
+  return dataset;
 }
 
 /**
@@ -163,7 +168,7 @@ retcode DatasetService::deleteDataset(const DatasetId& id) {
 }
 
 /**
- * @brief Consture datasets from yaml datasets configurtion.
+ * @brief Consture datasets from yaml datasets configuration.
  * @param config_file_path [input]: Datasets configuration file path
  *
  */
@@ -171,32 +176,38 @@ void DatasetService::loadDefaultDatasets(const std::string& config_file_path) {
   LOG(INFO) << "📃 Load default datasets from config: " << config_file_path;
   YAML::Node config = YAML::LoadFile(config_file_path);
   auto& server_cfg = ServerConfig::getInstance();
-  auto& nodelet_cfg = server_cfg.getServiceConfig();
+  auto& nodelet_cfg = server_cfg.PublicServiceConfig();
   std::string nodelet_addr = nodelet_cfg.to_string();
   if (!config["datasets"]) {
-    LOG(WARNING) << "no datsets found in config file, ignore....";
+    LOG(WARNING) << "no datasets found in config file, ignore....";
     return;
   }
   for (const auto& dataset : config["datasets"]) {
-    auto dataset_type = dataset["model"].as<std::string>();
-    auto dataset_uid = dataset["description"].as<std::string>();
-    auto access_info = createAccessInfo(dataset_type, dataset);
-    if (access_info == nullptr) {
-      LOG(WARNING) << "create access info for " << dataset_uid << " failed, to skip";
-      continue;
+    try {
+      auto dataset_type = dataset["model"].as<std::string>();
+      auto dataset_uid = dataset["description"].as<std::string>();
+      auto access_info = createAccessInfo(dataset_type, dataset);
+      if (access_info == nullptr) {
+        LOG(WARNING) << "create access info for "
+                     << dataset_uid << " failed, to skip";
+        continue;
+      }
+      std::string access_info_str = access_info->toString();
+      auto driver = DataDirverFactory::getDriver(dataset_type,
+                                                 nodelet_addr,
+                                                 std::move(access_info));
+      this->registerDriver(dataset_uid, driver);
+      auto cursor = driver->read();
+      if (cursor == nullptr) {
+        LOG(WARNING) << "get cursor for " << dataset_uid << " failed";
+        continue;
+      }
+
+      DatasetMeta meta;
+      newDataset(driver, dataset_uid, access_info_str, &meta);
+    } catch (std::exception& e) {
+      LOG(ERROR) << e.what() << " ignore .....";
     }
-    std::string access_info_str = access_info->toString();
-    auto driver = DataDirverFactory::getDriver(dataset_type,
-                                              nodelet_addr,
-                                              std::move(access_info));
-    this->registerDriver(dataset_uid, driver);
-    auto cursor = driver->read();
-    if (cursor == nullptr) {
-      LOG(WARNING) << "get cursor for " << dataset_uid << " failed";
-      continue;
-    }
-    DatasetMeta meta;
-    newDataset(driver, dataset_uid, access_info_str, &meta);
   }
 }
 
@@ -206,23 +217,27 @@ void DatasetService::restoreDatasetFromLocalStorage() {
   std::vector<DatasetMeta> metas;
   MetaService()->GetAllMetas(&metas);
   for (auto& meta : metas) {
-    auto meta_info = meta.toJSON();
-    VLOG(5) << "meta_info: " << meta_info;
-    std::string driver_type = meta.getDriverType();
-    std::string fid = meta.getDescription();
-    auto access_info = this->createAccessInfo(driver_type, meta_info);
-    if (access_info == nullptr) {
-      std::string err_msg = "create access info failed";
-      continue;
+    try {
+      auto meta_info = meta.toJSON();
+      VLOG(5) << "meta_info: " << meta_info;
+      std::string driver_type = meta.getDriverType();
+      std::string fid = meta.getDescription();
+      auto access_info = this->createAccessInfo(driver_type, meta_info);
+      if (access_info == nullptr) {
+        std::string err_msg = "create access info failed";
+        continue;
+      }
+      auto driver = DataDirverFactory::getDriver(driver_type,
+                                                nodelet_addr_,
+                                                std::move(access_info));
+      this->registerDriver(fid, driver);
+      // meta.setDataURL(nodelet_addr_ + ":" + dataset_path);
+      meta.setServerInfo(nodelet_addr_);
+      // Publish dataset meta on public network.
+      MetaService()->PutMeta(meta);
+    } catch (std::exception& e) {
+      LOG(ERROR) << e.what();
     }
-    auto driver = DataDirverFactory::getDriver(driver_type,
-                                              nodelet_addr_,
-                                              std::move(access_info));
-    this->registerDriver(fid, driver);
-    // meta.setDataURL(nodelet_addr_ + ":" + dataset_path);
-    meta.setServerInfo(nodelet_addr_);
-    // Publish dataset meta on public network.
-    MetaService()->PutMeta(meta);
   }
 }
 
@@ -273,14 +288,15 @@ DatasetService::getDriver(const std::string& dataset_id, bool is_acces_info) {
         schema.push_back(std::make_tuple(key, value));
       }
     }
-    auto access_info = createAccessInfo(meta_info.driver_type, meta_info);
-    if (access_info == nullptr) {
-      std::string err_msg = "create access info failed";
+    try {
+      auto access_info = createAccessInfo(meta_info.driver_type, meta_info);
+      return DataDirverFactory::getDriver(meta_info.driver_type,
+                                          DatasetLocation(),
+                                          std::move(access_info));
+    } catch (std::exception& e) {
+      LOG(ERROR) << e.what();
       return nullptr;
     }
-    return DataDirverFactory::getDriver(meta_info.driver_type,
-                                        DatasetLocation(),
-                                        std::move(access_info));
   }
 
   // get Meta using meta service
@@ -301,14 +317,15 @@ DatasetService::getDriver(const std::string& dataset_id, bool is_acces_info) {
       }
       VLOG(5) << "driver_type: " << meta_info.driver_type << " "
           << "access_info: " << meta_info.access_info;
-      auto access_info = createAccessInfo(meta_info.driver_type, meta_info);
-      if (access_info == nullptr) {
-        std::string err_msg = "create access info failed";
+      try {
+        auto access_info = createAccessInfo(meta_info.driver_type, meta_info);
+        driver = DataDirverFactory::getDriver(meta_info.driver_type,
+                                            DatasetLocation(),
+                                            std::move(access_info));
+      } catch (std::exception& e) {
+        LOG(ERROR) << e.what();
         return retcode::FAIL;
       }
-      driver = DataDirverFactory::getDriver(meta_info.driver_type,
-                                          DatasetLocation(),
-                                          std::move(access_info));
       return retcode::SUCCESS;
     } else {
       LOG(ERROR) << "get dataset meta failed";

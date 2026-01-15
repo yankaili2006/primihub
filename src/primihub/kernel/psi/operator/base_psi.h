@@ -25,7 +25,7 @@
 namespace primihub::psi {
 using LinkContext = network::LinkContext;
 struct Options {
-  LinkContext* link_ctx_ref;
+  LinkContext* link_ctx_ref{nullptr};
   std::map<std::string, Node> party_info;
   std::string self_party;
   PsiResultType psi_result_type{PsiResultType::INTERSECTION};
@@ -51,7 +51,7 @@ class BasePsiOperator {
    * broadcast from the party who get the result to the others who participate
    * in the protocol
    * result: input or output
-   *  for party who finally get the result after protocol, reuslt is input
+   *  for party who finally get the result after protocol, result is input
    *  for party who get result after broadcast step, result is output
   */
   virtual retcode BroadcastPsiResult(std::vector<std::string>* result);
@@ -68,14 +68,16 @@ class BasePsiOperator {
   */
   bool IgnoreParty(const std::string& party_name);
   /**
-   * party who doest not care about the result
+   * party who doesn't care about the result
   */
   bool IgnoreResult(const std::string& party_name);
   retcode BroadcastResult(const std::vector<std::string>& result);
   retcode ReceiveResult(std::vector<std::string>* result);
 
   void set_stop() {stop_.store(true);}
-
+  retcode GetResult(const std::vector<std::string>& input,
+                    const std::vector<uint64_t>& intersection_index,
+                    std::vector<std::string>* result);
  protected:
   bool has_stopped() {
     return stop_.load(std::memory_order::memory_order_relaxed);

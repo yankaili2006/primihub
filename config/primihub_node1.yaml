@@ -5,6 +5,11 @@ location: "primihub-node1"
 use_tls: false
 
 grpc_port: 50051
+# public_ip_proxy:
+#   mode: "grpc"
+#   ip:  "127.0.0.1"
+#   port: 30004
+#   use_tls: false
 
 #certificate:
 #  root_ca: "data/cert/ca.crt"
@@ -23,6 +28,9 @@ meta_service:
   port: 9099
   use_tls: false
 
+# default storage path
+# storage_path: "data"
+
 datasets:
   # no meaningful dataset, just used to represent this party
   - description: "FAKE_DATA_PARTY_1"
@@ -36,14 +44,6 @@ datasets:
   - description: "test_party_1"
     model: "csv"
     source: "data/test_party_1.csv"
-
-  # MNIST test case datasets
-  - description: "test_party_1_self"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_1"
-  - description: "test_party_1_next"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_2"
 
   # PIR test case dataset
   - description: "pir_server_data"
@@ -116,18 +116,6 @@ datasets:
     model: "image"
     image_dir: "data/FL/mnist/test/client1.zip"
     annotations_file: "data/FL/mnist/test/client1_annotations.csv"
-
-  - description: "train_hetero_xgb_host"
-    model: "csv"
-    source: "data/FL/hetero_xgb/train/train_breast_cancer_host.csv"
-
-  - description: "test_hetero_xgb_host"
-    model: "csv"
-    source: "data/FL/hetero_xgb/test/test_breast_cancer_host.csv"
-
-  - description: "iv_filter_host"
-    model: "csv"
-    source: "data/FL/hetero_iv/iv_host.csv"
 
   # FL preprocess
   - description: "preprocess_vfl_train_host"

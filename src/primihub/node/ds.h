@@ -31,7 +31,8 @@
 #include "src/primihub/protos/service.pb.h"
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/data_store/factory.h"
-#include "src/primihub/node/server_config.h"
+#include "src/primihub/common/config/server_config.h"
+#include "src/primihub/util/threadsafe_queue.h"
 
 namespace primihub {
 class DataServiceImpl final: public rpc::DataSetService::Service {
@@ -39,15 +40,36 @@ class DataServiceImpl final: public rpc::DataSetService::Service {
   explicit DataServiceImpl(service::DatasetService* service) :
       dataset_service_ref_(service) {
     auto& ins = ServerConfig::getInstance();
-    auto& server_info = ins.getServiceConfig();
+    auto& server_info = ins.PublicServiceConfig();
     location_info_ = server_info.to_string();
   }
+  struct DataBlock {
+    std::string data;
+    bool is_last_block{false};
+    std::string file_name;
+  };
 
   grpc::Status NewDataset(grpc::ServerContext *context,
                           const rpc::NewDatasetRequest *request,
                           rpc::NewDatasetResponse *response) override;
+  grpc::Status QueryResult(grpc::ServerContext* context,
+                           const rpc::QueryResultRequest* request,
+                           rpc::QueryResultResponse* response);
+  grpc::Status DownloadData(grpc::ServerContext* context,
+                            const rpc::DownloadRequest* request,
+                            grpc::ServerWriter<rpc::DownloadRespone>* writer);
+  grpc::Status UploadData(grpc::ServerContext* context,
+                          grpc::ServerReader<rpc::UploadFileRequest>* reader,
+                          rpc::UploadFileResponse* response);
 
  protected:
+  retcode DownloadDataImpl(const rpc::DownloadRequest& request,
+                           ThreadSafeQueue<DataBlock>* data_queue);
+  retcode UploadDataImpl(const rpc::DownloadRequest& request,
+                         ThreadSafeQueue<DataBlock>* data_queue);
+  retcode QueryResultImpl(const rpc::QueryResultRequest& request,
+                          rpc::QueryResultResponse* response);
+
   std::string DatasetLocation() {
     return location_info_;
   }

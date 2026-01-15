@@ -24,6 +24,11 @@ use_tls: false
 
 grpc_port: 50052
 
+# certificate:
+#   root_ca: "data/cert/ca.crt"
+#   key: "data/cert/test.key"
+#   cert: "data/cert/test.crt"
+
 proxy_server:
   mode: "grpc"
   ip:  "127.0.0.1"
@@ -46,6 +51,10 @@ tee:
   sgx_enable: True
   cert_path: "data/sgx/"
   ra_server_addr: "127.0.0.1:8888"
+
+# default storage path
+# storage_path: "data"
+
 # load datasets
 datasets:
   # ABY3 LR test case datasets
@@ -55,14 +64,6 @@ datasets:
   - description: "test_party_2"
     model: "csv"
     source: "data/test_party_2.csv"
-
-  # MNIST test case datasets
-  - description: "test_party_2_self"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_2"
-  - description: "test_party_2_next"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_0"
 
   # FL binclass
   - description: "binclass_vfl_train_guest"
@@ -126,18 +127,6 @@ datasets:
   #  model: "sqlite"
   #  table_name: "psi_client_data"
   #  source: "data/client_e.db3"
-
-  - description: "train_hetero_xgb_guest"
-    model: "csv"
-    source: "data/FL/hetero_xgb/train/train_breast_cancer_guest.csv"
-
-  - description: "test_hetero_xgb_guest"
-    model: "csv"
-    source: "data/FL/hetero_xgb/test/test_breast_cancer_guest.csv"
-
-  - description: "iv_filter_guest"
-    model: "csv"
-    source: "data/FL/hetero_iv/iv_guest.csv"
 
   # FL preprocess
   - description: "preprocess_vfl_train_guest"

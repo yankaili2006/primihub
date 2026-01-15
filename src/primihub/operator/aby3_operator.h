@@ -24,6 +24,7 @@
 #include <random>
 #include <vector>
 #include <string>
+#include <memory>
 
 #include "Eigen/Dense"
 #include "src/primihub/util/eigen_util.h"
@@ -43,6 +44,7 @@
 #include "cryptoTools/Network/Session.h"
 #include "src/primihub/common/common.h"
 #include "network/channel_interface.h"
+#include "src/primihub/common/value_check_util.h"
 
 namespace primihub {
 const uint8_t VAL_BITCOUNT = 64;
@@ -58,10 +60,10 @@ const uint8_t VAL_BITCOUNT = 64;
 // using si64Matrix = aby3::si64Matrix;
 // using sbMatrix = aby3::sbMatrix;
 // using Decimal = aby3::Decimal;
-using namespace aby3;
+using namespace aby3;         // NOLINT
 
 using BetaCircuit = osuCrypto::BetaCircuit;
-using KoggeStoneLibrary = aby3::KoggeStoneLibrary;   // TODO move to crptotool
+using KoggeStoneLibrary = aby3::KoggeStoneLibrary;
 using Channel = primihub::link::Channel;
 
 
@@ -87,7 +89,8 @@ class MPCOperator {
 
   Channel& mNext() {return comm_pkg_ref_->mNext;}
   Channel& mPrev() {return comm_pkg_ref_->mPrev;}
-  int setup(std::string next_ip, std::string prev_ip, u32 next_port, u32 prev_port);
+  int setup(std::string next_ip,
+            std::string prev_ip, u32 next_port, u32 prev_port);
   int setup(std::shared_ptr<aby3::CommPkg> comm_pkg);
   int setup(aby3::CommPkg* comm_pkg);
   retcode InitEngine();
@@ -296,7 +299,7 @@ class MPCOperator {
     auto b0 = sharedFixed[0].cols() != constFixedMatrix.cols();
     auto b1 = sharedFixed[0].rows() != constFixedMatrix.rows();
     if (b0 || b1) {
-      throw std::runtime_error(LOCATION);
+      RaiseException(LOCATION);
     }
     sf64Matrix<D> temp = sharedFixed;
     if (partyIdx == 0) {
@@ -350,7 +353,8 @@ class MPCOperator {
   }
 
   template <Decimal D>
-  sf64Matrix<D> MPC_Sub_Const(f64<D> constfixed, sf64Matrix<D> &sharedFixed, bool mode) {
+  sf64Matrix<D> MPC_Sub_Const(f64<D> constfixed,
+                              sf64Matrix<D> &sharedFixed, bool mode) {
     sf64Matrix<D> temp = sharedFixed;
 
     if (partyIdx == 0) {
@@ -402,8 +406,13 @@ class MPCOperator {
 
   template <Decimal D>
   sf64Matrix<D> MPC_Dot_Mul(const sf64Matrix<D> &A, const sf64Matrix<D> &B) {
-    if (A.cols() != B.cols() || A.rows() != B.rows())
-      throw std::runtime_error(LOCATION);
+    if (A.cols() != B.cols() || A.rows() != B.rows()) {
+      std::stringstream ss;
+      ss << "sf64Matrix, Shape does not match, "
+         << "A(row, col): (" << A.rows() << ": " << A.cols()<< ") "
+         << "B(row, col): (" << B.rows() << ": " << B.cols()<< ") ";
+      RaiseException(ss.str())
+    }
 
     sf64Matrix<D> ret(A.rows(), A.cols());
     eval.asyncDotMul(runtime, A, B, ret).get();
@@ -539,11 +548,11 @@ class MPCOperator {
 
       drelu_result = MPC_DReLu(Y_temp);
 
-      VLOG(6) << i << "th Drelu result for Y_temp"
-              << revealAll(drelu_result).format(HeavyFmt);
+      VLOG(6) << i << "th Drelu result for Y_temp: "
+              << revealAll(drelu_result).format(CSVFormat);
 
       drelu_result_temp = revealAll(
-          drelu_result);  // ematrix should mutiply rank to get rank matrix.
+          drelu_result);  // ematrix should multiply rank to get rank matrix.
       // rank_matrix += rank * drelu_result_temp;//check if this is working!!!
       for (i64 i = 0; i < Alpha_matrix.size(); ++i) {
         Alpha_matrix(i) += round_bound * static_cast<u64>(drelu_result_temp(i));
@@ -557,7 +566,7 @@ class MPCOperator {
     }
 
     if (partyIdx == 0) {
-      VLOG(6) << "final Alpha_matrix: " << Alpha_matrix;
+      VLOG(6) << "final Alpha_matrix: " << Alpha_matrix.format(CSVFormat);
     }
     return Alpha_matrix;
   }
@@ -616,7 +625,7 @@ class MPCOperator {
       drelu_result = MPC_DReLu(Y_temp);
 
       drelu_result_temp = revealAll(
-          drelu_result);  // ematrix should mutiply rank to get rank matrix.
+          drelu_result);  // ematrix should multiply rank to get rank matrix.
       // rank_matrix += rank * drelu_result_temp;//check if this is working!!!
       for (i64 i = 0; i < Alpha_matrix.size(); ++i) {
         Alpha_matrix(i) += round_bound * static_cast<u64>(drelu_result_temp(i));
@@ -683,8 +692,13 @@ class MPCOperator {
 
   template <Decimal D>
   sf64Matrix<D> MPC_Div(const sf64Matrix<D> &A, const sf64Matrix<D> &B) {
-    if (A.cols() != B.cols() || A.rows() != B.rows())
-      throw std::runtime_error(LOCATION);
+    if (A.cols() != B.cols() || A.rows() != B.rows()) {
+      std::stringstream ss;
+      ss << "sf64Matrix, Shape does not match, "
+         << "A(row, col): (" << A.rows() << ": " << A.cols()<< ") "
+         << "B(row, col): (" << B.rows() << ": " << B.cols()<< ") ";
+      RaiseException(ss.str());
+    }
     sf64Matrix<D> ret(A.rows(), B.cols());
 
     sf64Matrix<D> denominator_sign(B.rows(), B.cols());
@@ -699,7 +713,7 @@ class MPCOperator {
     sf64Matrix<D> quotient_sign(B.rows(), B.cols());
     MPC_Dotproduct(denominator_sign, numerator_sign, quotient_sign);
 
-    //.................................................................................
+    //......................................................................
     // judge whether denominator >=0.5 or <0.5
     f64Matrix<D> zeropointfive(B.rows(), B.cols());
     for (u64 i = 0; i < B.rows(); i++) {
@@ -743,9 +757,9 @@ class MPCOperator {
     }
 
     // VLOG(6) << "denominatorLess: "
-    //         << revealAll(denominatorLess).format(HeavyFmt);
+    //         << revealAll(denominatorLess).format(CSVFormat);
     // VLOG(6) << "denominatorMore: "
-    //         << revealAll(denominatorMore).format(HeavyFmt);
+    //         << revealAll(denominatorMore).format(CSVFormat);
 
     eMatrix<i64> rankLess(lessIdx.size(), B.cols());
     eMatrix<i64> rankMore(moreIdx.size(), B.cols());
@@ -762,7 +776,7 @@ class MPCOperator {
     for (u64 i = 0; i < moreIdx.size(); i++) {
       rank(moreIdx[i], 0) = rankMore(i, 0);
     }
-    //.................................................................................
+    //..................................................................
 
     /*because of the limitation of PIECEWISE, we have to input n rows and 1
      * cols*/
@@ -805,33 +819,34 @@ class MPCOperator {
     }
 
     VLOG(6) << "sfnormalization: "
-            << revealAll(sfnormalization).format(HeavyFmt);
+            << revealAll(sfnormalization).format(CSVFormat);
 
     sf64Matrix<D> temp_twob(B.rows(), B.cols());
     sf64Matrix<D> w0(B.rows(), B.cols());
     i64 constant_two = 2;
     eval.asyncConstMul(constant_two, denominator,
                        temp_twob);  // const needn't .get()
-    //...............................................................................
+    //.................................................................
 
     sf64Matrix<D> c(B.rows(), B.cols());
     // truncate D，no additional truncation
     MPC_Dotproduct(denominator, sfnormalization, c, 0);
 
-    VLOG(6) << "c result: " << revealAll(c).format(HeavyFmt);
+    VLOG(6) << "c result: " << revealAll(c).format(CSVFormat);
     sf64Matrix<D> temp_twoc(B.rows(), B.cols());
     eval.asyncConstMul(constant_two, c,
                        temp_twoc);  // const needn't .get()
-    //...............................................................................
+    //................................................................
     // The initial approximation of 1/c
-    w0 = sftwopotnine - temp_twoc;  // here means w0 has been truncate by rank+1;
+    // here means w0 has been truncate by rank+1;
+    w0 = sftwopotnine - temp_twoc;
 
-    VLOG(6) << "1/c w0 result: " << revealAll(w0).format(HeavyFmt);
+    VLOG(6) << "1/c w0 result: " << revealAll(w0).format(CSVFormat);
 
     // The initial approximation of 1/b
     MPC_Dotproduct(w0, sfnormalization, w0, 0);
 
-    VLOG(6) << "1/b w0 result: " << revealAll(w0).format(HeavyFmt);
+    VLOG(6) << "1/b w0 result: " << revealAll(w0).format(CSVFormat);
 
     sf64Matrix<D> epsilon0(B.rows(), B.cols());
 
@@ -839,23 +854,23 @@ class MPCOperator {
 
     MPC_Dotproduct(denominator, w0, bw0, 0);
 
-    VLOG(6) << "bw0 result: " << revealAll(bw0).format(HeavyFmt);
+    VLOG(6) << "bw0 result: " << revealAll(bw0).format(CSVFormat);
 
     // The initial approximation of a/b
     sf64Matrix<D> aw0(B.rows(), B.cols());
     MPC_Dotproduct(numerator, w0, aw0, 0);
 
-    VLOG(6) << "aw0 result: " << revealAll(aw0).format(HeavyFmt);
+    VLOG(6) << "aw0 result: " << revealAll(aw0).format(CSVFormat);
 
     epsilon0 = sfconstant_one - bw0;
 
-    VLOG(6) << "epsilon0 result: " << revealAll(epsilon0).format(HeavyFmt);
+    VLOG(6) << "epsilon0 result: " << revealAll(epsilon0).format(CSVFormat);
 
-    //............................................................................
+    //.................................................................
     sf64Matrix<D> epsilon0_one(B.rows(), B.cols());
     epsilon0_one = sfconstant_one + epsilon0;
     VLOG(6) << "epsilon0_one result: "
-            << revealAll(epsilon0_one).format(HeavyFmt);
+            << revealAll(epsilon0_one).format(CSVFormat);
 
     sf64Matrix<D> epsilon_prod(B.rows(), B.cols());
     // Closer and closer to a/b
@@ -871,11 +886,12 @@ class MPCOperator {
       MPC_Dotproduct(epsilon_prod, epsilon_i_one, epsilon_prod, 0);
       epsilon_pre = epsilon_i;
     }
-    //..............................................................................
+    //................................................................
     // get final result:
     MPC_Dotproduct(epsilon_prod, quotient_sign, ret);
 
-    VLOG(6) << "ret result: " << revealAll(ret).format(HeavyFmt);
+    VLOG(6) << "ret result: " << revealAll(ret).format(CSVFormat);
+
 
     return ret;
   }
@@ -897,7 +913,7 @@ class MPCOperator {
         } else if (partyIdx == (i + 2) % 3) {
           this->mNext().recv(shape);
         } else {
-          throw std::runtime_error("Message recv logic error.");
+          RaiseException("Message recv logic error.");
         }
       }
 
@@ -918,7 +934,7 @@ class MPCOperator {
     for (uint64_t i = 0; i < 3; i++) {
       if (all_party_shape[i][0] == 0 && all_party_shape[i][1] == 0) {
         if (skip_index != -1) {
-          throw std::runtime_error(
+          RaiseException(
               "There are two party that don't provide any value at last, but "
               "compare operator require value from two party.");
         } else {
@@ -928,7 +944,7 @@ class MPCOperator {
     }
 
     if (skip_index == -1)
-      throw std::runtime_error(
+      RaiseException(
           "This operator is binary, can only handle value from two party.");
 
     // Shape of matrix in two party shoubld be the same.
@@ -1006,7 +1022,7 @@ class MPCOperator {
         m.mData = m.mData.array() * -1;
     }
 
-    LOG(INFO) << "Finish evalute MSB circuit.";
+    LOG(INFO) << "Finish evaluate MSB circuit.";
   }
 
   void MPC_Compare(i64Matrix &m, sbMatrix &sh_res);

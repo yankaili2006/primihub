@@ -32,12 +32,16 @@ namespace primihub::task {
 class MPCExecutor {
  public:
   MPCExecutor(const std::string& task_req,
-              const std::string& protocol = "ABY3");
+              const std::string& protocol = "ABY3",
+              const std::string& root_ca_path = "",
+              const std::string& key_path = "",
+              const std::string& cert_path = "");
   ~MPCExecutor();
   retcode Max(const std::vector<double>& input, std::vector<double>* result);
   retcode Min(const std::vector<double>& input, std::vector<double>* result);
   retcode Avg(const std::vector<double>& input,
-              const std::vector<int64_t>& col_rows, std::vector<double>* result);
+              const std::vector<int64_t>& col_rows,
+              std::vector<double>* result);
   retcode Sum(const std::vector<double>& input, std::vector<double>* result);
   void StopTask();
 
@@ -88,6 +92,9 @@ class MPCExecutor {
   std::unique_ptr<MPCTask> task_ptr_{nullptr};
   std::string func_name_{"mpc_statistics"};
   std::string sync_flag_content_{"SyncFlag"};
+  std::string root_ca_path_;
+  std::string key_path_;
+  std::string cert_path_;
 };
 }  // namespace primihub::task
 

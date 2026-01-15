@@ -26,10 +26,13 @@
 #include "src/primihub/service/dataset/model.h"
 #include "src/primihub/util/network/message_interface.h"
 #include "src/primihub/util/network/link_context.h"
+#include "src/primihub/util/file_util.h"
+#include "src/primihub/common/value_check_util.h"
 
 using arrow::Array;
 using arrow::DoubleArray;
 using arrow::Int64Array;
+using arrow::Int32Array;
 using arrow::Table;
 namespace primihub {
 eMatrix<double> logistic_main(sf64Matrix<D> &train_data_0_1,
@@ -68,6 +71,21 @@ LogisticRegressionExecutor::LogisticRegressionExecutor(
   ss << config.job_id << "_" << config.task_id << "_party_" << local_id_
      << "_lr";
   model_name_ = ss.str();
+}
+
+retcode LogisticRegressionExecutor::ParseExcludeColumns(
+    primihub::rpc::Task &task_config) {
+  const auto& param_map = task_config.params().param_map();
+  auto it = param_map.find("ColumnsExclude");
+  if (it == param_map.end()) {
+    return retcode::SUCCESS;
+  }
+  const auto& columns_info =
+      it->second.value_string_array().value_string_array();
+  for (const auto& col : columns_info) {
+    this->columns_exclude_.push_back(col);
+  }
+  return retcode::SUCCESS;
 }
 
 int LogisticRegressionExecutor::loadParams(primihub::rpc::Task &task) {
@@ -115,6 +133,9 @@ int LogisticRegressionExecutor::loadParams(primihub::rpc::Task &task) {
     if (model_file_name_ == "") {
       model_file_name_ = "./" + model_name_ + ".csv";
     }
+    model_file_name_ = CompletePath(model_file_name_);
+    // parse colums which do not need to read data
+    ParseExcludeColumns(task);
   } catch (std::exception &e) {
     LOG(ERROR) << "Failed to load params: " << e.what();
     return -1;
@@ -124,11 +145,11 @@ int LogisticRegressionExecutor::loadParams(primihub::rpc::Task &task) {
   return 0;
 }
 
-int LogisticRegressionExecutor::_LoadDatasetFromCSV(std::string &dataset_id) {
+int LogisticRegressionExecutor::_LoadDataset(const std::string &dataset_id) {
   auto driver = this->dataset_service_->getDriver(dataset_id,
                                                   this->is_dataset_detail_);
   if (driver == nullptr) {
-    LOG(ERROR) << "get datset driver failed";
+    LOG(ERROR) << "get dataset driver failed";
     return -1;
   }
   auto cursor = driver->read();
@@ -136,12 +157,29 @@ int LogisticRegressionExecutor::_LoadDatasetFromCSV(std::string &dataset_id) {
     LOG(ERROR) << "get data cursor failed";
     return -1;
   }
-  auto ds = cursor->read();
+  auto orgin_schema = driver->dataSetAccessInfo()->ArrowSchema();
+  std::shared_ptr<arrow::Schema> new_schema = orgin_schema;
+  for (const auto& col_name : this->columns_exclude_) {
+    int index = new_schema->GetFieldIndex(col_name);
+    if (index == -1) {
+      LOG(WARNING) << "Column " << col_name << " not exists";
+      continue;
+    }
+    auto result = new_schema->RemoveField(index);
+    if (!result.ok()) {
+      std::stringstream ss;
+      ss << "Remove Column " << col_name
+         << " From Data Table Schema failed. " << result.status();
+      RaiseException(ss.str());
+    }
+    new_schema = *result;
+  }
+  auto ds = cursor->read(new_schema);
   if (ds == nullptr) {
     LOG(ERROR) << "read dataset data failed";
     return -1;
   }
-  auto& table = std::get<std::shared_ptr<Table>>(ds->data);
+  auto& table = std::get<std::shared_ptr<arrow::Table>>(ds->data);
 
   // Label column.
   std::vector<std::string> col_names = table->ColumnNames();
@@ -149,19 +187,34 @@ int LogisticRegressionExecutor::_LoadDatasetFromCSV(std::string &dataset_id) {
   int num_col = table->num_columns();
 
   // 'array' include values in a column of csv file.
-  auto array = std::static_pointer_cast<DoubleArray>(
-      table->column(num_col - 1)->chunk(0));
-  int64_t array_len = array->length();
-  VLOG(3) << "Label column '" << col_names[num_col - 1] << "' has " << array_len
-          << " values.";
+  int64_t array_len{0};
+  int chunk_size = table->column(num_col - 1)->num_chunks();
+
+  std::vector<int64_t> train_data_each_chunk(chunk_size);
+  auto& chunks = table->column(num_col - 1)->chunks();
+  double training_set_percentage = 0.8;
+  for (int i = 0; i < chunk_size; i++) {
+    auto& array = chunks[i];
+    int64_t len = array->length();
+    train_data_each_chunk[i] = floor(len * training_set_percentage);
+    array_len += len;
+  }
+
+  VLOG(3) << "Label column '" << col_names[num_col - 1]
+          << "' has " << array_len << " values.";
 
   // Force the same value count in every column.
   for (int i = 0; i < num_col - 1; i++) {
-    auto array =
-        std::static_pointer_cast<DoubleArray>(table->column(i)->chunk(0));
-    if (array->length() != array_len) {
-      LOG(ERROR) << "Column " << col_names[i] << " has " << array->length()
-                 << " value, but label column has " << array_len << " value.";
+    int64_t col_array_len{0};
+    auto& chunks = table->column(i)->chunks();
+    for (const auto& array : chunks) {
+      col_array_len += array->length();
+    }
+    if (col_array_len != array_len) {
+      std::stringstream ss;
+      ss << "Column " << col_names[i] << " has " << col_array_len << " value, "
+         << "but Label column has " << array_len << " value.";
+      RaiseException(ss.str());
       errors = true;
       break;
     }
@@ -169,37 +222,13 @@ int LogisticRegressionExecutor::_LoadDatasetFromCSV(std::string &dataset_id) {
 
   if (errors)
     return -1;
-  int64_t train_length = floor(array_len * 0.8);
+  int64_t train_length = std::accumulate(train_data_each_chunk.begin(),
+                                         train_data_each_chunk.end(),
+                                         0);
   int64_t test_length = array_len - train_length;
-  // LOG(INFO)<<"array_len: "<<array_len;
-  // LOG(INFO)<<"train_length: "<<train_length;
-  // LOG(INFO)<<"test_length: "<<test_length;
-  // train_input_.resize(train_length, num_col);
-  // test_input_.resize(test_length, num_col);
-  // // m.resize(array_len, num_col);
-  // for (int i = 0; i < num_col; i++) {
-  //   if (table->schema()->GetFieldByName(col_names[i])->type()->id() == 9) {
-  //     auto array =
-  //         std::static_pointer_cast<Int64Array>(table->column(i)->chunk(0));
-  //     for (int64_t j = 0; j < array->length(); j++) {
-  //       if (j < train_length)
-  //         train_input_(j, i) = array->Value(j);
-  //       else
-  //         test_input_(j - train_length, i) = array->Value(j);
-  //       // m(j, i) = array->Value(j);
-  //     }
-  //   } else {
-  //     auto array =
-  //         std::static_pointer_cast<DoubleArray>(table->column(i)->chunk(0));
-  //     for (int64_t j = 0; j < array->length(); j++) {
-  //       if (j < train_length)
-  //         train_input_(j, i) = array->Value(j);
-  //       else
-  //         test_input_(j - train_length, i) = array->Value(j);
-  //       // m(j, i) = array->Value(j);
-  //     }
-  //   }
-  // }
+  LOG(INFO) << "array_len: "<<array_len;
+  LOG(INFO) << "train_length: "<<train_length;
+  LOG(INFO) << "test_length: "<<test_length;
   train_input_.resize(train_length, num_col + 1);
   test_input_.resize(test_length, num_col + 1);
   // m.resize(array_len, num_col);
@@ -214,38 +243,64 @@ int LogisticRegressionExecutor::_LoadDatasetFromCSV(std::string &dataset_id) {
         // m(j, i) = array->Value(j);
       }
     } else {
-      if (table->schema()->GetFieldByName(col_names[i - 1])->type()->id() ==
-          9) {
-        auto array = std::static_pointer_cast<Int64Array>(
-            table->column(i - 1)->chunk(0));
-
-        for (int64_t j = 0; j < array->length(); j++) {
-          if (j < train_length) {
-            train_input_(j, i) = array->Value(j);
-          } else {
-            test_input_(j - train_length, i) = array->Value(j);
+      auto type_ptr = table->schema()->GetFieldByName(col_names[i - 1])->type();
+      auto data_type = type_ptr->id();
+      std::string type_name = type_ptr->name();
+      auto chunk_array = table->column(i - 1);
+      int chunk_size = chunk_array->num_chunks();
+      int64_t train_data_start = 0;
+      int64_t test_data_start = 0;
+      for (int chk_i = 0; chk_i < chunk_size; chk_i++) {
+        auto array = chunk_array->chunk(chk_i);
+        auto train_length = train_data_each_chunk[chk_i];
+        auto test_length = array->length() - train_length;
+        if (data_type == arrow::Type::type::INT64) {
+          auto ret = FillTrainAndTestData<Int64Array>(array,
+                                                      train_data_start,
+                                                      test_data_start,
+                                                      i,
+                                                      train_length);
+          if (ret != retcode::SUCCESS) {
+            std::stringstream ss;
+            ss << "Column " << col_names[i-1] << ", "
+              << "Convert Data From " << type_name << " To Int64 failed";
+            RaiseException(ss.str());
           }
-          // m(j, i) = array->Value(j);
+        } else if (data_type == arrow::Type::type::INT32) {
+          auto ret = FillTrainAndTestData<Int32Array>(array,
+                                                      train_data_start,
+                                                      test_data_start,
+                                                      i,
+                                                      train_length);
+          if (ret != retcode::SUCCESS) {
+            std::stringstream ss;
+            ss << "Column " << col_names[i-1] << ", "
+              << "Convert Data From " << type_name << " To Int32 failed";
+            RaiseException(ss.str());
+          }
+        } else {
+          auto ret = FillTrainAndTestData<DoubleArray>(array,
+                                                       train_data_start,
+                                                       test_data_start,
+                                                       i,
+                                                       train_length);
+          if (ret != retcode::SUCCESS) {
+            std::stringstream ss;
+            ss << "Column " << col_names[i-1] << ", "
+              << "Convert Data From " << type_name << " To Double failed";
+            RaiseException(ss.str());
+          }
         }
-      } else {
-        auto array = std::static_pointer_cast<DoubleArray>(
-            table->column(i - 1)->chunk(0));
-        for (int64_t j = 0; j < array->length(); j++) {
-          if (j < train_length)
-            train_input_(j, i) = array->Value(j);
-          else
-            test_input_(j - train_length, i) = array->Value(j);
-          // m(j, i) = array->Value(j);
-        }
+        train_data_start += train_length;
+        test_data_start += test_length;
       }
     }
   }
-
-  return array->length();
+  return array_len;
 }
 
 int LogisticRegressionExecutor::loadDataset() {
-  int ret = _LoadDatasetFromCSV(this->train_dataset_id_);
+  int ret = _LoadDataset(this->train_dataset_id_);
   // file reading error or file empty
   if (ret <= 0) {
     LOG(ERROR) << "Load dataset failed.";
@@ -260,9 +315,11 @@ int LogisticRegressionExecutor::loadDataset() {
   // }
 
   if (train_input_.cols() != test_input_.cols()) {
-    LOG(ERROR)
-        << "Dimension mismatch between local train dataset and test dataset.";
-    return -3;
+    std::stringstream ss;
+    ss << "Dimension mismatch between local train dataset and test dataset."
+       << "local train dataset dims: " << train_input_.cols() << " "
+       << "local test dataset dims: " << test_input_.cols();
+    RaiseException(ss.str());
   }
 
   VLOG(3) << "Train dataset has " << train_input_.rows()
@@ -295,19 +352,19 @@ int LogisticRegressionExecutor::_ConstructShares(sf64Matrix<D> &w,
       train_shares[i] = engine_.remoteInput<D>(i);
   }
   if (train_shares[0].cols() != train_shares[1].cols()) {
-    LOG(ERROR)
-        << "Count of column in train dataset mismatch between party 0 and 1, "
-        << "party 0 has " << train_shares[0].cols() << " column, party 1 has "
-        << train_shares[1].cols() << " column.";
-    return -1;
+    std::stringstream ss;
+    ss << "Count of column in train dataset mismatch between party 0 and 1, "
+       << "party 0 has " << train_shares[0].cols() << " column, party 1 has "
+       << train_shares[1].cols() << " column.";
+    RaiseException(ss.str());
   }
 
   if (train_shares[1].cols() != train_shares[2].cols()) {
-    LOG(ERROR)
-        << "Count of column in train dataset mismatch between party 1 and 2, "
+    std::stringstream ss;
+    ss  << "Count of column in train dataset mismatch between party 1 and 2, "
         << "party 1 has " << train_shares[1].cols() << " column, party 2 has "
         << train_shares[2].cols() << " column.";
-    return -1;
+    RaiseException(ss.str());
   }
 
   int num_cols = train_shares[0].cols() - 1;
@@ -347,27 +404,27 @@ int LogisticRegressionExecutor::_ConstructShares(sf64Matrix<D> &w,
   }
 
   if (test_shares[0].cols() != test_shares[1].cols()) {
-    LOG(ERROR)
-        << "Count of column in test dataset mismatch between party 0 and 1, "
+    std::stringstream ss;
+    ss  << "Count of column in test dataset mismatch between party 0 and 1, "
         << "party 0 has " << test_shares[0].cols() << " column, party 1 has "
         << test_shares[1].cols() << " column.";
-    return -2;
+    RaiseException(ss.str());
   }
 
   if (test_shares[1].cols() != train_shares[0].cols()) {
-    LOG(ERROR)
-        << "Count of column mismatch between train dataset and test dataset, "
+    std::stringstream ss;
+    ss  << "Count of column mismatch between train dataset and test dataset, "
         << "train dataset has " << train_shares[0].cols()
         << ", test dataset has " << test_shares[1].cols() << " column.";
-    return -2;
+    RaiseException(ss.str());
   }
 
   if (test_shares[1].cols() != test_shares[2].cols()) {
-    LOG(ERROR)
-        << "Count of column in test dataset mismatch between party 1 and 2, "
+    std::stringstream ss;
+    ss  << "Count of column in test dataset mismatch between party 1 and 2, "
         << "party 1 has " << test_shares[1].cols() << " column, party 2 has "
         << test_shares[2].cols() << " column.";
-    return -2;
+    RaiseException(ss.str());
   }
 
   num_cols = test_shares[0].cols() - 1;

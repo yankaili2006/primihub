@@ -27,6 +27,7 @@
 #include <tuple>
 #include <string>
 #include <queue>
+#include <vector>
 
 #include "src/primihub/common/common.h"
 #include "src/primihub/util/threadsafe_queue.h"
@@ -104,6 +105,7 @@ class VMNodeImpl {
   void CleanFinishedSchedulerWorkerThread();
   void ManageTaskOperatorThread();
   void ProcessKillTaskThread();
+  void ReportAliveInfoThread();
 
   std::shared_ptr<service::DatasetService> GetDatasetService() {
     return dataset_service_;
@@ -119,6 +121,10 @@ class VMNodeImpl {
   retcode ProcessForwardData(const rpc::TaskContext& task_info,
                              const std::string& key,
                              std::string* data_buffer);
+  retcode ProcessCompleteStatus(const rpc::TaskContext& task_info,
+                             const std::string& key,
+                             uint64_t expected_complete_num);
+
   retcode WaitUntilWorkerReady(const std::string& worker_id,
                                int timeout_ms = -1);
   std::shared_ptr<Nodelet> GetNodelet() { return this->nodelet_;}
@@ -127,23 +133,17 @@ class VMNodeImpl {
   retcode Init();
   std::shared_ptr<Worker> CreateWorker();
   std::shared_ptr<Worker> CreateWorker(const std::string& worker_id);
+  std::shared_ptr<Worker> CreateWorker(const rpc::TaskContext& task_info);
 
   void CleanDuplicateTaskIdFilter();
   bool IsDuplicateTask(const rpc::TaskContext& task_info);
   retcode GetAllParties(const rpc::Task& task_config,
                         std::vector<Node>* all_party);
-
-  std::string TaskInfoToString(const rpc::TaskContext& task_info) {
-    std::string info;
-    info.append("job_id: ").append(task_info.job_id()).append(", ")
-        .append("task_id: ").append(task_info.task_id()).append(", ")
-        .append("sub_task_id: ").append(task_info.sub_task_id()).append(", ")
-        .append("request_id: ").append(task_info.request_id());
-    return info;
-  }
   retcode ExecuteAddTaskOperation(task_manage_t&& task_detail);
   retcode ExecuteDelTaskOperation(task_manage_t&& task_detail);
   retcode ExecuteKillTaskOperation(task_manage_t&& task_detail);
+  std::string GenerateUUID();
+  auto GetDeviceInfo() -> std::tuple<std::string, std::string>;
 
  private:
   std::string node_id_;
@@ -183,6 +183,8 @@ class VMNodeImpl {
   ThreadSafeQueue<task_executor_container_t> finished_task_queue_;
   ThreadSafeQueue<task_executor_container_t> kill_task_queue_;
   std::future<void> kill_task_queue_fut_;
+  std::future<void> report_alive_info_fut_;
+  bool disable_report_{false};
 };
 }  // namespace primihub
 #endif  // SRC_PRIMIHUB_NODE_NODE_IMPL_H_

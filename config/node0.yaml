@@ -20,13 +20,18 @@ node: "node0"
 #use_tls: true
 location: "127.0.0.1"
 use_tls: false
-
 grpc_port: 50050
 
-#certificate:
-#  root_ca: "data/cert/ca.crt"
-#  key: "data/cert/node0.key"
-#  cert: "data/cert/node0.crt"
+# certificate:
+#   root_ca: "data/cert/ca.crt"
+#   key: "data/cert/test.key"
+#   cert: "data/cert/test.crt"
+
+# public_ip_proxy:
+#   mode: "grpc"
+#   ip:  "127.0.0.1"
+#   port: 30009
+#   use_tls: false
 
 proxy_server:
   mode: "grpc"
@@ -46,6 +51,9 @@ tee:
   cert_path: "data/sgx/"
   ra_server_addr: "127.0.0.1:8888"
 
+# default storage path
+# storage_path: "data"
+
 # load datasets
 datasets:
   # ABY3 LR test case datasets
@@ -55,14 +63,6 @@ datasets:
   - description: "test_party_0"
     model: "csv"
     source: "data/test_party_0.csv"
-
-  # MNIST test case datasets
-  - description: "test_party_0_self"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_0"
-  - description: "test_party_0_next"
-    model: "csv"
-    source: "data/falcon/dataset/MNIST/input_1"
 
   # FL fake dataset
   - description: "fl_fake_data"

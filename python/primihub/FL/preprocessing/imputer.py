@@ -2,40 +2,61 @@ import numbers
 import numpy as np
 from sklearn.impute import SimpleImputer as SKL_SimpleImputer
 from sklearn.impute._base import _BaseImputer
-from .base import PreprocessBase
-from .util import get_dense_mask, unique
-from primihub.FL.sketch import send_local_kll_sketch, merge_client_kll_sketch
+from sklearn.utils._encode import _unique
+from sklearn.utils._mask import _get_mask
+from .base import _PreprocessBase
+from .util import validate_quantile_sketch_params
+from ..sketch import (
+    send_local_quantile_sketch,
+    merge_local_quantile_sketch,
+    get_quantiles,
+    send_local_fi_sketch,
+    merge_local_fi_sketch,
+    get_frequent_items,
+)
 
 
-class SimpleImputer(PreprocessBase, _BaseImputer):
-
-    def __init__(self,
-                 missing_values=np.nan,
-                 strategy='mean',
-                 fill_value=None,
-                 copy=True,
-                 add_indicator=False,
-                 keep_empty_features=False,
-                 FL_type=None,
-                 role=None,
-                 channel=None):
+class SimpleImputer(_PreprocessBase, _BaseImputer):
+    def __init__(
+        self,
+        missing_values=np.nan,
+        strategy="mean",
+        fill_value=None,
+        copy=True,
+        add_indicator=False,
+        keep_empty_features=False,
+        sketch_name="KLL",
+        k=200,
+        is_hra=True,
+        FL_type=None,
+        role=None,
+        channel=None,
+    ):
         super().__init__(FL_type, role, channel)
-        if self.FL_type == 'H' and strategy != 'constant':
+        if self.FL_type == "H" and strategy != "constant":
             self.check_channel()
-        self.module = SKL_SimpleImputer(missing_values=missing_values,
-                                        strategy=strategy,
-                                        fill_value=fill_value,
-                                        copy=copy,
-                                        add_indicator=add_indicator,
-                                        keep_empty_features=keep_empty_features)
-        if FL_type == 'H':
+        self.sketch_name = sketch_name
+        self.k = k
+        self.is_hra = is_hra
+        self.module = SKL_SimpleImputer(
+            missing_values=missing_values,
+            strategy=strategy,
+            fill_value=fill_value,
+            copy=copy,
+            add_indicator=add_indicator,
+            keep_empty_features=keep_empty_features,
+        )
+        if FL_type == "H":
             self.missing_values = missing_values
             self.strategy = strategy
             self.copy = copy
             self.add_indicator = add_indicator
 
     def Hfit(self, X):
-        if self.role == 'client':
+        self.module._validate_params()
+        validate_quantile_sketch_params(self)
+
+        if self.role == "client":
             X = self.module._validate_input(X, in_fit=True)
 
             # default fill_value is 0 for numerical input and "missing_value"
@@ -59,24 +80,17 @@ class SimpleImputer(PreprocessBase, _BaseImputer):
                     "numerical value when imputing numerical "
                     "data".format(fill_value)
                 )
-            
-        elif self.role == 'server':
+
+        elif self.role == "server":
             fill_value = self.module.fill_value
 
-        self.module.statistics_ = \
-            self._dense_fit(
-                X,
-                self.module.strategy,
-                self.module.missing_values,
-                fill_value
-            )
-        
+        self.module.statistics_ = self._dense_fit(X, self.module.strategy, fill_value)
         return self
-    
-    def _dense_fit(self, X, strategy, missing_values, fill_value):
+
+    def _dense_fit(self, X, strategy, fill_value):
         """Fit the transformer on dense data."""
-        if self.role == 'client':
-            missing_mask = get_dense_mask(X, missing_values)
+        if self.role == "client":
+            missing_mask = _get_mask(X, self.missing_values)
             masked_X = np.ma.masked_array(X, mask=missing_mask)
 
             super()._fit_indicator(missing_mask)
@@ -84,9 +98,9 @@ class SimpleImputer(PreprocessBase, _BaseImputer):
 
         # Mean
         if strategy == "mean":
-            if self.role == 'client':
+            if self.role == "client":
                 sum_masked = np.ma.sum(masked_X, axis=0)
-                self.channel.send('sum_masked', sum_masked)
+                self.channel.send("sum_masked", sum_masked)
 
                 n_samples = X.shape[0] - np.sum(missing_mask, axis=0)
                 # for backward-compatibility, reduce n_samples to an integer
@@ -94,105 +108,128 @@ class SimpleImputer(PreprocessBase, _BaseImputer):
                 # missing values)
                 if np.ptp(n_samples) == 0:
                     n_samples = n_samples[0]
-                self.channel.send('n_samples', n_samples)
-                mean = self.channel.recv('mean')
+                self.channel.send("n_samples", n_samples)
+                mean = self.channel.recv("mean")
 
-            elif self.role == 'server':
-                sum_masked = self.channel.recv_all('sum_masked')
+            elif self.role == "server":
+                sum_masked = self.channel.recv_all("sum_masked")
                 sum_masked = np.ma.sum(sum_masked, axis=0)
 
-                n_samples = self.channel.recv_all('n_samples')
+                n_samples = self.channel.recv_all("n_samples")
                 # n_samples could be np.int or np.ndarray
                 n_sum = 0
                 for n in n_samples:
                     n_sum += n
                 if isinstance(n_sum, np.ndarray) and np.ptp(n_sum) == 0:
                     n_sum = n_sum[0]
-                
+
                 mean_masked = sum_masked / n_sum
                 # Avoid the warning "Warning: converting a masked element to nan."
                 mean = np.ma.getdata(mean_masked)
-                mean[np.ma.getmask(mean_masked)] = 0 if self.module.keep_empty_features else np.nan
-                self.channel.send_all('mean', mean)
-
+                mean[np.ma.getmask(mean_masked)] = (
+                    0 if self.module.keep_empty_features else np.nan
+                )
+                self.channel.send_all("mean", mean)
             return mean
 
         # Median
         elif strategy == "median":
-            if self.role == 'client':
-                send_local_kll_sketch(masked_X, self.channel)
-                median = self.channel.recv('median')
+            if self.role == "client":
+                send_local_quantile_sketch(
+                    masked_X,
+                    self.channel,
+                    sketch_name=self.sketch_name,
+                    k=self.k,
+                    is_hra=self.is_hra,
+                )
+                median = self.channel.recv("median")
 
-            elif self.role == 'server':
-                kll = merge_client_kll_sketch(self.channel)
-                mask = kll.is_empty()
+            elif self.role == "server":
+                sketch = merge_local_quantile_sketch(
+                    channel=self.channel,
+                    sketch_name=self.sketch_name,
+                    k=self.k,
+                    is_hra=self.is_hra,
+                )
+
+                if self.sketch_name == "KLL":
+                    mask = sketch.is_empty()
+                elif self.sketch_name == "REQ":
+                    mask = [col_sketch.is_empty() for col_sketch in sketch]
 
                 if not any(mask):
-                    median = kll.get_quantiles(0.5).reshape(-1)
+                    median = get_quantiles(
+                        quantiles=0.5,
+                        sketch=sketch,
+                        sketch_name=self.sketch_name,
+                    )
                 else:
                     median = np.zeros_like(mask, dtype=float)
                     idx = [i for i, x in enumerate(mask) if not x]
-                    median[idx] = kll.get_quantiles(0.5, isk=idx).reshape(-1)
+                    if self.sketch_name == "KLL":
+                        median[idx] = sketch.get_quantiles(0.5, isk=idx).reshape(-1)
+                    elif self.sketch_name == "REQ":
+                        for i in idx:
+                            median[i] = sketch[i].get_quantile(0.5)
                     median[mask] = 0 if self.module.keep_empty_features else np.nan
 
-                self.channel.send_all('median', median)
-
+                self.channel.send_all("median", median)
             return median
 
         # Most frequent
         elif strategy == "most_frequent":
-            if self.role == 'client':
-                frequency_counts = []
-                # To be able access the elements by columns
-                X = X.transpose()
-                mask = missing_mask.transpose()
-
-                for row, row_mask in zip(X[:], mask[:]):
-                    row_mask = np.logical_not(row_mask).astype(bool)
-                    row = row[row_mask]
-
-                    if len(row) == 0 and self.module.keep_empty_features:
-                        frequency_counts.append(([missing_values], len(row_mask)))
+            if self.role == "client":
+                items, counts = [], []
+                for col, col_mask in zip(X.T, missing_mask.T):
+                    col = col[~col_mask]
+                    if len(col) == 0:
+                        items.append([])
+                        counts.append([])
                     else:
-                        frequency_counts.append(unique(row, return_counts=True))
+                        col_items, col_counts = _unique(col, return_counts=True)
+                        items.append(col_items)
+                        counts.append(col_counts)
 
-                self.channel.send('frequency_counts', frequency_counts)
-                most_frequent = self.channel.recv('most_frequent')
+                send_local_fi_sketch(items, counts, channel=self.channel, k=self.k)
+                most_frequent = self.channel.recv("most_frequent")
 
-            elif self.role == 'server':
-                frequency_counts = self.channel.recv_all('frequency_counts')
-                n_features = len(frequency_counts[0])
-                most_frequent = []
+            elif self.role == "server":
+                sketch = merge_local_fi_sketch(
+                    channel=self.channel,
+                    k=self.k,
+                )
 
-                for feature_idx in range(n_features):
-                    feature_counts = {}
-                    for client_fc in frequency_counts:
-                        feature, counts = client_fc[feature_idx]
-                        for i, key in enumerate(feature):
-                            if key in feature_counts:
-                                feature_counts[key] += counts[i]
-                            else:
-                                feature_counts[key] = counts[i]
-
-                    most_frequent_for_idx = max(feature_counts, key=feature_counts.get)
-                    if most_frequent_for_idx == missing_values:
-                        if self.module.keep_empty_features:
-                            most_frequent_for_idx = 0
+                mask = [col_sketch.is_empty() for col_sketch in sketch]
+                if not any(mask):
+                    most_frequent, _ = get_frequent_items(
+                        sketch=sketch,
+                        error_type="NFP",
+                        max_item=1,
+                    )
+                    most_frequent = np.array(most_frequent, dtype=object).reshape(-1)
+                else:
+                    most_frequent = np.empty(len(sketch), dtype=object)
+                    for i, empty in enumerate(mask):
+                        if empty:
+                            most_frequent[i] = (
+                                0 if self.module.keep_empty_features else np.nan
+                            )
                         else:
-                            most_frequent_for_idx = np.nan
-                    most_frequent.append(most_frequent_for_idx)
-                most_frequent = np.array(most_frequent)
-
-                self.channel.send_all('most_frequent', most_frequent)
-
+                            item, _ = get_frequent_items(
+                                sketch[i],
+                                error_type="NFP",
+                                max_item=1,
+                                vector=False,
+                            )
+                            most_frequent[i] = item[0]
+                self.channel.send_all("most_frequent", most_frequent)
             return most_frequent
 
         # Constant
         elif strategy == "constant":
-            if self.role == 'client':
+            if self.role == "client":
                 # for constant strategy, self.statistcs_ is used to store
                 # fill_value in each column
                 return np.full(X.shape[1], fill_value, dtype=X.dtype)
-            elif self.role == 'server':
+            elif self.role == "server":
                 return fill_value
-            

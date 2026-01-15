@@ -144,7 +144,7 @@ retcode LinkContext::Recv(const std::string& key,
     return retcode::FAIL;
   }
   if (tmp_recv_buf.size() != recv_size) {
-    LOG(ERROR) << "recv data length doest not match, expected: " << recv_size
+    LOG(ERROR) << "recv data length doesn't match, expected: " << recv_size
                << " but get: " << tmp_recv_buf.size();
     return retcode::FAIL;
   }
@@ -202,4 +202,16 @@ retcode LinkContext::SendRecv(const std::string& key,
   return retcode::SUCCESS;
 }
 
+retcode LinkContext::CheckSendCompleteStatus(const std::string& key,
+                                             const Node& dest_node,
+                                             uint64_t expected_complete_num) {
+  auto channel = getChannel(dest_node);
+  auto ret = channel->CheckSendCompleteStatus(key, expected_complete_num);
+  if (ret != retcode::SUCCESS) {
+    LOG(ERROR) << "send data to peer: [" << dest_node.to_string()
+        << "] failed";
+    return ret;
+  }
+  return retcode::SUCCESS;
+}
 }  // namespace primihub::network

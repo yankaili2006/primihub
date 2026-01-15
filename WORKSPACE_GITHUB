@@ -5,7 +5,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_r
 
 git_repository(
   name = "com_github_bazel_rules_3rdparty",
-  commit = "6053d0f3f70cda3e2e145ed008c7bd9c822e5b37",
+  commit = "67ac7942969ee2224732a9b50b17180390c4fc97",
   remote = "https://github.com/primihub/bazel-rules-thirdparty.git",
 )
 
@@ -57,7 +57,7 @@ http_archive(
     "https://gitlab.com/libeigen/eigen/-/archive/3.4/eigen-3.4.tar.bz2",
     "https://primihub.oss-cn-beijing.aliyuncs.com/tools/eigen-3.4.tar.bz2",
   ],
-  sha256 = "a6f7aaa7b19c289dfeb33281e1954f19bf2ba1c6cae2c182354d820f535abef8",
+  #sha256 = "a6f7aaa7b19c289dfeb33281e1954f19bf2ba1c6cae2c182354d820f535abef8",
 )
 
 new_git_repository(
@@ -431,7 +431,7 @@ http_archive(
 git_repository(
   name = "osu_libpsi",
   #branch = "bazel_branch",
-  commit = "d56340b515989832983ac84132fef1a03184a9bc",
+  commit = "dcbab133a09579efebc1662a11eeab01b055eb86",
   remote = "https://github.com/primihub/libPSI.git",
 )
 
@@ -467,13 +467,14 @@ new_git_repository(
     # shallow_since = "1591047380 -0700",
 )
 
-new_git_repository(
-  name = "toolkit_relic",
-  build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
-  remote = "https://github.com/primihub/relic.git",
-  # tag 0.6.0
-  commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
-)
+# Temporarily disabled Relic due to macOS build issues
+# new_git_repository(
+#   name = "toolkit_relic",
+#   build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
+#   remote = "https://github.com/primihub/relic.git",
+#   # tag 0.6.0
+#   commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
+# )
 
 http_archive(
   name = "com_github_redis_hiredis",
@@ -544,7 +545,7 @@ http_archive(
 git_repository(
     name = "mircrosoft_apsi",
     #branch = "bazel_version",
-    commit = "44243c1a85435c04ca858279757ca5524dd3c9aa",
+    commit = "0b192b2df72a136900b8c06fdd0caff8b1d4ce8d",
     remote = "https://github.com/primihub/APSI.git",
 )
 

@@ -28,7 +28,7 @@
 
 #include "src/primihub/node/ds.h"
 #include "src/primihub/common/common.h"
-#include "src/primihub/node/server_config.h"
+#include "src/primihub/common/config/server_config.h"
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/service/dataset/meta_service/factory.h"
 #ifdef SGX
@@ -62,12 +62,12 @@ void RunServer(primihub::VMNodeInterface* node_service,
     std::string ip = host_config.ip();
     uint32_t port = host_config.port();
     if (host_config.use_tls()) {
-        LOG(INFO) << "server runing using tls";
+        LOG(INFO) << "server running using tls";
         // Listen to all interfaces
         ARROW_CHECK_OK(arrow::flight::Location::ForGrpcTls(
             "0.0.0.0", port, &location));
     } else {
-        LOG(INFO) << "server runing in no tls mode";
+        LOG(INFO) << "server running in no tls mode";
         ARROW_CHECK_OK(arrow::flight::Location::ForGrpcTcp(
             "0.0.0.0", port, &location));
     }
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
     std::string node_id = host_config.id();
     auto& cert_config = server_config.getCertificateConfig();
     std::string node_ip = "0.0.0.0";
-    // service for dataset meta controle
+    // service for dataset meta control
     auto& node_cfg = server_config.getNodeConfig();
     auto& meta_service_cfg = node_cfg.meta_service_config;
     auto meta_service =

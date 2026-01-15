@@ -22,11 +22,13 @@
 #include "src/primihub/util/network/link_context.h"
 namespace primihub::pir {
 using LinkContext = network::LinkContext;
+using IndexType = int32_t;
 struct Options {
   LinkContext* link_ctx_ref;
   std::map<std::string, Node> party_info;
   std::string self_party;
   std::string code;
+  Role role;
   // online
   bool use_cache{false};
   // offline task
@@ -52,14 +54,21 @@ class BasePirOperator {
     return stop_.load(std::memory_order::memory_order_relaxed);
   }
   std::string PartyName() {return options_.self_party;}
+  Role role() {return options_.role;}
   LinkContext* GetLinkContext() {return options_.link_ctx_ref;}
   Node& PeerNode() {return options_.peer_node;}
   Node& ProxyNode() {return options_.proxy_node;}
+  std::string PackageCountKey(const std::string& request_id) {
+    return "pack_count";
+  }
 
  protected:
   std::atomic<bool> stop_{false};
   Options options_;
   std::string key_{"pir_key"};
+  std::string response_key_{"response_pir_key"};
+  std::string key_task_end_{"pir_task_end"};
+  std::string loop_num_key_{"loop_num_key"};
 };
 }  // namespace primihub::pir
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_BASE_PIR_H_

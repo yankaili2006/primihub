@@ -7,7 +7,10 @@
 #include <memory>
 
 #include "src/primihub/util/util.h"
+#include "src/primihub/util/log.h"
+#include "src/primihub/util/proto_log_helper.h"
 
+namespace pb_util = primihub::proto::util;
 namespace primihub::network {
 GrpcChannel::GrpcChannel(const primihub::Node& node, LinkContext* link_ctx) :
     IChannel(link_ctx) {
@@ -15,6 +18,19 @@ GrpcChannel::GrpcChannel(const primihub::Node& node, LinkContext* link_ctx) :
   std::string address_ = node.ip_ + ":" + std::to_string(node.port_);
   auto channel = buildChannel(address_, node.use_tls_);
   stub_ = rpc::VMNode::NewStub(channel);
+  dataset_stub_ = rpc::DataSetService::NewStub(channel);
+}
+
+retcode GrpcChannel::BuildTaskInfo(rpc::TaskContext* task_info) {
+  auto link_ctx = this->getLinkContext();
+  if (link_ctx == nullptr) {
+    return retcode::FAIL;
+  }
+  task_info->set_job_id(link_ctx->job_id());
+  task_info->set_task_id(link_ctx->task_id());
+  task_info->set_sub_task_id(link_ctx->sub_task_id());
+  task_info->set_request_id(link_ctx->request_id());
+  return retcode::SUCCESS;
 }
 
 std::shared_ptr<grpc::Channel> GrpcChannel::buildChannel(
@@ -53,6 +69,11 @@ retcode GrpcChannel::sendRecv(const std::string& role,
   std::shared_ptr<reader_writer_t> client_stream(stub_->SendRecv(&context));
   std::vector<rpc::TaskRequest> send_requests;
   buildTaskRequest(role, send_data, &send_requests);
+  std::string TASK_INFO_STR;
+  if (!send_requests.empty()) {
+    auto& task_info = send_requests[0].task_info();
+    TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
+  }
   for (const auto& request : send_requests) {
     client_stream->Write(request);
   }
@@ -65,11 +86,15 @@ retcode GrpcChannel::sendRecv(const std::string& role,
   }
   grpc::Status status = client_stream->Finish();
   if (!status.ok()) {
-    LOG(ERROR) << "recv data encountes error, detail: "
-      << status.error_code() << ": " << status.error_message();
+    PH_LOG(ERROR, LogType::kTask)
+        << TASK_INFO_STR
+        << "recv data encountes error, detail: "
+        << status.error_code() << ": " << status.error_message();
     return retcode::FAIL;
   }
-  VLOG(5) << "recv data success, data size: " << recv_data->size();
+  PH_VLOG(5, LogType::kTask)
+      << TASK_INFO_STR
+      << "recv data success, data size: " << recv_data->size();
   return retcode::SUCCESS;
 }
 
@@ -83,8 +108,11 @@ bool GrpcChannel::send_wrapper(const std::string& role,
                                const std::string& data) {
     auto ret = this->send(role, data);
     if (ret != retcode::SUCCESS) {
-        LOG(ERROR) << "send data encountes error";
-        return false;
+      rpc::TaskContext task_info;
+      BuildTaskInfo(&task_info);
+      std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
+      PH_LOG(ERROR, LogType::kTask) << "send data encountes error";
+      return false;
     }
     return true;
 }
@@ -93,7 +121,11 @@ bool GrpcChannel::send_wrapper(const std::string& role,
                                std::string_view sv_data) {
     auto ret = this->send(role, sv_data);
     if (ret != retcode::SUCCESS) {
-        LOG(ERROR) << "send data encountes error";
+        rpc::TaskContext task_info;
+        BuildTaskInfo(&task_info);
+        PH_LOG(ERROR, LogType::kTask)
+            << pb_util::TaskInfoToString(task_info)
+            << "send data encountes error";
         return false;
     }
     return true;
@@ -109,6 +141,11 @@ retcode GrpcChannel::send(const std::string& role, std::string_view data_sv) {
   buildTaskRequest(role, data_sv, &send_requests);
   auto send_tiemout_ms = this->getLinkContext()->sendTimeout();
   int retry_time{0};
+  std::string TASK_INFO_STR;
+  if (!send_requests.empty()) {
+    const auto& task_info = send_requests[0].task_info();
+    TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
+  }
   do {
     grpc::ClientContext context;
     if (send_tiemout_ms > 0) {
@@ -127,23 +164,27 @@ retcode GrpcChannel::send(const std::string& role, std::string_view data_sv) {
     if (status.ok()) {
       auto ret_code = task_response.ret_code();
       if (ret_code) {
-          LOG(ERROR) << "send data to [" << dest_node_.to_string()
-            << "] return failed error code: " << ret_code;
+          PH_LOG(ERROR, LogType::kTask)
+              << "send data to [" << dest_node_.to_string()
+              << "] return failed error code: " << ret_code;
           return retcode::FAIL;
       }
       break;
     } else {
-      LOG(WARNING) << "send data to [" << dest_node_.to_string()
-                << "] failed. error_code: " << status.error_code() << " "
-                << "error message: " << status.error_message() << " "
-                << "retry: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << "send data to [" << dest_node_.to_string()
+          << "] failed. error_code: " << status.error_code() << " "
+          << "error message: " << status.error_message() << " "
+          << "retry: " << retry_time;
       retry_time++;
       if (retry_time < retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send data to [" << dest_node_.to_string()
-                << "] failed. error_code: " << status.error_code() << " "
-                << "error message: " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send data to [" << dest_node_.to_string()
+            << "] failed. error_code: " << status.error_code() << " "
+            << "error message: " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -164,9 +205,6 @@ retcode GrpcChannel::buildTaskRequest(const std::string& role,
   size_t max_package_size = LIMITED_PACKAGE_SIZE;  // limit data size 4M
   size_t total_length = data_sv.size();
   char* send_buf = const_cast<char*>(data_sv.data());
-  std::string job_id = this->getLinkContext()->job_id();
-  std::string task_id = this->getLinkContext()->task_id();
-  std::string request_id = this->getLinkContext()->request_id();
   // VLOG(5) << "job_id: " << job_id << " "
   //     << "task_id: " << task_id << " "
   //     << "request id: " << request_id << " "
@@ -175,9 +213,7 @@ retcode GrpcChannel::buildTaskRequest(const std::string& role,
   do {
     rpc::TaskRequest task_request;
     auto task_info = task_request.mutable_task_info();
-    task_info->set_job_id(job_id);
-    task_info->set_task_id(task_id);
-    task_info->set_request_id(request_id);
+    BuildTaskInfo(task_info);
     task_request.set_role(role);
     task_request.set_data_len(total_length);
     auto data_ptr = task_request.mutable_data();
@@ -207,9 +243,7 @@ std::string GrpcChannel::forwardRecv(const std::string& role) {
   }
   rpc::TaskRequest send_request;
   auto task_info = send_request.mutable_task_info();
-  task_info->set_task_id(this->getLinkContext()->task_id());
-  task_info->set_job_id(this->getLinkContext()->job_id());
-  task_info->set_request_id(this->getLinkContext()->request_id());
+  BuildTaskInfo(task_info);
   send_request.set_role(role);
   // VLOG(5) << "forwardRecv request info: job_id: "
   //         << this->getLinkContext()->job_id()
@@ -223,6 +257,7 @@ std::string GrpcChannel::forwardRecv(const std::string& role) {
   // waiting for response
   std::string tmp_buff;
   rpc::TaskRequest recv_response;
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(*task_info);
   bool init_flag{false};
   while (client_reader->Read(&recv_response)) {
     auto data = recv_response.data();
@@ -231,25 +266,30 @@ std::string GrpcChannel::forwardRecv(const std::string& role) {
       tmp_buff.reserve(data_len);
       init_flag = true;
     }
-    VLOG(5) << "data length: " << data.size();
+    PH_VLOG(5, LogType::kTask)
+        << "data length: " << data.size();
     tmp_buff.append(data);
   }
 
   grpc::Status status = client_reader->Finish();
   if (!status.ok()) {
-    LOG(ERROR) << "recv data encountes error, detail: "
-               << status.error_code() << ": " << status.error_message();
+    PH_LOG(ERROR, LogType::kTask)
+        << "recv data encountes error, detail: "
+        << status.error_code() << ": " << status.error_message();
     return std::string("");
   }
   // VLOG(5) << "recv data success, data size: " << tmp_buff.size();
   auto time_cost = timer.timeElapse();
-  VLOG(5) << "forwardRecv time cost(ms): " << time_cost;
+  PH_VLOG(5, LogType::kTask)
+      << "forwardRecv time cost(ms): " << time_cost;
   return tmp_buff;
 }
 
 retcode GrpcChannel::submitTask(const rpc::PushTaskRequest& request,
                                 rpc::PushTaskReply* reply) {
   int retry_time{0};
+  const auto& task_info = request.task().task_info();
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -257,21 +297,27 @@ retcode GrpcChannel::submitTask(const rpc::PushTaskRequest& request,
     context.set_deadline(deadline);
     grpc::Status status = stub_->SubmitTask(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send submitTask to node: ["
-              <<  dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kScheduler)
+          << TASK_INFO_STR
+          << "send submitTask to node: ["
+          <<  dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send submitTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kScheduler)
+          << TASK_INFO_STR
+          << "send submitTask to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send submitTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kScheduler)
+            << TASK_INFO_STR
+            << "send submitTask to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -283,6 +329,8 @@ retcode GrpcChannel::submitTask(const rpc::PushTaskRequest& request,
 retcode GrpcChannel::executeTask(const rpc::PushTaskRequest& request,
                                  rpc::PushTaskReply* reply) {
   int retry_time{0};
+  const auto& task_info = request.task().task_info();
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -291,31 +339,38 @@ retcode GrpcChannel::executeTask(const rpc::PushTaskRequest& request,
     auto task_info = request.task().task_info();
     grpc::Status status = stub_->ExecuteTask(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send ExecuteTask to node: ["
-              << dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send ExecuteTask to node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send ExecuteTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send ExecuteTask to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send ExecuteTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send ExecuteTask to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
   } while (true);
   return retcode::SUCCESS;
 }
+
 retcode GrpcChannel::StopTask(const rpc::TaskContext& request,
                               rpc::Empty* reply) {
-//
   int retry_time{0};
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(request);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -323,21 +378,27 @@ retcode GrpcChannel::StopTask(const rpc::TaskContext& request,
     context.set_deadline(deadline);
     grpc::Status status = stub_->StopTask(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send StopTask to node: ["
-              <<  dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send StopTask to node: ["
+          <<  dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send StopTask to Node ["
-                <<  dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send StopTask to Node ["
+          <<  dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send StopTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send StopTask to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -348,6 +409,8 @@ retcode GrpcChannel::StopTask(const rpc::TaskContext& request,
 retcode GrpcChannel::killTask(const rpc::KillTaskRequest& request,
                               rpc::KillTaskResponse* reply) {
   int retry_time{0};
+  const auto& task_info = request.task_info();
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -355,21 +418,27 @@ retcode GrpcChannel::killTask(const rpc::KillTaskRequest& request,
     context.set_deadline(deadline);
     grpc::Status status = stub_->KillTask(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send killTask to node: ["
-              <<  dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send killTask to node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send KillTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send KillTask to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send KillTask to Node ["
-                << dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send KillTask to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -380,6 +449,8 @@ retcode GrpcChannel::killTask(const rpc::KillTaskRequest& request,
 retcode GrpcChannel::updateTaskStatus(const rpc::TaskStatus& request,
                                       rpc::Empty* reply) {
   int retry_time{0};
+  const auto& task_info = request.task_info();
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -387,21 +458,27 @@ retcode GrpcChannel::updateTaskStatus(const rpc::TaskStatus& request,
     context.set_deadline(deadline);
     grpc::Status status = stub_->UpdateTaskStatus(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send UpdateTaskStatus to node: ["
-              <<  dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send UpdateTaskStatus to node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send UpdateTaskStatus to Node ["
-                <<  dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send UpdateTaskStatus to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send UpdateTaskStatus to Node ["
-                <<  dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send UpdateTaskStatus to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -412,6 +489,7 @@ retcode GrpcChannel::updateTaskStatus(const rpc::TaskStatus& request,
 retcode GrpcChannel::fetchTaskStatus(const rpc::TaskContext& request,
                                      rpc::TaskStatusReply* reply) {
   int retry_time{0};
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(request);
   do {
     grpc::ClientContext context;
     auto deadline = std::chrono::system_clock::now() +
@@ -419,21 +497,27 @@ retcode GrpcChannel::fetchTaskStatus(const rpc::TaskContext& request,
     context.set_deadline(deadline);
     grpc::Status status = stub_->FetchTaskStatus(&context, request, reply);
     if (status.ok()) {
-      VLOG(5) << "send FetchTaskStatus from node: ["
-              <<  dest_node_.to_string() << "] rpc succeeded.";
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send FetchTaskStatus from node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
       break;
     } else {
-      LOG(WARNING) << "send FetchTaskStatus from Node ["
-                <<  dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message() << " "
-                << "retry times: " << retry_time;
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send FetchTaskStatus from Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
         continue;
       } else {
-        LOG(ERROR) << "send FetchTaskStatus from Node ["
-                <<  dest_node_.to_string() << "] rpc failed. "
-                << status.error_code() << ": " << status.error_message();
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send FetchTaskStatus from Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
         return retcode::FAIL;
       }
     }
@@ -466,4 +550,127 @@ std::shared_ptr<IChannel> GrpcLinkContext::getChannel(
   return channel;
 }
 
+// dataset related operation
+retcode GrpcChannel::DownloadData(const rpc::DownloadRequest& request,
+                                  std::vector<std::string>* data) {
+  grpc::ClientContext context;
+  auto deadline = std::chrono::system_clock::now() +
+      std::chrono::seconds(CONTROL_CMD_TIMEOUT_S);
+  context.set_deadline(deadline);
+  auto client_reader = this->dataset_stub_->DownloadData(&context, request);
+
+  const auto& request_id = request.request_id();
+  rpc::DownloadRespone response;
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(request_id);
+  bool has_error{false};
+  std::string err_msg;
+  while (client_reader->Read(&response)) {
+    if (response.code() != rpc::Status::SUCCESS) {
+      has_error = true;
+      err_msg = response.info();
+      break;
+    }
+    auto block_data = response.mutable_data();
+    data->push_back(std::move(*block_data));
+  }
+
+  grpc::Status status = client_reader->Finish();
+  if (!status.ok()) {
+    LOG(ERROR) << TASK_INFO_STR
+               << "recv data encountes error, detail: "
+               << status.error_code() << ": " << status.error_message();
+    return retcode::FAIL;
+  }
+  if (has_error) {
+    LOG(ERROR) << "download data encountes error: " << err_msg;
+    return retcode::FAIL;
+  }
+  return retcode::SUCCESS;
+}
+
+retcode GrpcChannel::CheckSendCompleteStatus(
+    const std::string& key, uint64_t expected_complete_num) {
+  int retry_time{0};
+  rpc::CompleteStatusRequest request;
+  auto task_info_ptr = request.mutable_task_info();
+  BuildTaskInfo(task_info_ptr);
+  request.set_key(key);
+  request.set_complete_count(expected_complete_num);
+  const auto& task_info = request.task_info();
+  std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
+  do {
+    grpc::ClientContext context;
+    auto deadline = std::chrono::system_clock::now() +
+        std::chrono::seconds(CONTROL_CMD_TIMEOUT_S);
+    context.set_deadline(deadline);
+    rpc::Empty reply;
+    grpc::Status status = stub_->CompleteStatus(&context, request, &reply);
+    if (status.ok()) {
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send CompleteStatus to node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
+      break;
+    } else {
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send CompleteStatus to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
+      retry_time++;
+      if (retry_time < this->retry_max_times_) {
+        continue;
+      } else {
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send CompleteStatus to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
+        return retcode::FAIL;
+      }
+    }
+  } while (true);
+  return retcode::SUCCESS;
+}
+
+retcode GrpcChannel::NewDataset(const rpc::NewDatasetRequest& request,
+                                rpc::NewDatasetResponse* reply) {
+  int retry_time{0};
+  // const auto& task_info = request.task().task_info();
+  std::string TASK_INFO_STR = "";
+  do {
+    grpc::ClientContext context;
+    auto deadline = std::chrono::system_clock::now() +
+        std::chrono::seconds(CONTROL_CMD_TIMEOUT_S);
+    context.set_deadline(deadline);
+    grpc::Status status = dataset_stub_->NewDataset(&context, request, reply);
+    if (status.ok()) {
+      PH_VLOG(5, LogType::kTask)
+          << TASK_INFO_STR
+          << "send NewDataset to node: ["
+          << dest_node_.to_string() << "] rpc succeeded.";
+      break;
+    } else {
+      PH_LOG(WARNING, LogType::kTask)
+          << TASK_INFO_STR
+          << "send NewDataset to Node ["
+          << dest_node_.to_string() << "] rpc failed. "
+          << status.error_code() << ": " << status.error_message() << " "
+          << "retry times: " << retry_time;
+      retry_time++;
+      if (retry_time < this->retry_max_times_) {
+        continue;
+      } else {
+        PH_LOG(ERROR, LogType::kTask)
+            << TASK_INFO_STR
+            << "send NewDataset to Node ["
+            << dest_node_.to_string() << "] rpc failed. "
+            << status.error_code() << ": " << status.error_message();
+        return retcode::FAIL;
+      }
+    }
+  } while (true);
+  return retcode::SUCCESS;
+}
 }  // namespace primihub::network

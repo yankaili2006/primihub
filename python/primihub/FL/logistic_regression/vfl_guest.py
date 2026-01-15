@@ -1,12 +1,13 @@
 from primihub.FL.utils.net_work import GrpcClient
 from primihub.FL.utils.base import BaseModel
-from primihub.FL.utils.file import check_directory_exist
+from primihub.FL.utils.file import save_pickle_file, load_pickle_file
 from primihub.FL.utils.dataset import read_data, DataLoader
 from primihub.utils.logger_util import logger
 from primihub.FL.crypto.ckks import CKKS
+from primihub.FL.psi import sample_alignment
 
-import pickle
 from sklearn.preprocessing import StandardScaler
+from sklearn.utils.validation import check_array
 
 from .vfl_base import LogisticRegression_Guest_Plaintext,\
                       LogisticRegression_Guest_CKKS
@@ -45,11 +46,17 @@ class LogisticRegressionGuest(BaseModel):
         
         # load dataset
         selected_column = self.role_params['selected_column']
-        id = self.role_params['id']
         x = read_data(data_info=self.role_params['data'],
-                      selected_column=selected_column,
-                      id=id)
-        x = x.values
+                      selected_column=selected_column)
+
+        # psi
+        id = self.role_params.get("id")
+        psi_protocol = self.common_params.get("psi")
+        if isinstance(psi_protocol, str):
+            x = sample_alignment(x, id, self.roles, psi_protocol)
+
+        x = x.drop(id, axis=1)
+        x = check_array(x, dtype='numeric')
 
         # guest init
         batch_size = min(x.shape[0], self.common_params['batch_size'])
@@ -107,11 +114,7 @@ class LogisticRegressionGuest(BaseModel):
             "transformer": scaler,
             "model": guest.model
         }
-        model_path = self.role_params['model_path']
-        check_directory_exist(model_path)
-        logger.info(f"model path: {model_path}")
-        with open(model_path, 'wb') as file_path:
-            pickle.dump(modelFile, file_path)
+        save_pickle_file(modelFile, self.role_params['model_path'])
 
     def predict(self):
         # setup communication channels
@@ -122,10 +125,7 @@ class LogisticRegressionGuest(BaseModel):
                                   task_info=self.task_info)
         
         # load model for prediction
-        model_path = self.role_params['model_path']
-        logger.info(f"model path: {model_path}")
-        with open(model_path, 'rb') as file_path:
-            modelFile = pickle.load(file_path)
+        modelFile = load_pickle_file(self.role_params['model_path'])
 
         # load dataset
         x = read_data(data_info=self.role_params['data'])
@@ -134,9 +134,12 @@ class LogisticRegressionGuest(BaseModel):
         if selected_column:
             x = x[selected_column]
         id = modelFile['id']
+        psi_protocol = self.common_params.get("psi")
+        if isinstance(psi_protocol, str):
+            x = sample_alignment(x, id, self.roles, psi_protocol)
         if id in x.columns:
             x.pop(id)
-        x = x.values
+        x = check_array(x, dtype='numeric')
 
         # data preprocessing
         transformer = modelFile['transformer']

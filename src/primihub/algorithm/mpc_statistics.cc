@@ -1,5 +1,6 @@
 // "Copyright [2023] <PrimiHub>"
 #include "src/primihub/algorithm/mpc_statistics.h"
+#include "src/primihub/executor/statistical_tests.h"
 #include <arrow/api.h>
 #include <arrow/csv/api.h>
 #include <arrow/csv/writer.h>
@@ -15,6 +16,8 @@
 #include "src/primihub/common/common.h"
 #include "src/primihub/util/file_util.h"
 #include "src/primihub/util/network/message_interface.h"
+#include "src/primihub/util/file_util.h"
+#include "src/primihub/common/value_check_util.h"
 
 using namespace rapidjson;
 // using primihub::columnDtypeToString;
@@ -74,20 +77,22 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
   do_nothing_ = false;
   Document json_doc;
   if (json_doc.Parse(json_str.c_str()).HasParseError()) {
-    LOG(ERROR) << "Parse json string failed, json:\n" << json_str << ".";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Parse json string failed, json:" << json_str << ".";
+    RaiseException(ss.str());
   }
 
   if (!json_doc.HasMember("features")) {
-    LOG(ERROR)
-        << "Json object should have 'features' member but not found now.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Json object should have 'features' member but not found now.";
+    RaiseException(ss.str());
   }
 
   const Value &features_content = json_doc["features"];
   if (!features_content.IsArray()) {
-    LOG(ERROR) << "Value of 'features' in json must be a array.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Value of 'features' in json must be a array.";
+    RaiseException(ss.str());
   }
 
   // Value of key 'features' contain dataset name and target columns.
@@ -95,16 +100,15 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
   for (int i = 0; i < features_content.Size(); i++) {
     const Value &item = features_content[i];
     if (!item.HasMember("resourceId")) {
-      LOG(ERROR) << "Can't find 'resourceId' in the value of 'features'in "
-                    "json string.";
-      return retcode::FAIL;
+      std::stringstream ss;
+      ss << "Can't find 'resourceId' in the value of 'features'in json string.";
+      RaiseException(ss.str());
     }
 
     // Value of 'resourceId' is dataset name.
     const Value &resource_id = item["resourceId"];
     if (!resource_id.IsString()) {
-      LOG(ERROR) << "Type of 'resourceId' should be string.";
-      return retcode::FAIL;
+      RaiseException("Type of 'resourceId' should be string.");
     }
 
     if (ds_name_ != resource_id.GetString())
@@ -113,15 +117,14 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
     // Value of 'checked' is array that include target column.
     const Value &checked = item["checked"];
     if (!checked.IsArray()) {
-      LOG(ERROR)
-          << "Value of 'checked' in the value of 'features' should be a array.";
-      return retcode::FAIL;
+      RaiseException(
+          "Value of 'checked' in the value of 'features' should be a array.");
     }
 
     LOG(INFO) << "Count of column processed is " << checked.Size() << ".";
 
     if (checked.Size() == 0) {
-      LOG(WARNING) << "No column in the value of key 'checked'.";
+      LOG(WARNING) << "No column in the value of key 'checked'";
       do_nothing_ = true;
       return retcode::FAIL;
     }
@@ -129,10 +132,10 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
     for (int i = 0; i < checked.Size(); i++) {
       const Value &tmp = checked[i];
       if (!tmp.IsString()) {
-        LOG(ERROR) << "The " << i + 1
-                   << "th value of array in the value of 'checked' should be a "
-                      "string.";
-        return retcode::FAIL;
+        std::stringstream ss;
+        ss  << "The " << i + 1
+            << "th value of array in the value of 'checked' should be a string";
+        RaiseException(ss.str());
       }
 
       target_columns_.emplace_back(tmp.GetString());
@@ -143,14 +146,14 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
   }
 
   if (found == false) {
-    LOG(ERROR) << "Can't find content for dataset " << ds_name_
-               << " in the json string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss  << "Can't find content for dataset " << ds_name_
+        << " in the json string.";
+    RaiseException(ss.str());
   }
 
   if (!json_doc.HasMember("type")) {
-    LOG(ERROR) << "Json object should have 'type' member but not found now.";
-    return retcode::FAIL;
+    RaiseException("Json object should have 'type' member but not found now.");
   }
 
   const Value &type_object = json_doc["type"];
@@ -163,8 +166,9 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
   } else if (type_object.GetString() == std::string("4")) {
     type_ = MPCStatisticsType::MIN;
   } else {
-    LOG(ERROR) << "Unknown statistics type " << type_object.GetString() << ".";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Unknown statistics type " << type_object.GetString() << ".";
+    RaiseException(ss.str());
   }
 
   return retcode::SUCCESS;
@@ -173,40 +177,46 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
 retcode MPCStatisticsExecutor::_parseColumnDtype(const std::string &json_str) {
   Document json_doc;
   if (json_doc.Parse(json_str.c_str()).HasParseError()) {
-    LOG(ERROR) << "Parse json string failed, json:\n" << json_str << ".";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Parse json string failed, json: " << json_str << ".";
+    RaiseException(ss.str());
   }
 
   if (!json_doc.HasMember(ds_name_.c_str())) {
-    LOG(ERROR) << "Can't find key '" << ds_name_ << "' in json string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't find key '" << ds_name_ << "' in json string.";
+    RaiseException(ss.str());
   }
 
   const Value &map_obj = json_doc[ds_name_.c_str()];
   if (!map_obj.HasMember("columns")) {
-    LOG(ERROR) << "Can't find key 'columns' in the value of '" << ds_name_
-               << "' in the json string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't find key 'columns' in the value of '" << ds_name_
+       << "' in the json string.";
+    RaiseException(ss.str());
   }
 
   if (!map_obj.HasMember("newDataSetId")) {
-    LOG(ERROR) << "Can't find key 'newDataSetId' in the value of '" << ds_name_
-               << "' in the json string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't find key 'newDataSetId' in the value of '" << ds_name_
+       << "' in the json string.";
+    RaiseException(ss.str());
   }
 
   if (!map_obj.HasMember("outputFilePath")) {
-    LOG(ERROR) << "Can't find key 'outputFilePath' in the value of '"
-               << ds_name_ << "' in the json string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Can't find key 'outputFilePath' in the value of '"
+       << ds_name_ << "' in the json string.";
+    RaiseException(ss.str());
   }
 
   // Get dtype of target columns.
   const Value &dtype_obj = map_obj["columns"];
   if (!dtype_obj.IsObject()) {
-    LOG(ERROR) << "Value of 'columns' in the value of '" << ds_name_
-               << "' should be object.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Value of 'columns' in the value of '" << ds_name_
+       << "' should be object.";
+    RaiseException(ss.str());
   }
 
   for (Value::ConstMemberIterator iter = dtype_obj.MemberBegin();
@@ -223,9 +233,10 @@ retcode MPCStatisticsExecutor::_parseColumnDtype(const std::string &json_str) {
   // Get dataset id of new dataset.
   const Value &new_id_obj = map_obj["newDataSetId"];
   if (!new_id_obj.IsString()) {
-    LOG(ERROR) << "Value of 'newDataSetId' in the value of '" << ds_name_
-               << "' should be string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss << "Value of 'newDataSetId' in the value of '" << ds_name_
+       << "' should be string.";
+    RaiseException(ss.str());
   }
 
   new_ds_id_ = new_id_obj.GetString();
@@ -233,12 +244,14 @@ retcode MPCStatisticsExecutor::_parseColumnDtype(const std::string &json_str) {
   // Get save path of new dataset.
   const Value &new_path = map_obj["outputFilePath"];
   if (!new_path.IsString()) {
-    LOG(ERROR) << "Value of 'outputFilePath' in the value of '" << ds_name_
-               << "' should be string.";
-    return retcode::FAIL;
+    std::stringstream ss;
+    ss  << "Value of 'outputFilePath' in the value of '" << ds_name_
+        << "' should be string.";
+    RaiseException(ss.str());
   }
 
   output_path_ = new_path.GetString();
+  output_path_ = CompletePath(output_path_);
 
   return retcode::SUCCESS;
 }
@@ -313,7 +326,9 @@ int MPCStatisticsExecutor::loadParams(primihub::rpc::Task &task) {
   for (const auto &col_name : target_columns_) {
     auto iter = col_type_.find(col_name);
     if (iter == col_type_.end()) {
+      std::stringstream ss;
       LOG(ERROR) << "Can't find dtype of column " << col_name << ".";
+      RaiseException(ss.str());
       miss_flag = true;
       break;
     }
@@ -321,9 +336,11 @@ int MPCStatisticsExecutor::loadParams(primihub::rpc::Task &task) {
     if ((iter->second != ColumnDtype::LONG) &&
         (iter->second != ColumnDtype::INTEGER) &&
         (iter->second != ColumnDtype::DOUBLE)) {
-      LOG(ERROR) << "Dtype of column " << iter->first << " is "
-                 << columnDtypeToString(iter->second)
-                 << ", don't support this dtype now.";
+      std::stringstream ss;
+      ss  << "Dtype of column " << iter->first << " is "
+          << columnDtypeToString(iter->second)
+          << ", don't support this dtype now.";
+      RaiseException(ss.str());
       miss_flag = true;
       break;
     }
@@ -405,10 +422,27 @@ retcode MPCStatisticsExecutor::InitEngine() {
     case rpc::Algorithm::SUM:
       type_ = MPCStatisticsType::SUM;
       break;
-    default:
-      LOG(ERROR) << "Unknown Algorithm operation type: "
-                 << static_cast<int>(op_type);
-      return retcode::FAIL;
+    case rpc::Algorithm::T_TEST:
+      type_ = MPCStatisticsType::T_TEST;
+      break;
+    case rpc::Algorithm::F_TEST:
+      type_ = MPCStatisticsType::F_TEST;
+      break;
+    case rpc::Algorithm::CHI_SQUARE_TEST:
+      type_ = MPCStatisticsType::CHI_SQUARE_TEST;
+      break;
+    case rpc::Algorithm::REGRESSION:
+      type_ = MPCStatisticsType::REGRESSION;
+      break;
+    case rpc::Algorithm::CORRELATION:
+      type_ = MPCStatisticsType::CORRELATION;
+      break;
+    default: {
+      std::stringstream ss;
+      ss  << "Unknown Algorithm operation type: "
+          << static_cast<int>(op_type);
+      RaiseException(ss.str());
+    }
     }
   }
   switch (type_) {
@@ -424,9 +458,29 @@ retcode MPCStatisticsExecutor::InitEngine() {
   case MPCStatisticsType::MIN:
     executor_ = std::make_unique<MPCMinOrMax>(type_);
     break;
-  default:
-    LOG(ERROR) << "No executor for "
-               << MPCStatisticsOperator::statisticsTypeToString(type_) << ".";
+  case MPCStatisticsType::T_TEST:
+    executor_ = std::make_unique<MPCTTest>();
+    break;
+  case MPCStatisticsType::F_TEST:
+    executor_ = std::make_unique<MPCFTest>();
+    break;
+  case MPCStatisticsType::CHI_SQUARE_TEST:
+    executor_ = std::make_unique<MPCChiSquareTest>();
+    break;
+  case MPCStatisticsType::CORRELATION:
+    executor_ = std::make_unique<MPCCorrelation>();
+    break;
+  case MPCStatisticsType::REGRESSION:
+    // Regression will be handled separately
+    LOG(INFO) << "Regression analysis will be handled by regression executor";
+    break;
+  default: {
+    std::stringstream ss;
+    ss << "No executor for "
+       << MPCStatisticsOperator::statisticsTypeToString(type_) << ".";
+    RaiseException(ss.str());
+  }
+
     return retcode::FAIL;
   }
   executor_->setupChannel(this->party_id(), this->CommPkgPtr());
@@ -442,7 +496,7 @@ int MPCStatisticsExecutor::loadDataset() {
   auto driver = dataset_service_->getDriver(dataset_id_,
                                             this->is_dataset_detail_);
   if (driver == nullptr) {
-    LOG(ERROR) << "get datset driver failed";
+    LOG(ERROR) << "get dataset driver failed";
     return -1;
   }
   auto cursor = std::move(driver->read());

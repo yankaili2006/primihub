@@ -43,7 +43,7 @@ class DataAlign:
     def parse_dataset_param(self):
         self_host_info = self.node_info.get(self.party_name, None)
         if self_host_info is None:
-          raise Exception("Party acces info for self is not found {}".format(self.party_name))
+          raise Exception("Party access info for self is not found {}".format(self.party_name))
         use_tls = 1 if self_host_info.use_tls else 0
         service_addr = "{}:{}:{}".format(self_host_info.ip.decode(),
                                         self_host_info.port,
@@ -404,28 +404,34 @@ class DataAlign:
             new_file_writer.writerow(header)
             for row in f_csv:
                 psi_key = ""
-                if isinstance(psi_index, list):
-                    for _index in psi_index:
-                        psi_key += row[_index]
-                else:
-                    psi_key = row[psi_index]
-                if psi_key not in intersection_set:
-                    continue
-                else:
-                    if psi_key != intersection_list[0]:  # save to map
-                        intersection_map[psi_key] = row
+                try:
+                    if len(row) == 0:
+                        logger.info(f"{row} is empty, ignore ...")
+                        continue
+                    if isinstance(psi_index, list):
+                        for _index in psi_index:
+                            psi_key += row[_index]
                     else:
-                        new_file_writer.writerow(row)
-                        del intersection_list[0]
-                    while True:
-                        if len(intersection_list) == 0:
-                            break
-                        psi_key = intersection_list[0]
-                        if psi_key in intersection_map:
-                            new_file_writer.writerow(intersection_map[psi_key])
-                            del intersection_list[0]
+                        psi_key = row[psi_index]
+                    if psi_key not in intersection_set:
+                        continue
+                    else:
+                        if psi_key != intersection_list[0]:  # save to map
+                            intersection_map[psi_key] = row
                         else:
-                            break
+                            new_file_writer.writerow(row)
+                            del intersection_list[0]
+                        while True:
+                            if len(intersection_list) == 0:
+                                break
+                            psi_key = intersection_list[0]
+                            if psi_key in intersection_map:
+                                new_file_writer.writerow(intersection_map[psi_key])
+                                del intersection_list[0]
+                            else:
+                                break
+                except Exception as e:
+                    continue
         self.register_new_dataset(host_address, "csv", new_dataset_output_path, new_dataset_id)
 
 
@@ -437,5 +443,5 @@ class DataAlign:
             self.generate_new_datast_from_mysql(meta_info, thread_num)
         else:
             raise RuntimeError(
-                "Don't support dataset model {} now.".format(dataset_model))
+                "unsupport dataset model {} now.".format(dataset_model))
 

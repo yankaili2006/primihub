@@ -2,18 +2,34 @@ BUILD_FLAG ?=
 
 TARGET := //:node \
           //:cli \
-          //src/primihub/cli:reg_cli \
-          //src/primihub/pybind_warpper:linkcontext \
-          //src/primihub/pybind_warpper:opt_paillier_c2py \
-          //src/primihub/task/pybind_wrapper:ph_secure_lib \
           //:task_main
 
+ifneq ($(disable_py_task), y)
+  TARGET += //src/primihub/pybind_warpper:linkcontext \
+      //src/primihub/pybind_warpper:opt_paillier_c2py \
+      //src/primihub/task/pybind_wrapper:ph_secure_lib
+  BUILD_FLAG += --define enable_py_task=true
+endif
+
+ifneq ($(disable_mpc_task), y)
+  BUILD_FLAG += --define enable_mpc_task=true
+endif
+
+ifneq ($(disable_pir_task), y)
+  BUILD_FLAG += --define enable_pir_task=true
+endif
+
+ifneq ($(disable_psi_task), y)
+  BUILD_FLAG += --define enable_psi_task=true
+endif
+
 ifeq ($(mysql), y)
-    BUILD_FLAG += --define enable_mysql_driver=true
+  BUILD_FLAG += --define enable_mysql_driver=true
 endif
 
 ifeq ($(protos), y)
-    TARGET += //src/primihub/protos:worker_py_pb2_grpc //src/primihub/protos:service_py_pb2_grpc
+  TARGET += //src/primihub/protos:worker_py_pb2_grpc \
+      //src/primihub/protos:service_py_pb2_grpc
 endif
 
 JOBS?=

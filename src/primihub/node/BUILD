@@ -22,6 +22,9 @@ cc_library(
     "//src/primihub/protos:worker_proto",
     "//src/primihub/common/config:config_lib",
     "//src/primihub/util:util_lib",
+    "//src/primihub/util:log_util",
+    "//src/primihub/util:pb_log_helper",
+    "//src/primihub/util:hash_lib",
     "//src/primihub/task/language:language_parser_factory",
     "//src/primihub/task/semantic:task_semantic_parser",
     "//src/primihub/service/dataset/meta_service:meta_service_factory",
@@ -30,19 +33,10 @@ cc_library(
     "@com_google_absl//absl/flags:flag",
     "@com_google_absl//absl/flags:parse",
     "@arrow",
+    "@curl//:curl",
+    "@com_github_stduuid//:stduuid_lib",
   ],
 )
-
-cc_library(
-  name = "server_config",
-  hdrs = ["server_config.h"],
-  srcs = ["server_config.cc"],
-  deps = [
-    "//src/primihub/common:common_defination",
-    "//src/primihub/common/config:config_lib",
-  ],
-)
-
 
 cc_library(
   name = "data_register_service",
@@ -53,6 +47,9 @@ cc_library(
     "//src/primihub/data_store:data_store_lib",
     "//src/primihub/service:dataset_service",
     "//src/primihub/util:thread_local_data",
+    "//src/primihub/common/config:server_config",
+    "//src/primihub/util:pb_log_helper",
+    "//src/primihub/util:file_util",
   ],
 )
 

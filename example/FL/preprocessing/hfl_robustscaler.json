@@ -32,7 +32,9 @@
                     "quantile_range_min": 25.0,
                     "quantile_range_max": 75.0,
                     "copy": true,
-                    "unit_variance": false
+                    "unit_variance": false,
+                    "sketch_name": "KLL",
+                    "k": 200
                 }
             }
         },

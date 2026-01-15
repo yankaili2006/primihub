@@ -67,16 +67,42 @@ class LogisticRegressionExecutor : public AlgorithmBase {
   int saveModel(void);
   retcode InitEngine() override;
 
+ protected:
+  retcode ParseExcludeColumns(primihub::rpc::Task &task_config);
+
  private:
   int _ConstructShares(sf64Matrix<D> &w, sf64Matrix<D> &train_data,
                        sf64Matrix<D> &train_label, sf64Matrix<D> &test_data,
                        sf64Matrix<D> &test_label);
 
-  int _LoadDatasetFromCSV(std::string &filename);
-
+  int _LoadDataset(const std::string& filename);
   uint16_t NextPartyId() {return (local_id_ + 1) % 3;}
   uint16_t PrevPartyId() {return (local_id_ + 2) % 3;}
 
+  template<typename T>
+  retcode FillTrainAndTestData(std::shared_ptr<arrow::Array> chunk_array,
+                               const int64_t train_fill_start_pos,
+                               const int64_t test_fill_start_pos,
+                               const int col_index,
+                               int64_t train_length) {
+    auto array = std::dynamic_pointer_cast<T>(chunk_array);
+    if (array == nullptr) {
+      return retcode::FAIL;
+    }
+    int64_t train_data_pos = train_fill_start_pos;
+    int64_t test_data_pos = test_fill_start_pos;
+    for (int64_t i = 0; i < train_length; i++) {
+      this->train_input_(train_data_pos, col_index) = array->Value(i);
+      train_data_pos++;
+    }
+    for (int64_t i = train_length; i < array->length(); i++) {
+      this->test_input_(test_data_pos, col_index) = array->Value(i);
+      test_data_pos++;
+    }
+    return retcode::SUCCESS;
+  }
+
+ private:
   std::string model_file_name_;
   std::string model_name_;
   uint16_t local_id_;
@@ -90,6 +116,7 @@ class LogisticRegressionExecutor : public AlgorithmBase {
   std::string test_input_filepath_;
   std::string train_dataset_id_;
   bool is_dataset_detail_{false};
+  std::vector<std::string> columns_exclude_;
   int batch_size_;
   int num_iter_;
 };
