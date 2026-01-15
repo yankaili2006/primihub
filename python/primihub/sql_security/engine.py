@@ -46,6 +46,20 @@ from .validators import (
     WindowFunctionValidator,
     SubqueryValidator
 )
+from .functions import FunctionValidator
+from .formatter import (
+    SQLFormatter,
+    SQLNormalizer,
+    SQLPrettifier,
+    SQLCompactor,
+    FormatOptions,
+    FormatStyle,
+    KeywordCase,
+    format_sql,
+    normalize_sql,
+    compact_sql,
+    prettify_sql
+)
 
 
 class SQLSecurityEngine:
@@ -71,7 +85,11 @@ class SQLSecurityEngine:
         self.policy = SecurityPolicy()
         self.schema_manager = SchemaSecurityManager()
         self._sql_parser: Optional[SQLParser] = None
+        self._function_validator: Optional[FunctionValidator] = None
+        self._formatter: Optional[SQLFormatter] = None
+        self._normalizer: Optional[SQLNormalizer] = None
         self._initialized = False
+        self._validate_functions = True  # 是否校验函数
 
         if config_path:
             self.load_config(config_path)
@@ -81,6 +99,32 @@ class SQLSecurityEngine:
         if self._sql_parser is None:
             self._sql_parser = SQLParser()
         return self._sql_parser
+
+    def _get_function_validator(self) -> FunctionValidator:
+        """获取函数校验器（延迟初始化）"""
+        if self._function_validator is None:
+            self._function_validator = FunctionValidator(
+                get_field_security_func=self._get_field_security_func()
+            )
+        return self._function_validator
+
+    def _get_formatter(self) -> SQLFormatter:
+        """获取SQL格式化器（延迟初始化）"""
+        if self._formatter is None:
+            self._formatter = SQLFormatter()
+        return self._formatter
+
+    def _get_normalizer(self) -> SQLNormalizer:
+        """获取SQL标准化器（延迟初始化）"""
+        if self._normalizer is None:
+            self._normalizer = SQLNormalizer()
+        return self._normalizer
+
+    def _get_field_security_func(self):
+        """获取字段安全查询函数"""
+        def get_field_security(table_name: str, field_name: str):
+            return self.schema_manager.get_field_security(table_name, field_name)
+        return get_field_security
 
     def load_config(self, config_path: str) -> None:
         """从配置文件加载安全配置
@@ -175,6 +219,10 @@ class SQLSecurityEngine:
             # 检查未知表
             self._check_unknown_tables(parsed_sql, result)
 
+            # 校验函数调用
+            if self._validate_functions:
+                self._validate_function_calls(sql, result)
+
         except Exception as e:
             result.add_issue(ValidationIssue(
                 issue_type=ValidationIssueType.UNKNOWN_RISK,
@@ -250,6 +298,87 @@ class SQLSecurityEngine:
                     remediation="请在配置文件中添加该表的安全配置，或使用默认的PROTECTED级别",
                     affected_tables=[table.table_name]
                 ))
+
+    def _validate_function_calls(self, sql: str, result: ValidationResult) -> None:
+        """校验SQL中的函数调用
+
+        Args:
+            sql: SQL语句
+            result: 校验结果
+        """
+        try:
+            func_validator = self._get_function_validator()
+            func_issues = func_validator.get_all_issues(sql)
+            for issue in func_issues:
+                result.add_issue(issue)
+        except Exception as e:
+            result.add_issue(ValidationIssue(
+                issue_type=ValidationIssueType.UNKNOWN_RISK,
+                risk_level=RiskLevel.LOW,
+                description=f"函数校验错误: {str(e)}",
+                validator_name="FunctionValidator"
+            ))
+
+    def set_function_validation(self, enabled: bool) -> None:
+        """设置是否启用函数校验
+
+        Args:
+            enabled: 是否启用
+        """
+        self._validate_functions = enabled
+
+    # SQL格式化相关方法
+
+    def format_sql(self, sql: str, style: FormatStyle = FormatStyle.READABLE) -> str:
+        """格式化SQL语句
+
+        Args:
+            sql: SQL语句
+            style: 格式化风格
+
+        Returns:
+            格式化后的SQL
+        """
+        formatter = self._get_formatter()
+        formatter.options.style = style
+        return formatter.format(sql)
+
+    def normalize_sql(self, sql: str) -> str:
+        """标准化SQL语句
+
+        Args:
+            sql: SQL语句
+
+        Returns:
+            标准化后的SQL
+        """
+        normalizer = self._get_normalizer()
+        return normalizer.normalize(sql)
+
+    def compare_sql(self, sql1: str, sql2: str) -> bool:
+        """比较两个SQL语句是否等价
+
+        Args:
+            sql1: 第一个SQL语句
+            sql2: 第二个SQL语句
+
+        Returns:
+            是否等价
+        """
+        normalizer = self._get_normalizer()
+        return normalizer.normalize(sql1) == normalizer.normalize(sql2)
+
+    def get_sql_hash(self, sql: str) -> str:
+        """获取SQL的哈希值
+
+        Args:
+            sql: SQL语句
+
+        Returns:
+            哈希值
+        """
+        normalizer = self._get_normalizer()
+        return normalizer.get_sql_hash(sql)
 
     def validate_batch(self, sqls: List[str], current_party: str = "default") -> List[ValidationResult]:
         """批量校验SQL语句

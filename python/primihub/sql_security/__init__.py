@@ -19,6 +19,8 @@ PrimiHub SQL安全校验模块
 - 字段保密属性管理
 - 各类SQL算子的安全检查
 - k-匿名和隐私风险分析
+- 函数安全校验（字符串、日期、时间戳、数值）
+- SQL格式化和标准化
 
 Usage:
     from primihub.sql_security import SQLSecurityEngine, validate_sql
@@ -39,6 +41,10 @@ Usage:
         for issue in result.issues:
             print(f"[{issue.risk_level.name}] {issue.description}")
             print(f"  建议: {issue.remediation}")
+
+    # 方式3: SQL格式化
+    formatted = engine.format_sql("select * from users where id=1")
+    print(formatted)
 """
 
 from .field_security import (
@@ -70,7 +76,52 @@ from .sql_parser import (
 )
 from .engine import SQLSecurityEngine, create_engine
 
-__version__ = "1.0.0"
+# 函数校验模块
+from .functions import (
+    # 字符串函数
+    StringFunctionType,
+    StringFunctionExtractor,
+    StringFunctionValidator,
+    is_safe_string_function,
+    # 日期函数
+    DateFunctionType,
+    DateFunctionExtractor,
+    DateFunctionValidator,
+    is_safe_date_function,
+    # 时间戳函数
+    TimestampFunctionType,
+    TimestampFunctionExtractor,
+    TimestampFunctionValidator,
+    is_safe_timestamp_function,
+    # 数值函数
+    NumericFunctionType,
+    NumericFunctionExtractor,
+    NumericFunctionValidator,
+    is_safe_numeric_function,
+    # 统一接口
+    FunctionExtractor,
+    FunctionValidator,
+    validate_functions,
+)
+
+# 格式化模块
+from .formatter import (
+    SQLFormatter,
+    SQLNormalizer,
+    SQLPrettifier,
+    SQLCompactor,
+    FormatOptions,
+    FormatStyle,
+    KeywordCase,
+    IdentifierCase,
+    format_sql,
+    normalize_sql,
+    compact_sql,
+    prettify_sql,
+    compare_sql,
+)
+
+__version__ = "1.1.0"
 __author__ = "PrimiHub Team"
 
 __all__ = [
@@ -104,6 +155,42 @@ __all__ = [
     'AggregateCall',
     'WindowCall',
     'SubqueryInfo',
+
+    # 函数校验
+    'StringFunctionType',
+    'StringFunctionExtractor',
+    'StringFunctionValidator',
+    'is_safe_string_function',
+    'DateFunctionType',
+    'DateFunctionExtractor',
+    'DateFunctionValidator',
+    'is_safe_date_function',
+    'TimestampFunctionType',
+    'TimestampFunctionExtractor',
+    'TimestampFunctionValidator',
+    'is_safe_timestamp_function',
+    'NumericFunctionType',
+    'NumericFunctionExtractor',
+    'NumericFunctionValidator',
+    'is_safe_numeric_function',
+    'FunctionExtractor',
+    'FunctionValidator',
+    'validate_functions',
+
+    # SQL格式化
+    'SQLFormatter',
+    'SQLNormalizer',
+    'SQLPrettifier',
+    'SQLCompactor',
+    'FormatOptions',
+    'FormatStyle',
+    'KeywordCase',
+    'IdentifierCase',
+    'format_sql',
+    'normalize_sql',
+    'compact_sql',
+    'prettify_sql',
+    'compare_sql',
 
     # 便捷函数
     'validate_sql',
