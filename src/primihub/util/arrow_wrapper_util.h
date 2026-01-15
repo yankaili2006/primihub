@@ -1,4 +1,4 @@
-// Copyright [2023] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #ifndef SRC_PRIMIHUB_UTIL_ARROW_WRAPPER_UTIL_H_
 #define SRC_PRIMIHUB_UTIL_ARROW_WRAPPER_UTIL_H_
 #include <memory>

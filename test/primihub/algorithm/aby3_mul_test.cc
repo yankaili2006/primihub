@@ -1,4 +1,4 @@
-// Copyright [2021] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #pragma once
 #include "gtest/gtest.h"
 // #include "src/primihub/algorithm/logistic.h"

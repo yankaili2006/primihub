@@ -5,8 +5,10 @@ cc_library(
   deps = [
     "//src/primihub/kernel/pir:common_def",
     ":base_pir_operator",
-    ":keyword_pir_operator",
-  ]
+  ] + select({
+    "//:microsoft-apsi": [":keyword_pir_operator"],
+    "//conditions:default": [],
+  })
 )
 
 cc_library(

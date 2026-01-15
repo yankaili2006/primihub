@@ -127,3 +127,37 @@ localdb/
 # dylib
 *.dylib
 *.so
+
+# 构建生成的文件
+primihub-cli
+primihub-node
+
+# 日志文件
+log_node*
+server.log
+
+# Python虚拟环境
+venv/
+
+# 构建配置备份
+WORKSPACE.backup*
+WORKSPACE.fixed
+WORKSPACE.original
+.bazelrc.custom
+.bazelrc.local
+
+# 测试生成的文件
+meta_service/
+third_party/python_headers
+third_party/rules_foreign_cc/
+
+# 临时补丁文件（已提交到仓库的除外）
+*.patch
+
+# 测试报告和结果
+psi_validation_report.md
+test_summary.md
+data/result/
+
+# 演示脚本
+demo_primihub.py

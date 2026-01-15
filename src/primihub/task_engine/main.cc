@@ -38,6 +38,8 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(request_id.c_str());
   FLAGS_colorlogtostderr = false;
   FLAGS_alsologtostderr = false;
+  FLAGS_max_log_size = 5; // 5MB per log file for task engine
+  FLAGS_stop_logging_if_full_disk = true;
   if (!log_path.empty()) {
     FLAGS_logtostderr = false;
     FLAGS_log_dir = log_path.c_str();

@@ -1,4 +1,4 @@
-// Copyright [2023] <primihub.com>
+// Copyright [2023] <PrimiHub>.com>
 #include "src/primihub/util/arrow_wrapper_util.h"
 #include <glog/logging.h>
 #include <algorithm>

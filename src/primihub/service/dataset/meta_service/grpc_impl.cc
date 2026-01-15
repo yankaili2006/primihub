@@ -15,7 +15,16 @@ GrpcDatasetMetaService::GrpcDatasetMetaService(const Node& server_cfg) {
   std::string server_address = meta_service_.ip() + ":" + std::to_string(meta_service_.port());
   std::shared_ptr<grpc::ChannelCredentials> creds{nullptr};
   grpc::ChannelArguments channel_args;
-  // channel_args.SetMaxReceiveMessageSize(128*1024*1024);
+
+  // Set channel arguments to improve compatibility with grpc-spring-boot-starter
+  channel_args.SetMaxReceiveMessageSize(128*1024*1024);
+  channel_args.SetMaxSendMessageSize(128*1024*1024);
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 30000);
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10000);
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+  channel_args.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
+  channel_args.SetInt(GRPC_ARG_HTTP2_BDP_PROBE, 1);
+
   if (meta_service_.use_tls()) {
     // auto link_context = this->getLinkContext();
     // auto& cert_config = link_context->getCertificateConfig();

@@ -1,0 +1,9 @@
+--- a/cryptoTools/Common/Timer.h
++++ b/cryptoTools/Common/Timer.h
+@@ -4,6 +4,7 @@
+ #include <chrono>
+ #include <string>
+ #include <mutex>
++#include <stdexcept>
+ namespace osuCrypto
+ { 
