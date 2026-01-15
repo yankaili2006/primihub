@@ -58,5 +58,58 @@
     },
     "PythonEngine": {
         "executor": "primihub.engine.engine.PythonEngine"
+    },
+    "FL_DataFusion": {
+        "guest": "primihub.FL.data_fusion.guest.DataFusionGuest",
+        "host": "primihub.FL.data_fusion.host.DataFusionHost",
+        "coordinator": "primihub.FL.data_fusion.coordinator.DataFusionCoordinator"
+    },
+    "FL_Preprocessing": {
+        "guest": "primihub.FL.fl_preprocessing.guest.FLPreprocessGuest",
+        "host": "primihub.FL.fl_preprocessing.host.FLPreprocessHost"
+    },
+    "FL_FeatureSimilarity": {
+        "guest": "primihub.FL.feature_similarity.guest.FeatureSimilarityGuest",
+        "host": "primihub.FL.feature_similarity.host.FeatureSimilarityHost"
+    },
+    "FL_FeatureEncoding": {
+        "guest": "primihub.FL.feature_encoding.guest.FeatureEncodingGuest",
+        "host": "primihub.FL.feature_encoding.host.FeatureEncodingHost"
+    },
+    "FL_FeatureAlignment": {
+        "guest": "primihub.FL.feature_alignment.guest.FeatureAlignmentGuest",
+        "host": "primihub.FL.feature_alignment.host.FeatureAlignmentHost"
+    },
+    "FL_FeatureSharing": {
+        "guest": "primihub.FL.feature_sharing.guest.FeatureSharingGuest",
+        "host": "primihub.FL.feature_sharing.host.FeatureSharingHost"
+    },
+    "FL_FeatureImputation": {
+        "guest": "primihub.FL.feature_imputation.guest.FeatureImputationGuest",
+        "host": "primihub.FL.feature_imputation.host.FeatureImputationHost"
+    },
+    "FL_SampleExpansion": {
+        "guest": "primihub.FL.sample_expansion.guest.SampleExpansionGuest",
+        "host": "primihub.FL.sample_expansion.host.SampleExpansionHost"
+    },
+    "FL_SampleWeighting": {
+        "guest": "primihub.FL.sample_weighting.guest.SampleWeightingGuest",
+        "host": "primihub.FL.sample_weighting.host.SampleWeightingHost"
+    },
+    "FL_MetricsModeling": {
+        "guest": "primihub.FL.metrics_modeling.guest.MetricsModelingGuest",
+        "host": "primihub.FL.metrics_modeling.host.MetricsModelingHost"
+    },
+    "FL_FeatureBinning": {
+        "guest": "primihub.FL.feature_binning.guest.FeatureBinningGuest",
+        "host": "primihub.FL.feature_binning.host.FeatureBinningHost"
+    },
+    "FL_DataSplitting": {
+        "guest": "primihub.FL.data_splitting.guest.DataSplittingGuest",
+        "host": "primihub.FL.data_splitting.host.DataSplittingHost"
+    },
+    "FL_DataTransformation": {
+        "guest": "primihub.FL.data_transformation.guest.DataTransformationGuest",
+        "host": "primihub.FL.data_transformation.host.DataTransformationHost"
     }
 }
