@@ -1,0 +1,188 @@
+# PrimiHub SQL安全校验配置文件
+#
+# 该配置文件定义了联邦分析SQL校验的安全策略和表级配置。
+#
+# 字段安全级别说明:
+#   - PUBLIC: 公开字段，可以任意操作
+#   - PROTECTED: 受保护字段，允许聚合但不允许直接暴露
+#   - PRIVATE: 私有字段，需要MPC/加密计算
+#   - SENSITIVE: 高度敏感字段，仅允许计数或存在性查询
+
+sql_security:
+  # 全局安全策略
+  global_policy:
+    # k-匿名阈值，每个分组至少需要k条记录
+    default_k_anonymity: 5
+
+    # 是否允许敏感字段出现在WHERE条件中
+    allow_sensitive_in_where: false
+
+    # 是否允许跨方JOIN
+    allow_cross_party_join: true
+
+    # 是否允许窗口函数
+    allow_window_functions: false
+
+    # 是否允许关联子查询
+    allow_correlated_subquery: false
+
+    # 是否允许SELECT *
+    allow_select_star: false
+
+    # 最大结果行数
+    max_result_rows: 10000
+
+    # 严格模式
+    strict_mode: true
+
+    # 范围查询最小宽度
+    min_range_width: 10.0
+
+    # IN子句最大值数量
+    max_in_clause_values: 100
+
+    # LIKE模式最小长度
+    min_like_pattern_length: 3
+
+  # 表安全配置示例
+  tables:
+    # 用户表配置示例
+    - name: "users"
+      owner_party: "party_a"
+      global_min_k: 10
+      allow_cross_party_join: false
+      fields:
+        # 公开字段 - 可以任意查询
+        - name: "id"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_join: true
+          allow_order_by: true
+          allow_group_by: true
+
+        # 私有字段 - 姓名
+        - name: "name"
+          security_level: "PRIVATE"
+          allow_filter: false
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: false
+
+        # 私有字段 - 邮箱
+        - name: "email"
+          security_level: "SENSITIVE"
+          allow_filter: false
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: false
+
+        # 受保护字段 - 年龄（允许聚合）
+        - name: "age"
+          security_level: "PROTECTED"
+          min_aggregation_count: 10
+          allow_filter: true
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: true
+
+        # 私有字段 - 薪资
+        - name: "salary"
+          security_level: "PRIVATE"
+          min_aggregation_count: 20
+          allow_filter: false
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: false
+
+        # 受保护字段 - 性别
+        - name: "gender"
+          security_level: "PROTECTED"
+          allow_filter: true
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: true
+
+        # 受保护字段 - 城市
+        - name: "city"
+          security_level: "PROTECTED"
+          allow_filter: true
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: true
+
+    # 订单表配置示例
+    - name: "orders"
+      owner_party: "party_b"
+      global_min_k: 5
+      fields:
+        # 公开字段 - 订单ID
+        - name: "order_id"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_join: true
+          allow_order_by: true
+          allow_group_by: true
+
+        # 受保护字段 - 用户ID（允许JOIN）
+        - name: "user_id"
+          security_level: "PROTECTED"
+          allow_filter: true
+          allow_join: true
+          allow_order_by: false
+          allow_group_by: true
+
+        # 受保护字段 - 金额
+        - name: "amount"
+          security_level: "PROTECTED"
+          min_aggregation_count: 10
+          allow_filter: true
+          allow_join: false
+          allow_order_by: false
+          allow_group_by: false
+
+        # 公开字段 - 产品名称
+        - name: "product_name"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_join: false
+          allow_order_by: true
+          allow_group_by: true
+
+        # 公开字段 - 订单日期
+        - name: "order_date"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_join: false
+          allow_order_by: true
+          allow_group_by: true
+
+    # 交易表配置示例
+    - name: "transactions"
+      owner_party: "party_c"
+      global_min_k: 10
+      fields:
+        - name: "tx_id"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_join: true
+
+        - name: "account_id"
+          security_level: "SENSITIVE"
+          allow_filter: false
+          allow_join: false
+
+        - name: "amount"
+          security_level: "PRIVATE"
+          min_aggregation_count: 50
+          allow_filter: false
+
+        - name: "tx_type"
+          security_level: "PROTECTED"
+          allow_filter: true
+          allow_group_by: true
+
+        - name: "tx_date"
+          security_level: "PUBLIC"
+          allow_filter: true
+          allow_order_by: true
+          allow_group_by: true
