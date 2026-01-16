@@ -111,5 +111,44 @@
     "FL_DataTransformation": {
         "guest": "primihub.FL.data_transformation.guest.DataTransformationGuest",
         "host": "primihub.FL.data_transformation.host.DataTransformationHost"
+    },
+    "Local_DataStatistics": {
+        "executor": "primihub.local.data_statistics.executor.DataStatisticsExecutor"
+    },
+    "Local_DataCleaning": {
+        "executor": "primihub.local.data_cleaning.executor.DataCleaningExecutor"
+    },
+    "Local_DataScaling": {
+        "executor": "primihub.local.data_scaling.executor.DataScalingExecutor"
+    },
+    "Local_FeatureEncoding": {
+        "executor": "primihub.local.feature_encoding.executor.FeatureEncodingExecutor"
+    },
+    "Local_FeatureBinning": {
+        "executor": "primihub.local.feature_binning.executor.FeatureBinningExecutor"
+    },
+    "Local_FeatureSelection": {
+        "executor": "primihub.local.feature_selection.executor.FeatureSelectionExecutor"
+    },
+    "Local_FeatureDerivation": {
+        "executor": "primihub.local.feature_derivation.executor.FeatureDerivationExecutor"
+    },
+    "Local_ML_LR": {
+        "executor": "primihub.local.ml_lr.executor.MLLRExecutor"
+    },
+    "Local_ML_XGB": {
+        "executor": "primihub.local.ml_xgb.executor.MLXGBExecutor"
+    },
+    "Local_PythonScript": {
+        "executor": "primihub.local.python_script.executor.PythonScriptExecutor"
+    },
+    "Local_SQLProcessing": {
+        "executor": "primihub.local.sql_processing.executor.SQLProcessingExecutor"
+    },
+    "Local_TrainingLogger": {
+        "executor": "primihub.local.training_logger.executor.TrainingLoggerExecutor"
+    },
+    "Local_LogExporter": {
+        "executor": "primihub.local.log_exporter.executor.LogExporterExecutor"
     }
 }
