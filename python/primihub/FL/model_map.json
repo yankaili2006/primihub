@@ -158,5 +158,13 @@
     "FL_ModelEvaluation": {
         "guest": "primihub.FL.model_evaluation.guest.ModelEvaluationGuest",
         "host": "primihub.FL.model_evaluation.host.ModelEvaluationHost"
+    },
+    "FL_FederatedQuery": {
+        "guest": "primihub.FL.federated_query.guest.FederatedQueryGuest",
+        "host": "primihub.FL.federated_query.host.FederatedQueryHost"
+    },
+    "FL_FederatedPSI": {
+        "guest": "primihub.FL.federated_psi.guest.FederatedPSIGuest",
+        "host": "primihub.FL.federated_psi.host.FederatedPSIHost"
     }
 }
