@@ -154,5 +154,9 @@
     "FL_PSU": {
         "guest": "primihub.FL.psu.guest.PSUGuest",
         "host": "primihub.FL.psu.host.PSUHost"
+    },
+    "FL_ModelEvaluation": {
+        "guest": "primihub.FL.model_evaluation.guest.ModelEvaluationGuest",
+        "host": "primihub.FL.model_evaluation.host.ModelEvaluationHost"
     }
 }
