@@ -166,5 +166,20 @@
     "FL_FederatedPSI": {
         "guest": "primihub.FL.federated_psi.guest.FederatedPSIGuest",
         "host": "primihub.FL.federated_psi.host.FederatedPSIHost"
+    },
+    "VFL_linear_regression_v2": {
+        "guest": "primihub.FL.vertical_algorithms.linear_regression.vfl_guest.VFLLinearRegressionGuest",
+        "host": "primihub.FL.vertical_algorithms.linear_regression.vfl_host.VFLLinearRegressionHost",
+        "coordinator": "primihub.FL.vertical_algorithms.linear_regression.vfl_coordinator.VFLLinearRegressionCoordinator"
+    },
+    "VFL_logistic_regression_v2": {
+        "guest": "primihub.FL.vertical_algorithms.logistic_regression.vfl_guest.VFLLogisticRegressionGuest",
+        "host": "primihub.FL.vertical_algorithms.logistic_regression.vfl_host.VFLLogisticRegressionHost",
+        "coordinator": "primihub.FL.vertical_algorithms.logistic_regression.vfl_coordinator.VFLLogisticRegressionCoordinator"
+    },
+    "VFL_xgboost": {
+        "guest": "primihub.FL.vertical_algorithms.xgboost.vfl_guest.VFLXGBoostGuest",
+        "host": "primihub.FL.vertical_algorithms.xgboost.vfl_host.VFLXGBoostHost",
+        "coordinator": "primihub.FL.vertical_algorithms.xgboost.vfl_coordinator.VFLXGBoostCoordinator"
     }
 }
