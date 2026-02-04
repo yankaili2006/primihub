@@ -61,7 +61,7 @@ config_setting(
   values = {"define" : "enable_py_task=true"},
 )
 
-LINK_PYTHON_OPTS = PLACEHOLDER-PYTHON3.X-CONFIG
+LINK_PYTHON_OPTS = []
 
 cc_library(
   name = "python3_lib",

@@ -31,7 +31,7 @@ check_and_set_proxy() {
     echo "如需设置代理，请执行:"
     echo "  export http_proxy=http://127.0.0.1:7890"
     echo "  export https_proxy=http://127.0.0.1:7890"
-    return 1
+    return 0
 }
 
 # 检查系统依赖（解决编译依赖问题）
