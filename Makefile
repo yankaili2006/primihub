@@ -180,12 +180,12 @@ deps:
 .PHONY: format
 format:
 	@echo "格式化代码 (需要安装clang-format)..."
-	@find src -name "*.cc" -o -name "*.h" | xargs clang-format -i
+	@find src \( -name "*.cc" -o -name "*.h" \) | xargs clang-format -i
 
 .PHONY: lint
 lint:
 	@echo "代码检查 (需要安装cpplint)..."
-	@find src -name "*.cc" -o -name "*.h" | xargs python3 external/cpplint.py --filter=-build/include_subdir
+	@find src \( -name "*.cc" -o -name "*.h" \) | xargs python3 external/cpplint.py --filter=-build/include_subdir
 
 # ================================================
 # 默认目标

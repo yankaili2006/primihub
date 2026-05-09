@@ -1,4 +1,4 @@
-import pickle
+import json
 import linkcontext
 from primihub.utils.logger_util import logger
 from primihub.context import Context
@@ -45,7 +45,7 @@ class GrpcClient:
     def send(self, key, val):
         key = self.local_party + '_' + key
         logger.info(f"Start send {key} to {self.remote_party}")
-        self.send_channel.send(key, pickle.dumps(val))
+        self.send_channel.send(key, json.dumps(val).encode())
         logger.info(f"End send {key} to {self.remote_party}")
 
     def recv(self, key):
@@ -53,7 +53,7 @@ class GrpcClient:
         logger.info(f"Start receive {key}")
         val = self.recv_channel.recv(key)
         logger.info(f"End receive {key}")
-        return pickle.loads(val)
+        return json.loads(val.decode())
 
 
 class MultiGrpcClients:

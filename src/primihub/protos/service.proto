@@ -8,7 +8,7 @@ service DataSetService {
   rpc NewDataset(NewDatasetRequest) returns (NewDatasetResponse);
   rpc GetDataset(GetDatasetRequest) returns (GetDatasetResponse);
   rpc QueryResult(QueryResultRequest) returns (QueryResultResponse);
-  rpc DownloadData(DownloadRequest) returns (stream DownloadRespone);
+  rpc DownloadData(DownloadRequest) returns (stream DownloadResponse);
   rpc UploadData(stream UploadFileRequest) returns (UploadFileResponse);
 }
 
@@ -35,7 +35,7 @@ message DownloadRequest {
   repeated string file_list = 2;     // optional
 }
 
-message DownloadRespone {
+message DownloadResponse {
   string file_name = 1;
   bool is_end = 2;
   Status.Code code = 3;

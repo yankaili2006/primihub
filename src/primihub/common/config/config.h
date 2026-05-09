@@ -138,6 +138,8 @@ struct NodeConfig {
   ServerInfo proxy_server_cfg;
   StorageInfo storage_info;
   bool disable_report{false};
+  std::string report_api_key;
+  bool report_tls_verify{true};
 };
 
 }  // namespace primihub::common
@@ -331,6 +333,12 @@ template <> struct convert<NodeConfig> {
     // }
     if (node["tee"]) {
       nc.tee_conf = node["tee"].as<Tee>();
+    }
+    if (node["report_api_key"]) {
+      nc.report_api_key = node["report_api_key"].as<std::string>();
+    }
+    if (node["report_tls_verify"]) {
+      nc.report_tls_verify = node["report_tls_verify"].as<bool>();
     }
     return true;
   }
