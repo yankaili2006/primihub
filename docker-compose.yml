@@ -1,122 +1,97 @@
 version: '3'
+x-node-base: &node-base
+  image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
+  restart: "always"
+  volumes:
+    - ./data:/app/data
+  entrypoint:
+    - "/bin/bash"
+    - "-c"
+    - "GLOG_logtostderr=1 GLOG_v=2 ./primihub-node --node_id={{NODE_ID}} --config=/app/config/primihub_{{NODE_ID}}.yaml"
+
+x-meta-base: &meta-base
+  image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
+  restart: "always"
+  entrypoint:
+    - "/bin/bash"
+    - "-c"
+    - "java -jar /applications/meta-simple.jar \
+        --server.port=8088 \
+        --grpc.server.port=9099 \
+        --db.path=/data/meta_service/{{META_ID}} \
+        --collaborate={{COLLAB_URLS}}"
+  healthcheck:
+    test: ["CMD-SHELL", "wget -O - -q http://localhost:8088/health"]
+    interval: 8s
+    timeout: 3s
+    retries: 3
+
 services:
   node0:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
-    restart: "always"
+    <<: *node-base
     container_name: primihub-node0
-    # ports:
-    #   - "50050:50050"
-    volumes:
-      # - ./config:/app/config
-      - ./data:/app/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "GLOG_logtostderr=1 GLOG_v=2 ./primihub-node --node_id=node0 --config=/app/config/primihub_node0.yaml"
-    # GLOG_v 0->7,the larger the value the more detailed the log
     depends_on:
-      meta0:
-        condition: service_healthy
+      meta0: { condition: service_healthy }
 
   node1:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
-    restart: "always"
+    <<: *node-base
     container_name: primihub-node1
-    # ports:
-    #   - "50051:50051"
-    volumes:
-      # - ./config:/app/config
-      - ./data:/app/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "GLOG_logtostderr=1 GLOG_v=2 ./primihub-node --node_id=node1 --config=/app/config/primihub_node1.yaml"
     depends_on:
-      meta1:
-        condition: service_healthy
+      meta1: { condition: service_healthy }
 
   node2:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
-    restart: "always"
+    <<: *node-base
     container_name: primihub-node2
-    # ports:
-    #   - "50052:50052"
-    volumes:
-      # - ./config:/app/config
-      - ./data:/app/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "GLOG_logtostderr=1 GLOG_v=2 ./primihub-node --node_id=node2 --config=/app/config/primihub_node2.yaml"
     depends_on:
-      meta2:
-        condition: service_healthy
+      meta2: { condition: service_healthy }
 
   meta0:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
-    restart: "always"
+    <<: *meta-base
     container_name: primihub-meta0
-    # ports:
-    #   - "7977:9099"
-    # volumes:
-    #   - ./data:/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "java -jar /applications/meta-simple.jar \
-        --server.port=8088 \
-        --grpc.server.port=9099 \
-        --db.path=/data/meta_service/node0 \ 
-        --collaborate=http://primihub-meta1:8088/,http://primihub-meta2:8088/"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -O - -q http://localhost:8088/health"]
-      interval: 8s
-      timeout: 3s
-      retries: 3
+          --server.port=8088 \
+          --grpc.server.port=9099 \
+          --db.path=/data/meta_service/node0 \
+          --collaborate=http://primihub-meta1:8088/,http://primihub-meta2:8088/"
 
   meta1:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
-    restart: "always"
+    <<: *meta-base
     container_name: primihub-meta1
-    # ports:
-    #   - "7977:9099"
-    # volumes:
-    #   - ./data:/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "java -jar /applications/meta-simple.jar \
-        --server.port=8088 \
-        --grpc.server.port=9099 \
-        --db.path=/data/meta_service/node1 \ 
-        --collaborate=http://primihub-meta0:8088/,http://primihub-meta2:8088/"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -O - -q http://localhost:8088/health"]
-      interval: 8s
-      timeout: 3s
-      retries: 3
+          --server.port=8088 \
+          --grpc.server.port=9099 \
+          --db.path=/data/meta_service/node1 \
+          --collaborate=http://primihub-meta0:8088/,http://primihub-meta2:8088/"
 
   meta2:
-    image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
-    restart: "always"
+    <<: *meta-base
     container_name: primihub-meta2
-    # ports:
-    #   - "7977:9099"
-    # volumes:
-    #   - ./data:/data
     entrypoint:
       - "/bin/bash"
       - "-c"
       - "java -jar /applications/meta-simple.jar \
-        --server.port=8088 \
-        --grpc.server.port=9099 \
-        --db.path=/data/meta_service/node2 \
-        --collaborate=http://primihub-meta0:8088/,http://primihub-meta1:8088/"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -O - -q http://localhost:8088/health"]
-      interval: 8s
-      timeout: 3s
-      retries: 3
+          --server.port=8088 \
+          --grpc.server.port=9099 \
+          --db.path=/data/meta_service/node2 \
+          --collaborate=http://primihub-meta0:8088/,http://primihub-meta1:8088/"
 
 networks:
   primihub_net:

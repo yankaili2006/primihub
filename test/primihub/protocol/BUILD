@@ -19,12 +19,12 @@ cc_test(
 cc_test(
     name = "protocol_aby3_test",
     srcs = [
-      # "aby3/evaluator/evaluator_test.cc",
+      "aby3/evaluator/evaluator_test.cc",
       "aby3/evaluator/binary_evaluator_test.cc",
-      # "aby3/evaluator/piecewise_test.cc",
-      # "aby3/encryptor_test.cc",
-      # "aby3/runtime_test.cc",
-      # "aby3/sh3_gen_test.cc",
+      "aby3/evaluator/piecewise_test.cc",
+      "aby3/encryptor_test.cc",
+      "aby3/runtime_test.cc",
+      "aby3/sh3_gen_test.cc",
     ],
     deps = [
         "//src/primihub/protocol:protocol_aby3_lib",

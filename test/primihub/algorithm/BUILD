@@ -109,12 +109,12 @@ cc_test(
 cc_test(
     name = "aby3_A2B_test",
     srcs = [
-        # "test/primihub/protocol/aby3/evaluator/evaluator_test.cc",
         "aby3_A2B_test.cc",
-        # "test/primihub/protocol/aby3/evaluator/piecewise_test.cc",
-        # "test/primihub/protocol/aby3/encryptor_test.cc",
-        # "test/primihub/protocol/aby3/runtime_test.cc",
-        # "test/primihub/protocol/aby3/sh3_gen_test.cc",
+        "test/primihub/protocol/aby3/evaluator/evaluator_test.cc",
+        "test/primihub/protocol/aby3/evaluator/piecewise_test.cc",
+        "test/primihub/protocol/aby3/encryptor_test.cc",
+        "test/primihub/protocol/aby3/runtime_test.cc",
+        "test/primihub/protocol/aby3/sh3_gen_test.cc",
     ],
     deps = ABY3_DEPS,
 )

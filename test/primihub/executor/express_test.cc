@@ -77,8 +77,7 @@ runParty(std::map<std::string, std::vector<T>> &col_and_val,
 
   try {
     mpc_exec->initMPCRuntime(party_id, next_ip, prev_ip, next_port, prev_port);
-    // ASSERT_EQ(mpc_exec->runMPCEvaluate(), 0);
-    mpc_exec->runMPCEvaluate();
+    ASSERT_EQ(mpc_exec->runMPCEvaluate(), 0);
     mpc_exec->revealMPCResult(parties, final_val);
     for (auto itr = final_val.begin(); itr != final_val.end(); itr++)
       LOG(INFO) << *itr;
