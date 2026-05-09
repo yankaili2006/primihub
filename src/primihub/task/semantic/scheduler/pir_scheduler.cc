@@ -118,7 +118,8 @@ retcode PIRScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
 
   LOG(INFO) << TASK_INFO_STR
       << "begin to Dispatch SubmitTask to PIR task party node ...";
-  std::vector<std::thread> thrds;
+  auto& pool = getThreadPool();
+  std::vector<std::future<retcode>> futs;
   for (const auto& [party_name, node] : participate_node) {
     Node dest_node;
     pbNode2Node(node, &dest_node);
@@ -126,16 +127,16 @@ retcode PIRScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
         << "Dispatch SubmitTask to PIR party node: "
         << dest_node.to_string() << " "
         << "party_name: " << party_name;
-    thrds.emplace_back(
-      std::thread(
+    futs.push_back(
+      pool.enqueue(
         &PIRScheduler::ScheduleTask,
         this,
         party_name,
         dest_node,
         std::ref(push_request)));
   }
-  for (auto &t : thrds) {
-    t.join();
+  for (auto& f : futs) {
+    f.get();
   }
   if (has_error()) {
     return retcode::FAIL;

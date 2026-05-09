@@ -20,7 +20,7 @@ namespace primihub {
 #define TO_CUCHAR(ptr) reinterpret_cast<const unsigned char*>(ptr)
 
 [[maybe_unused]] static uint16_t ABY3_TOTAL_PARTY_NUM = 3;
-[[maybe_unused]] static uint64_t LIMITED_PACKAGE_SIZE = 3 * 1024 * 1024;  // 4M
+[[maybe_unused]] static uint64_t LIMITED_PACKAGE_SIZE = 128 * 1024 * 1024;  // 128M, match server MaxReceiveMessageSize
 // macro definition
 [[maybe_unused]] static const char* ROLE_CLIENT = "CLIENT";
 [[maybe_unused]] static const char* ROLE_SCHEDULER = "SCHEDULER";

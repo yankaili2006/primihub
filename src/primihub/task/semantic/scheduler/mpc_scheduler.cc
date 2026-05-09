@@ -86,7 +86,8 @@ retcode MPCScheduler::dispatch(const PushTaskRequest *push_request) {
     }
   }
 
-  std::vector<std::thread> threads;
+  auto& pool = getThreadPool();
+  std::vector<std::future<void>> futs;
   std::map<std::string, Node> scheduled_nodes;
   auto &node_map = request.task().node_map();
   for (int i = 0; i < party_num_; i++) {
@@ -101,8 +102,8 @@ retcode MPCScheduler::dispatch(const PushTaskRequest *push_request) {
     Node dest_node;
     pbNode2Node(pb_node, &dest_node);
     scheduled_nodes[node_addr] = std::move(dest_node);
-    threads.emplace_back(
-      std::thread(
+    futs.push_back(
+      pool.enqueue(
         &CRYPTFLOW2Scheduler::push_task,
         this,
         iter->first,
@@ -111,8 +112,8 @@ retcode MPCScheduler::dispatch(const PushTaskRequest *push_request) {
         std::ref(scheduled_nodes[node_addr])));
   }
 
-  for (auto &t : threads) {
-    t.join();
+  for (auto& f : futs) {
+    f.get();
   }
   if (has_error()) {
     return retcode::FAIL;

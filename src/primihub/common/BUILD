@@ -36,6 +36,7 @@ cc_library(
   name = "common_defination",
   hdrs = [
     "common.h",
+    "thread_pool.h",
     "value_check_util.h"
   ],
 )

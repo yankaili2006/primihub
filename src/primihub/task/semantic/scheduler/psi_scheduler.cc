@@ -71,10 +71,22 @@ retcode PSIScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
   LOG(INFO) << "PSIScheduler::dispatch: " << str;
   LOG(INFO) << "Dispatch SubmitTask to PSI client node";
   const auto& participate_node = push_request.task().party_access_info();
-  std::vector<std::thread> thrds;
-  // allocate space for error msg
-  for (const auto& [party_name, node] : participate_node) {
-    this->error_msg_.insert({party_name, ""});
+  auto& pool = getThreadPool();
+  std::vector<std::future<retcode>> futs;
+  for (auto& [party_name, dest_node] : party_nodes) {
+    auto ret = CheckPartyNodeValid(party_name);
+    if (ret != retcode::SUCCESS) {
+      return ret;
+    }
+    auto& push_request = schedule_param.push_request;
+    LOG(INFO) << "Dispatch SubmitTask to PSI client node to: "
+        << dest_node.to_string() << " party_name: " << party_name;
+    futs.push_back(pool.enqueue(
+        &PSIScheduler::ScheduleTask, this,
+        party_name, dest_node, std::ref(push_request)));
+  }
+  for (auto& f : futs) {
+    f.get();
   }
   for (const auto& [party_name, node] : participate_node) {
     Node dest_node;

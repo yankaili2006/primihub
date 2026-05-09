@@ -82,7 +82,8 @@ retcode FLScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
   const auto& task_info = send_request.task().task_info();
   std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   // schedule
-  std::vector<std::thread> thrds;
+  auto& pool = getThreadPool();
+  std::vector<std::future<retcode>> futs;
   const auto& party_access_info = send_request.task().party_access_info();
   for (const auto& [party_name, node] : party_access_info) {
     this->error_msg_.insert({party_name, ""});
@@ -93,16 +94,16 @@ retcode FLScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
     LOG(INFO) << TASK_INFO_STR
         << "Dispatch SubmitTask to: " << dest_node.to_string() << " "
         << "party_name: " << party_name;
-    thrds.emplace_back(
-      std::thread(
+    futs.push_back(
+      pool.enqueue(
         &FLScheduler::ScheduleTask,
         this,
         party_name,
         dest_node,
         std::ref(send_request)));
   }
-  for (auto&& t : thrds) {
-    t.join();
+  for (auto& f : futs) {
+    f.get();
   }
   if (has_error()) {
     return retcode::FAIL;
