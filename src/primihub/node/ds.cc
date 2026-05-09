@@ -86,13 +86,13 @@ grpc::Status DataServiceImpl::QueryResult(grpc::ServerContext* context,
 
 grpc::Status DataServiceImpl::DownloadData(grpc::ServerContext* context,
     const rpc::DownloadRequest* request,
-    grpc::ServerWriter<rpc::DownloadRespone>* writer) {
+    grpc::ServerWriter<rpc::DownloadResponse>* writer) {
   const auto& file_list = request->file_list();
   const auto& request_id = request->request_id();
   if (file_list.empty()) {
     std::string err_msg = "download list is empty, no data file for download";
     LOG(ERROR) << pb_util::TaskInfoToString(request_id) << err_msg;
-    rpc::DownloadRespone resp;
+    rpc::DownloadResponse resp;
     resp.set_info(err_msg);
     resp.set_code(rpc::Status::FAIL);
     writer->Write(resp);
@@ -128,7 +128,7 @@ grpc::Status DataServiceImpl::DownloadData(grpc::ServerContext* context,
     if (data_block.is_last_block) {  // read end flag
       break;
     }
-    rpc::DownloadRespone resp;
+    rpc::DownloadResponse resp;
     if (error.load(std::memory_order::memory_order_relaxed)) {
       resp.set_info(error_msg);
       resp.set_code(rpc::Status::FAIL);

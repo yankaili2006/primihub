@@ -89,7 +89,7 @@ retcode MySQLAccessInfo::ParseFromMetaInfoImpl(
     return retcode::SUCCESS;
   }
   try {
-    LOG(INFO) << "meta_info: " << access_info;
+    VLOG(9) << "meta_info: " << access_info;
     nlohmann::json js_access_info = nlohmann::json::parse(access_info);
     ret = ParseFromJsonImpl(js_access_info);
   } catch (std::exception& e) {

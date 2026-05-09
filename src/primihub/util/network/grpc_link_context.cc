@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <utility>
 #include <memory>
+#include <thread>
+#include <chrono>
 
 #include "src/primihub/util/util.h"
 #include "src/primihub/util/log.h"
@@ -12,6 +14,14 @@
 
 namespace pb_util = primihub::proto::util;
 namespace primihub::network {
+
+namespace {
+void backoffWait(int retry_count) {
+  int delay_ms = std::min(50 * (1 << retry_count), 5000);
+  std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+}
+}  // namespace
+
 GrpcChannel::GrpcChannel(const primihub::Node& node, LinkContext* link_ctx) :
     IChannel(link_ctx) {
   dest_node_ = node;
@@ -178,6 +188,7 @@ retcode GrpcChannel::send(const std::string& role, std::string_view data_sv) {
           << "retry: " << retry_time;
       retry_time++;
       if (retry_time < retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -311,6 +322,7 @@ retcode GrpcChannel::submitTask(const rpc::PushTaskRequest& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kScheduler)
@@ -353,6 +365,7 @@ retcode GrpcChannel::executeTask(const rpc::PushTaskRequest& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -392,6 +405,7 @@ retcode GrpcChannel::StopTask(const rpc::TaskContext& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -432,6 +446,7 @@ retcode GrpcChannel::killTask(const rpc::KillTaskRequest& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -472,6 +487,7 @@ retcode GrpcChannel::updateTaskStatus(const rpc::TaskStatus& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -511,6 +527,7 @@ retcode GrpcChannel::fetchTaskStatus(const rpc::TaskContext& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -560,7 +577,7 @@ retcode GrpcChannel::DownloadData(const rpc::DownloadRequest& request,
   auto client_reader = this->dataset_stub_->DownloadData(&context, request);
 
   const auto& request_id = request.request_id();
-  rpc::DownloadRespone response;
+  rpc::DownloadResponse response;
   std::string TASK_INFO_STR = pb_util::TaskInfoToString(request_id);
   bool has_error{false};
   std::string err_msg;
@@ -620,6 +637,7 @@ retcode GrpcChannel::CheckSendCompleteStatus(
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)
@@ -660,6 +678,7 @@ retcode GrpcChannel::NewDataset(const rpc::NewDatasetRequest& request,
           << "retry times: " << retry_time;
       retry_time++;
       if (retry_time < this->retry_max_times_) {
+        backoffWait(retry_time);
         continue;
       } else {
         PH_LOG(ERROR, LogType::kTask)

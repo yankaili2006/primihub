@@ -57,7 +57,7 @@ class DataServiceImpl final: public rpc::DataSetService::Service {
                            rpc::QueryResultResponse* response);
   grpc::Status DownloadData(grpc::ServerContext* context,
                             const rpc::DownloadRequest* request,
-                            grpc::ServerWriter<rpc::DownloadRespone>* writer);
+                            grpc::ServerWriter<rpc::DownloadResponse>* writer);
   grpc::Status UploadData(grpc::ServerContext* context,
                           grpc::ServerReader<rpc::UploadFileRequest>* reader,
                           rpc::UploadFileResponse* response);
