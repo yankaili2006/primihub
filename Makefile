@@ -52,28 +52,28 @@ endif
 # 并行构建 (加速构建过程)
 JOBS?=
 ifneq ($(jobs), )
-	JOBS = $(jobs)
-	BUILD_FLAG += --jobs=$(JOBS)
-	$(info [INFO] 使用 $(JOBS) 个线程并行构建)
+  JOBS = $(jobs)
+  BUILD_FLAG += --jobs=$(JOBS)
+  $(info [INFO] 使用 $(JOBS) 个线程并行构建)
 endif
 
 # TEE/SGX支持
 ifeq ($(tee), y)
-	BUILD_FLAG += --cxxopt=-DSGX
-	BUILD_FLAG += --define enable_sgx=true
-	$(info [INFO] 启用TEE/SGX支持)
+  BUILD_FLAG += --cxxopt=-DSGX
+  BUILD_FLAG += --define enable_sgx=true
+  $(info [INFO] 启用TEE/SGX支持)
 endif
 
 # 调试构建 (包含asan检测)
 ifeq ($(debug), y)
-	BUILD_FLAG += --config=linux_asan
-	$(info [INFO] 启用调试模式 (ASAN))
+  BUILD_FLAG += --config=linux_asan
+  $(info [INFO] 启用调试模式 (ASAN))
 endif
 
 # 详细输出 (显示详细构建信息)
 ifeq ($(verbose), y)
-	BUILD_FLAG += --subcommands --verbose_failures
-	$(info [INFO] 启用详细输出模式)
+  BUILD_FLAG += --subcommands --verbose_failures
+  $(info [INFO] 启用详细输出模式)
 endif
 
 # ================================================

@@ -5,10 +5,12 @@ cc_library(
   hdrs = [
     "express.h",
     "statistics.h",
+    "statistical_tests.h",
   ],
   srcs = [
     "express.cc",
     "statistics.cc",
+    "statistical_tests.cc",
   ],
   deps = [
     "//src/primihub/common:type",

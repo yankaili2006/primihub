@@ -40,10 +40,31 @@ http_archive(
 
 git_repository(
     name = "com_github_nelhage_rules_boost",
-    # commit = "1e3a69bf2d5cd10c34b74f066054cd335d033d71",
-    branch = "master",
+    commit = "81945736a62fa8490d2ab6bb31705bb04ce4bb6c",
     remote = "https://github.com/primihub/rules_boost.git",
-    # shallow_since = "1591047380 -0700",
+    shallow_since = "1677906695 +0800",
+)
+
+# Override boost and its deps before boost_deps() (OSS mirror returns 403)
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "com_github_facebook_zstd",
+    build_file = "@com_github_nelhage_rules_boost//:BUILD.zstd",
+    sha256 = "e28b2f2ed5710ea0d3a1ecac3f6a947a016b972b9dd30242369010e5f53d7002",
+    strip_prefix = "zstd-1.5.1",
+    urls = [
+        "https://github.com/facebook/zstd/releases/download/v1.5.1/zstd-1.5.1.tar.gz",
+    ],
+)
+http_archive(
+    name = "boost",
+    build_file = "@com_github_nelhage_rules_boost//:BUILD.boost",
+    sha256 = "273f1be93238a068aba4f9735a4a2b003019af067b9c183ed227780b8f36062c",
+    strip_prefix = "boost_1_79_0",
+    urls = [
+        "https://archives.boost.io/release/1.79.0/source/boost_1_79_0.tar.gz",
+        "https://boostorg.jfrog.io/artifactory/main/release/1.79.0/source/boost_1_79_0.tar.gz",
+    ],
 )
 
 load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
@@ -222,7 +243,7 @@ http_archive(
   strip_prefix = "double-conversion-3.1.5",
   urls = [
     "https://github.com/google/double-conversion/archive/v3.1.5.tar.gz",
-    "https://primihub.oss-cn-beijing.aliyuncs.com/double-conversion-3.1.5.tar.gz",
+    "https://primihub.oss-cn-beijing.aliyuncs.com/double-conversion-3.1.5.tar.gz"
   ],
 )
 
@@ -467,14 +488,12 @@ new_git_repository(
     # shallow_since = "1591047380 -0700",
 )
 
-# Temporarily disabled Relic due to macOS build issues
-# new_git_repository(
-#   name = "toolkit_relic",
-#   build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
-#   remote = "https://github.com/primihub/relic.git",
-#   # tag 0.6.0
-#   commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
-# )
+new_git_repository(
+    name = "toolkit_relic",
+    build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
+    remote = "https://github.com/primihub/relic.git",
+    commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
+)
 
 http_archive(
   name = "com_github_redis_hiredis",
@@ -489,6 +508,25 @@ http_archive(
 #PSI
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
+# Override deps from psi_preload that use OSS mirror (returns 403)
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "io_bazel_rules_rust",
+    sha256 = "75b29ba47ff4ef81f48574d1109bb6612788212524afe99e21467c71c980baa5",
+    strip_prefix = "rules_rust-8cfa049d478ad33e407d572e260e912bdb31796a",
+    urls = [
+        "https://github.com/bazelbuild/rules_rust/archive/8cfa049d478ad33e407d572e260e912bdb31796a.tar.gz",
+    ],
+)
+http_archive(
+    name = "rules_proto_grpc",
+    sha256 = "d771584bbff98698e7cb3cb31c132ee206a972569f4dc8b65acbdd934d156b33",
+    strip_prefix = "rules_proto_grpc-2.0.0",
+    urls = [
+        "https://github.com/rules-proto-grpc/rules_proto_grpc/archive/2.0.0.tar.gz",
+    ],
+)
+
 git_repository(
    name = "org_openmined_psi",
    remote = "https://github.com/primihub/PSI.git",
@@ -499,6 +537,14 @@ git_repository(
 load("@org_openmined_psi//private_set_intersection:preload.bzl", "psi_preload")
 
 psi_preload()
+
+# Override private_join_and_compute before psi_deps (gitlab.primihub.com SSL cert issue)
+http_archive(
+    name = "private_join_and_compute",
+    strip_prefix = "private-join-and-compute-master",
+    url = "file:///home/primihub/local_deps/private-join-and-compute-master.zip",
+    sha256 = "f8cbd621aa404ace22b6ba1f578804b5f444433d3965274d13724db3b2760a24",
+)
 
 load("@org_openmined_psi//private_set_intersection:deps.bzl", "psi_deps")
 
@@ -559,11 +605,23 @@ new_git_repository(
     branch = "2.1.0",
     remote = "https://github.com/microsoft/Kuku.git",
 )
-# needed by APSI
+
+# needed by PIR keyword_pir
 git_repository(
+    name = "com_google_cityhash",
+    commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
+    remote = "https://gitee.com/primihub/cityhash.git",
+)
+
+# needed by APSI
+http_archive(
     name = "jsoncpp",
-    branch = "master",
-    remote = "https://github.com/open-source-parsers/jsoncpp.git",
+    build_file = "//third_party:BUILD.jsoncpp",
+    sha256 = "55d25ac6576da7481e1d933604dfcac581d82722b70b308fdb83dba5a33f59e0",
+    strip_prefix = "jsoncpp-755d0a69d7109d465db6196a3c7e1c6f3c62a48f",
+    urls = [
+        "https://github.com/open-source-parsers/jsoncpp/archive/755d0a69d7109d465db6196a3c7e1c6f3c62a48f.zip",
+    ],
 )
 
 #support sqlite

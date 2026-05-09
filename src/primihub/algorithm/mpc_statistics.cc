@@ -162,9 +162,9 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
   } else if (type_object.GetString() == std::string("2")) {
     type_ = MPCStatisticsType::SUM;
   } else if (type_object.GetString() == std::string("3")) {
-    type_ = MPCStatisticsType::MAX;
+    type_ = MPCStatisticsType::STAT_MAX;
   } else if (type_object.GetString() == std::string("4")) {
-    type_ = MPCStatisticsType::MIN;
+    type_ = MPCStatisticsType::STAT_MIN;
   } else {
     std::stringstream ss;
     ss << "Unknown statistics type " << type_object.GetString() << ".";
@@ -411,10 +411,10 @@ retcode MPCStatisticsExecutor::InitEngine() {
     auto op_type = algorithm.statistics_op_type();
     switch (op_type) {
     case rpc::Algorithm::MAX:
-      type_ = MPCStatisticsType::MAX;
+      type_ = MPCStatisticsType::STAT_MAX;
       break;
     case rpc::Algorithm::MIN:
-      type_ = MPCStatisticsType::MIN;
+      type_ = MPCStatisticsType::STAT_MIN;
       break;
     case rpc::Algorithm::AVG:
       type_ = MPCStatisticsType::AVG;
@@ -425,8 +425,8 @@ retcode MPCStatisticsExecutor::InitEngine() {
     case rpc::Algorithm::T_TEST:
       type_ = MPCStatisticsType::T_TEST;
       break;
-    case rpc::Algorithm::F_TEST:
-      type_ = MPCStatisticsType::F_TEST;
+    case rpc::Algorithm::F_STAT_TEST:
+      type_ = MPCStatisticsType::STAT_F_TEST;
       break;
     case rpc::Algorithm::CHI_SQUARE_TEST:
       type_ = MPCStatisticsType::CHI_SQUARE_TEST;
@@ -452,16 +452,16 @@ retcode MPCStatisticsExecutor::InitEngine() {
   case MPCStatisticsType::SUM:
     executor_ = std::make_unique<MPCSumOrAvg>(type_);
     break;
-  case MPCStatisticsType::MAX:
+  case MPCStatisticsType::STAT_MAX:
     executor_ = std::make_unique<MPCMinOrMax>(type_);
     break;
-  case MPCStatisticsType::MIN:
+  case MPCStatisticsType::STAT_MIN:
     executor_ = std::make_unique<MPCMinOrMax>(type_);
     break;
   case MPCStatisticsType::T_TEST:
     executor_ = std::make_unique<MPCTTest>();
     break;
-  case MPCStatisticsType::F_TEST:
+  case MPCStatisticsType::STAT_F_TEST:
     executor_ = std::make_unique<MPCFTest>();
     break;
   case MPCStatisticsType::CHI_SQUARE_TEST:

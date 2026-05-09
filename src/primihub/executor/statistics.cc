@@ -445,7 +445,7 @@ retcode MPCMinOrMax::PlainTextDataCompute(
       }
     }
     if (VLOG_IS_ON(3)) {
-      if (type_ == MPCStatisticsType::MAX) {
+      if (type_ == MPCStatisticsType::STAT_MAX) {
         VLOG(3) << "Max value of column " << col_name
                 << " is " << col_result << ".";
       } else {
@@ -462,7 +462,7 @@ retcode MPCMinOrMax::CipherTextDataCompute(const eMatrix<double>& col_data,
     const std::vector<std::string>& col_names,
     const eMatrix<double>& row_records) {
   mpc_result_.resize(col_data.rows(), 1);
-  if (type_ == MPCStatisticsType::MIN) {
+  if (type_ == MPCStatisticsType::STAT_MIN) {
     for (uint64_t col_index = 0; col_index < col_data.rows(); col_index++) {
       auto& col_name = col_names[col_index];
       double col_result = col_data(col_index, 0);
