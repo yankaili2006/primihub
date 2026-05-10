@@ -21,26 +21,79 @@ jobs:
     - name: bazel test
       run: |
         bash pre_build.sh
-        bazel build --config=linux_`arch` \
-            //test/primihub/algorithm:logistic_test
-        #    //test/primihub/algorithm:maxpool_test \
-        #    //test/primihub/algorithm:falcon_lenet_test \
-        #    //test/primihub/common/type:common_test \
-        #    //test/primihub/util:network_test
 
-        ./bazel-bin/test/primihub/algorithm/logistic_test
-        #./bazel-bin/test/primihub/algorithm/maxpool_test
-        #./bazel-bin/test/primihub/algorithm/falcon_lenet_test
-        #./bazel-bin/test/primihub/common/type/common_test
-        #./bazel-bin/test/primihub/util/network_test
+        # Phase 1: Unit tests (pure logic, fast)
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/util:util_func_test \
+            //test/primihub/common/config:config_decode_test \
+            //test/primihub/cli:task_config_parser_test
 
-        # bazel test --test_output=all --config=linux test_opt_paillier_c2py
-        # bazel test --test_output=all --config=linux test_opt_paillier_pack_c2py
-        # bazel test --test_output=errors --config=linux common_test
-        # bazel test --test_output=errors --config=linux network_test
-        # bazel test --config=linux primitive_test
-        # bazel test --config=linux protocol_aby3_test
-        # bazel test --config=linux prng_test
+        # Phase 2: Data store tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/data_store:csv_driver_test \
+            //test/primihub/data_store:parquet_driver_test \
+            //test/primihub/data_store:sqlite_driver_test
+
+        # Phase 3: PSI utility and mock tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/kernel/psi:psi_util_test \
+            //test/primihub/kernel/psi:base_psi_test \
+            //test/primihub/kernel/psi:ecdh_psi_mock_test
+
+        # Phase 4: Algorithm unit tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/algorithm:logistic_test \
+            //test/primihub/algorithm:mpc_avg_test \
+            //test/primihub/algorithm:mpc_sum_test \
+            //test/primihub/algorithm:mpc_min_test \
+            //test/primihub/algorithm:mpc_max_test \
+            //test/primihub/algorithm:maxpool_test \
+            //test/primihub/algorithm:aby3_add_test \
+            //test/primihub/algorithm:aby3_mul_test \
+            //test/primihub/algorithm:aby3_div_test \
+            //test/primihub/algorithm:aby3_A2B_test \
+            //test/primihub/algorithm:aby3_MSB_test \
+            //test/primihub/algorithm:falcon_lenet_test
+
+        # Phase 4: Type tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/common/type:common_test
+
+        # Phase 5: Type & Crypto tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/common/type:common_test
+
+        # Phase 6: Crypto and utility tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/util:prng_test \
+            //test/primihub/util:arrow_wrapper_test \
+            //test/primihub/util:file_util_test
+
+        # Phase 7: Python unit tests (local data processing modules)
+        pip install pytest -q
+        python -m pytest python/primihub/tests/test_data_cleaning.py \
+            python/primihub/tests/test_data_statistics.py \
+            python/primihub/tests/test_feature_selection.py \
+            python/primihub/tests/test_feature_binning.py \
+            python/primihub/tests/test_data_scaling.py \
+            python/primihub/tests/test_feature_encoding.py \
+            python/primihub/tests/test_feature_derivation.py \
+            python/primihub/tests/test_sql_processing.py \
+            python/primihub/tests/test_training_logger.py \
+            python/primihub/tests/test_log_exporter.py \
+            python/primihub/tests/test_ml_lr.py \
+            python/primihub/tests/test_executors.py \
+            -v --tb=short
+
+        # Phase 8: Mock-based network tests
+        bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+            //test/primihub/util/network:mock_channel_test
+
+        # Phase 9: Primitive & Protocol tests (require network)
+        # bazel test --config=linux_`arch` --jobs=4 --test_output=errors \
+        #     //test/primihub/primitive:primitive_test \
+        #     //test/primihub/protocol:protocol_aby3_test \
+        #     //test/primihub/protocol:share_test
     - name: bazel build
       run: |
         # cc_binary

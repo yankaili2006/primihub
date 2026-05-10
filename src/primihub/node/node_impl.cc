@@ -185,8 +185,12 @@ void VMNodeImpl::ReportAliveInfoThread() {
 
       auto& node_info = ins.getServiceConfig();
       const auto& api_key = cfg.report_api_key.empty()
-          ? "5oC06czJLeF3kXdfg7D1q2z0G4wwYJ3l"
+          ? cfg.report_api_key
           : cfg.report_api_key;
+      if (api_key.empty()) {
+        LOG(WARNING) << "report_api_key is not configured, report will be skipped";
+        return;
+      }
       std::string content;
       content
         .append("key=").append(api_key).append("&")
@@ -281,7 +285,7 @@ std::shared_ptr<Worker> VMNodeImpl::CreateWorker(
       std::make_shared<Worker>(this->node_id_, task_info, GetNodelet());
   PH_LOG(INFO, LogType::kScheduler)
       << TASK_INFO_STR
-      << "Fininsh create worker " << this->node_id_;
+      << "Finished create worker " << this->node_id_;
   return worker;
 }
 

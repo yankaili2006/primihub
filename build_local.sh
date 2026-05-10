@@ -65,7 +65,9 @@ else
   # "
 fi
 
-make release $build_opt
+# 限制并行编译任务数，防止 OOM 导致系统关机
+# 如有更多内存可改为 jobs=8
+make release $build_opt jobs=4
 
 if [ $? -ne 0 ]; then
     echo "Build failed!!!"

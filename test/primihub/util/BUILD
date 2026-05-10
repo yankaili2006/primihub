@@ -43,3 +43,38 @@ cc_test(
         "//src/primihub/util/crypto:prng_lib",
     ],
 )
+
+cc_test(
+    name = "util_func_test",
+    size = "small",
+    srcs = ["util_func_test.cc"],
+    deps = [
+        "//src/primihub/util:util_lib",
+        "@com_google_googletest//:gtest_main",
+        "@com_github_glog_glog//:glog",
+        "@com_github_grpc_grpc//:grpc++",
+    ],
+)
+
+cc_test(
+    name = "arrow_wrapper_test",
+    size = "small",
+    srcs = ["arrow_wrapper_test.cc"],
+    deps = [
+        "//src/primihub/util:arrow_wrapper_util",
+        "@com_google_googletest//:gtest_main",
+        "@com_github_glog_glog//:glog",
+        "@arrow",
+    ],
+)
+
+cc_test(
+    name = "file_util_test",
+    size = "small",
+    srcs = ["file_util_test.cc"],
+    deps = [
+        "//src/primihub/util:file_util",
+        "@com_google_googletest//:gtest_main",
+        "@com_github_glog_glog//:glog",
+    ],
+)

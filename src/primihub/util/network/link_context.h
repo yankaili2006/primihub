@@ -90,41 +90,41 @@ class LinkContext {
   StatusDataQueue& GetCompleteQueue(const std::string& role = "default");
 
   void Clean();
-  retcode Send(const std::string& key,
+  virtual retcode Send(const std::string& key,
                const Node& dest_node, const std::string& send_buf);
-  retcode Send(const std::string& key,
+  virtual retcode Send(const std::string& key,
                const Node& dest_node, std::string_view send_buf);
-  retcode Send(const std::string& key,
+  virtual retcode Send(const std::string& key,
                const Node& dest_node, char* send_buf, size_t send_size);
-  retcode Recv(const std::string& key, std::string* recv_buf);
-  retcode Recv(const std::string& key, char* recv_buf, size_t recv_size);
-  retcode Recv(const std::string& key,
+  virtual retcode Recv(const std::string& key, std::string* recv_buf);
+  virtual retcode Recv(const std::string& key, char* recv_buf, size_t recv_size);
+  virtual retcode Recv(const std::string& key,
                const Node& dest_node, std::string* recv_buf);
-  retcode Recv(const std::string& key,
+  virtual retcode Recv(const std::string& key,
                const Node& dest_node, char* recv_buf, size_t recv_size);
   /**
    * sender to process send recv
   */
-  retcode SendRecv(const std::string& key,
+  virtual retcode SendRecv(const std::string& key,
                    const Node& dest_node,
                    const std::string& send_buf,
                    std::string* recv_buf);
-  retcode SendRecv(const std::string& key,
+  virtual retcode SendRecv(const std::string& key,
                    const Node& dest_node,
                    std::string_view send_buf,
                    std::string* recv_buf);
-  retcode SendRecv(const std::string& key,
+  virtual retcode SendRecv(const std::string& key,
                    const Node& dest_node,
                    const char* send_buf, size_t length,
                    std::string* recv_buf);
   /**
    * receiver to process send recv
   */
-  retcode SendRecv(const std::string& key,
+  virtual retcode SendRecv(const std::string& key,
                    const std::string& send_buf,
                    std::string* recv_buf);
 
-  retcode CheckSendCompleteStatus(const std::string& key,
+  virtual retcode CheckSendCompleteStatus(const std::string& key,
                                   const Node& dest_node,
                                   uint64_t expected_complete_num);
 

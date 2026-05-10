@@ -86,16 +86,23 @@ class LogisticRegressionModel:
             y = y.values
 
         # 创建并训练模型
-        self._model = LogisticRegression(
-            penalty=self.penalty,
+        import sklearn
+        lr_kwargs = dict(
             C=self.C,
             solver=self.solver,
             max_iter=self.max_iter,
-            multi_class=self.multi_class,
             class_weight=self.class_weight,
             random_state=self.random_state,
             verbose=self.verbose,
         )
+        if sklearn.__version__ < "1.8":
+            lr_kwargs["penalty"] = self.penalty
+        else:
+            if self.penalty == "l2":
+                pass
+            elif self.penalty == "l1":
+                lr_kwargs["l1_ratio"] = 1.0
+        self._model = LogisticRegression(**lr_kwargs)
 
         self._model.fit(X, y)
         self._classes = self._model.classes_

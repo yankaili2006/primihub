@@ -118,7 +118,7 @@ struct Node {
   Node(const Node&) = default;
   Node& operator=(const Node&) = default;
   Node& operator=(Node&&) = default;
-  bool operator==(const Node& item) {
+  bool operator==(const Node& item) const {
     return (this->ip() == item.ip()) &&
         (this->port() == item.port()) &&
         (this->use_tls() == item.use_tls());

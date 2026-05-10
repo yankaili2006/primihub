@@ -218,7 +218,7 @@ WORKDIR /app
 # 移除旧的构建产物
 RUN rm -rf bazel-bin cli node task_main primihub-cli primihub-node \
     bazel-bin/cli bazel-bin/node bazel-bin/task_main \
-    bazel-bin/src/primihub/pybind_warpper/*.so \
+    bazel-bin/src/primihub/pybind_wrapper/*.so \
     bazel-bin/src/primihub/task/pybind_wrapper/*.so \
     python/primihub/FL/model/*.so \
     commit.txt 2>/dev/null || true
@@ -301,7 +301,7 @@ tar -tzf bazel-bin.tar.gz | head -20
 make release mysql=y
 tar zcf bazel-bin.tar.gz \
     bazel-bin/cli bazel-bin/node bazel-bin/task_main \
-    bazel-bin/src/primihub/pybind_warpper/*.so \
+    bazel-bin/src/primihub/pybind_wrapper/*.so \
     bazel-bin/src/primihub/task/pybind_wrapper/*.so \
     python config example data
 ```

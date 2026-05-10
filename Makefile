@@ -17,8 +17,8 @@ TARGET := //:node \
 
 # 功能开关
 ifneq ($(disable_py_task), y)
-  TARGET += //src/primihub/pybind_warpper:linkcontext \
-      //src/primihub/pybind_warpper:opt_paillier_c2py \
+  TARGET += //src/primihub/pybind_wrapper:linkcontext \
+      //src/primihub/pybind_wrapper:opt_paillier_c2py \
       //src/primihub/task/pybind_wrapper:ph_secure_lib
   BUILD_FLAG += --define enable_py_task=true
 endif
@@ -55,6 +55,10 @@ ifneq ($(jobs), )
   JOBS = $(jobs)
   BUILD_FLAG += --jobs=$(JOBS)
   $(info [INFO] 使用 $(JOBS) 个线程并行构建)
+else
+  JOBS = 4
+  BUILD_FLAG += --jobs=$(JOBS)
+  $(info [INFO] 使用默认 $(JOBS) 个线程并行构建（未指定 jobs，默认 4）)
 endif
 
 # TEE/SGX支持
@@ -87,9 +91,9 @@ help:
 	@echo "================================================"
 	@echo ""
 	@echo "常用构建命令:"
-	@echo "  make release              # 标准构建"
+	@echo "  make release              # 标准构建 (默认 jobs=4，防止 OOM)"
 	@echo "  make release mysql=y      # 启用MySQL支持"
-	@echo "  make release jobs=4       # 4线程并行构建"
+	@echo "  make release jobs=8       # 8线程并行构建 (内存充足时)"
 	@echo "  make release debug=y      # 调试构建"
 	@echo "  make release tee=y        # 启用TEE/SGX"
 	@echo "  make release verbose=y    # 详细输出"
@@ -114,7 +118,7 @@ release:
 	@echo "构建选项: $(BUILD_FLAG)"
 	@echo "构建目标: $(TARGET)"
 	@echo "================================================"
-	@bazel build --config=linux_x86_64 $(BUILD_FLAG) ${TARGET}
+	@bazel build --local_ram_resources=12288 --config=linux_x86_64 $(BUILD_FLAG) ${TARGET}
 	@rm -f primihub-cli
 	@ln -s -f bazel-bin/cli primihub-cli
 	@rm -f primihub-node
