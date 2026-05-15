@@ -1,0 +1,122 @@
+<mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- Title -->
+    <mxCell id="2" value="PrimiHub System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=24;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="200" y="10" width="400" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- Layer 1: Application -->
+    <mxCell id="10" value="APPLICATION LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a73e8;fontColor=#FFFFFF;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="70" width="680" height="70" as="geometry"/>
+    </mxCell>
+    <mxCell id="11" value="Web UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285f4;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="80" y="90" width="120" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="12" value="CLI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285f4;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="240" y="90" width="100" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="13" value="Python SDK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285f4;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="380" y="90" width="120" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="14" value="gRPC API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4285f4;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="540" y="90" width="120" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- Arrow 1->2 -->
+    <mxCell id="a12" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="10" target="20">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Layer 2: Task Scheduling -->
+    <mxCell id="20" value="TASK SCHEDULING LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0d652d;fontColor=#FFFFFF;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="180" width="680" height="70" as="geometry"/>
+    </mxCell>
+    <mxCell id="21" value="Task Parsing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34a853;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="80" y="200" width="120" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="22" value="Semantic Analysis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34a853;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="240" y="200" width="130" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="23" value="Task Orchestration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34a853;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="410" y="200" width="130" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="24" value="Resource Scheduling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34a853;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="580" y="200" width="120" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- Arrow 2->3 -->
+    <mxCell id="a23" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="20" target="30">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Layer 3: Algorithm -->
+    <mxCell id="30" value="ALGORITHM LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b06000;fontColor=#FFFFFF;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="290" width="680" height="70" as="geometry"/>
+    </mxCell>
+    <mxCell id="31" value="PSI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="80" y="310" width="70" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="32" value="PIR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="175" y="310" width="70" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="33" value="Federated Learning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="270" y="310" width="130" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="34" value="MPC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="425" y="310" width="70" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="35" value="HE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="520" y="310" width="70" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="36" value="TEE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9ab00;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="615" y="310" width="70" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- Arrow 3->4 -->
+    <mxCell id="a34" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="30" target="40">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Layer 4: Communication -->
+    <mxCell id="40" value="COMMUNICATION LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6c3483;fontColor=#FFFFFF;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="400" width="680" height="70" as="geometry"/>
+    </mxCell>
+    <mxCell id="41" value="gRPC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8e44ad;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="80" y="420" width="100" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="42" value="P2P Network" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8e44ad;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="220" y="420" width="110" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="43" value="Message Routing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8e44ad;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="370" y="420" width="130" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="44" value="Data Transfer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8e44ad;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="540" y="420" width="120" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- Arrow 4->5 -->
+    <mxCell id="a45" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="40" target="50">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Layer 5: Data -->
+    <mxCell id="50" value="DATA LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#922b21;fontColor=#FFFFFF;fontSize=14;fontStyle=1;verticalAlign=top;align=left;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="510" width="680" height="70" as="geometry"/>
+    </mxCell>
+    <mxCell id="51" value="Data Abstraction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e74c3c;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="80" y="530" width="120" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="52" value="Multi-Source Access" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e74c3c;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="240" y="530" width="140" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="53" value="Metadata Management" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e74c3c;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="420" y="530" width="150" height="35" as="geometry"/>
+    </mxCell>
+    <mxCell id="54" value="Data Preprocessing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e74c3c;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="610" y="530" width="130" height="35" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>

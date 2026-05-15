@@ -44,3 +44,13 @@ def test_psi_difference():
 
     kill_node.direct_kill()
     print("Nodes have been  killed")
+
+def test_psi_kkrt():
+    ''' 测试KKRT-PSI协议 '''
+    path = config.primihub_path
+    os.chdir(path)
+    command = "./bazel-bin/cli --task_type=3 --params='clientData:STRING:0:psi_client_data,serverData:STRING:0:psi_server_data,clientIndex:INT32:0:0,serverIndex:INT32:0:1,psiType:INT32:0:0,psiTag:INT32:0:1,outputFullFilename:STRING:0:data/result/psi_kkrt_result.csv' --input_datasets='clientData,serverData'"
+    assert(os.system(command)) == 0
+    print("KKRT PSI command has been sent")
+    assert(os.path.isfile('data/result/psi_kkrt_result.csv')) == 1
+    print("KKRT PSI output file has been generated")

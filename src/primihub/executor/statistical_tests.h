@@ -159,6 +159,43 @@ private:
   eMatrix<double> mpc_result_;
 };
 
+class MPCRegression : public MPCStatisticsOperator {
+public:
+  MPCRegression() {
+    type_ = MPCStatisticsType::REGRESSION;
+  }
+
+  virtual ~MPCRegression() {
+    mpc_op_.reset();
+  }
+
+  retcode run(std::shared_ptr<primihub::Dataset> &dataset,
+              const std::vector<std::string> &columns,
+              const std::map<std::string, ColumnDtype> &col_dtype) override;
+
+  retcode PlainTextDataCompute(std::shared_ptr<primihub::Dataset>& dataset,
+      const std::vector<std::string>& columns,
+      const std::map<std::string, ColumnDtype>& col_dtype,
+      eMatrix<double>* result_data,
+      eMatrix<double>* row_records) override;
+
+  retcode CipherTextDataCompute(const eMatrix<double>& col_data,
+                                const std::vector<std::string>& col_name,
+                                const eMatrix<double>& row_records) override;
+
+  retcode getResult(eMatrix<double> &result) override;
+
+private:
+  retcode computeLocalRegression(const eMatrix<double>& data_x,
+                                const eMatrix<double>& data_y,
+                                double* slope,
+                                double* intercept,
+                                double* r_squared,
+                                double* p_value);
+
+  eMatrix<double> mpc_result_;
+};
+
 }; // namespace primihub
 
 #endif

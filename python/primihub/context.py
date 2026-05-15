@@ -9,7 +9,6 @@ Note, the dataset is also included in this parameter.
 
 import functools
 from primihub.utils.logger_util import logger
-from primihub.client.ph_grpc.src.primihub.protos import worker_pb2
 
 class ContextAll:
     '''
@@ -28,6 +27,7 @@ class ContextAll:
         self.cert_config = {}
 
     def init_context(self):
+        from primihub.client.ph_grpc.src.primihub.protos import worker_pb2
         self.task_req = worker_pb2.PushTaskRequest()
         self.task_req.ParseFromString(self.message)
         self.task_config = self.task_req.task

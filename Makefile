@@ -48,7 +48,7 @@ ifeq ($(debug), y)
 endif
 
 release:
-	bazel build --config=PLATFORM_HARDWARE $(BUILD_FLAG) ${TARGET}
+	bazel build --config=linux_x86_64 $(BUILD_FLAG) ${TARGET}
 	rm -f primihub-cli
 	ln -s -f bazel-bin/cli primihub-cli
 	rm -f primihub-node

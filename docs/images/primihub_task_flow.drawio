@@ -1,0 +1,94 @@
+<mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169">
+  <root>
+    <mxCell id="0"/><mxCell id="1" parent="0"/>
+
+    <mxCell id="t" value="Task Execution Flow (PSI ECDH Example)" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="100" y="10" width="600" height="36" as="geometry"/>
+    </mxCell>
+
+    <!-- Client -->
+    <mxCell id="cl" value="Client (primihub-cli)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a73e8;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="60" width="200" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- Step 1: Submit Task -->
+    <mxCell id="s1" value="1. Submit PSI Task" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="40" y="130" width="720" height="36" as="geometry"/>
+    </mxCell>
+
+    <!-- Step 2: Parse Config -->
+    <mxCell id="s2" value="2. Parse JSON Task Config" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="40" y="180" width="720" height="36" as="geometry"/>
+    </mxCell>
+
+    <!-- Step 3: Semantic Analysis -->
+    <mxCell id="s3" value="3. Semantic Analysis (PSITask)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34a853;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="40" y="230" width="720" height="36" as="geometry"/>
+    </mxCell>
+
+    <!-- Step 4: Distribute to nodes -->
+    <mxCell id="s4" value="4. Forward Task to Participating Nodes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34a853;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="40" y="280" width="720" height="36" as="geometry"/>
+    </mxCell>
+
+    <!-- Parallel boxes -->
+    <mxCell id="nc" value="Node 0 (Client Party)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a73e8;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="60" y="340" width="280" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="ns" value="Node 1 (Server Party)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#34a853;fontColor=#FFFFFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="460" y="340" width="280" height="40" as="geometry"/>
+    </mxCell>
+
+    <!-- Client steps -->
+    <mxCell id="nc1" value="5a. Generate ECDH keypair (sk_cl, pk_cl)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="395" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="nc2" value="6a. Hash &amp; encrypt dataset A" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="435" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="nc3" value="8a. Receive server's encrypted data" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="475" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="nc4" value="9a. Double-encrypt &amp; compute intersection" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="515" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="nc5" value="10a. Save result to CSV" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F0FE;strokeColor=#1a73e8;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="555" width="280" height="30" as="geometry"/>
+    </mxCell>
+
+    <!-- Server steps -->
+    <mxCell id="ns1" value="5b. Generate ECDH keypair (sk_sv, pk_sv)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34a853;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="460" y="395" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="ns2" value="6b. Hash &amp; encrypt dataset B" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34a853;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="460" y="435" width="280" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="ns3" value="7b. Send encrypted data to client" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F4EA;strokeColor=#34a853;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="460" y="475" width="280" height="30" as="geometry"/>
+    </mxCell>
+
+    <!-- Arrow from node0 to node1 -->
+    <mxCell id="ar1" value="Send encrypted data" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#e74c3c;fontSize=9;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="340" y="450" as="sourcePoint"/>
+        <mxPoint x="460" y="450" as="targetPoint"/>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Arrow from server to client -->
+    <mxCell id="ar2" value="Return encrypted result" style="endArrow=classic;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;strokeColor=#e74c3c;fontSize=9;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="460" y="490" as="sourcePoint"/>
+        <mxPoint x="340" y="490" as="targetPoint"/>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Output -->
+    <mxCell id="r" value="Result: data/result/psi_result.csv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE8E6;strokeColor=#e74c3c;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="250" y="620" width="300" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="ar3" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="nc5" target="r">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>
