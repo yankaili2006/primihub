@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <memory>
 #include "src/primihub/kernel/pir/common.h"
+#include "src/primihub/kernel/pir/operator/id_pir.h"
 #ifdef MICROSOFT_APSI
 #include "src/primihub/kernel/pir/operator/keyword_pir.h"
 #endif
@@ -15,7 +16,7 @@ class Factory {
     std::unique_ptr<BasePirOperator> operator_ptr{nullptr};
     switch (pir_type) {
     case PirType::ID_PIR:
-      LOG(ERROR) << "Unimplement";
+      operator_ptr = std::make_unique<IdPirOperator>(options);
       break;
     case PirType::KEY_PIR:
 #ifdef MICROSOFT_APSI

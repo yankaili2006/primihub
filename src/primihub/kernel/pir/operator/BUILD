@@ -5,6 +5,7 @@ cc_library(
   deps = [
     "//src/primihub/kernel/pir:common_def",
     ":base_pir_operator",
+    ":id_pir_operator",
   ] + select({
     "//:microsoft-apsi": [":keyword_pir_operator"],
     "//conditions:default": [],
@@ -20,6 +21,17 @@ cc_library(
     "//src/primihub/util:endian_util",
     "//src/primihub/util:util_lib",
     "//src/primihub/common:common_defination",
+    "//src/primihub/util/network:communication_lib",
+  ],
+)
+
+cc_library(
+  name = "id_pir_operator",
+  hdrs = ["id_pir.h"],
+  srcs = ["id_pir.cc"],
+  deps = [
+    ":base_pir_operator",
+    "//src/primihub/kernel/pir:common_def",
     "//src/primihub/util/network:communication_lib",
   ],
 )

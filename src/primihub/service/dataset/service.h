@@ -80,6 +80,9 @@ class DatasetService  {
   std::shared_ptr<DataDriver> getDriver(const std::string& dataset_id,
                                         bool is_access_info = false);
   retcode unRegisterDriver(const std::string& dataset_id);
+  // Generate party access info for local datasets (fallback when meta service unavailable)
+  std::map<std::string, Node> getLocalPartyAccessInfo(
+      const std::vector<DatasetWithParamTag>& datasets_with_tag);
   // local config file
   std::unique_ptr<DataSetAccessInfo>
   createAccessInfo(const std::string& driver_type, const YAML::Node& meta_info);

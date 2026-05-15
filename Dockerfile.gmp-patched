@@ -31,23 +31,29 @@ WORKDIR /src
 ADD . /src
 
 # Bazel build primihub-node & primihub-cli & paillier shared library
-RUN bash pre_build.sh \
+COPY gmp-6.2.1.tar.xz /tmp/gmp-6.2.1.tar.xz
+RUN mv WORKSPACE WORKSPACE.orig && python3 -c "
+import re
+with open("WORKSPACE.orig") as f:
+    ws = f.read()
+url ="file:///tmp/gmp-6.2.1.tar.xz"
+ws = re.sub(r"https?://primihub\.oss-cn-beijing\.aliyuncs\.com/tools/gmp-6\.2\.1\.tar\.xz", url, ws)
+with open("WORKSPACE", "w") as f:
+    f.write(ws)
+" && bash pre_build.sh \
   && mv -f WORKSPACE_GITHUB WORKSPACE \
   && make mysql=y \
   && tar zcfh bazel-bin.tar.gz bazel-bin/cli \
         bazel-bin/node \
         bazel-bin/_solib* \
         bazel-bin/task_main \
+        bazel-bin/src/primihub/pybind_warpper/opt_paillier_c2py.so \
+        bazel-bin/src/primihub/pybind_warpper/linkcontext.so \
+        bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
         python \
         config \
         example \
-        data 2>/dev/null || true \
-  && if ls bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null; then \
-       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null || true; \
-     fi \
-  && if ls bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null; then \
-       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null || true; \
-     fi
+        data
 
 FROM ubuntu:20.04 as runner
 

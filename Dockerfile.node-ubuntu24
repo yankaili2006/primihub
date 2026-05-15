@@ -1,0 +1,18 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install -y python3 python3-pip libgmp-dev libmysqlclient-dev tzdata wget \
+  && ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ADD bazel-bin.tar.gz ./
+
+RUN mkdir -p log && \
+    ln -sf bazel-bin/node primihub-node && \
+    ln -sf bazel-bin/cli primihub-cli
+
+EXPOSE 50050

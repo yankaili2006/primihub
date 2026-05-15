@@ -370,8 +370,8 @@ retcode PirTask::ServerLoadDataset() {
   auto& table = std::get<std::shared_ptr<arrow::Table>>(data_ptr->data);
   int col_count = table->num_columns();
   size_t row_count = table->num_rows();
-  if (col_count < 2) {
-    RaiseException("data for server must have label");
+  if (col_count < 1) {
+    RaiseException("data for server is empty");
   }
   auto& key_col = this->server_key_columns_;
   if (key_col.empty()) {

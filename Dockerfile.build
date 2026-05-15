@@ -15,6 +15,10 @@ ADD bazel-bin.tar.gz ./
 COPY src/primihub/protos/ src/primihub/protos/
 COPY commit.txt ./
 
+# Recreate symlinks
+RUN ln -sf bazel-bin/node primihub-node && \
+    ln -sf bazel-bin/cli primihub-cli
+
 # Reinstall Python package with new binaries
 RUN cd python \
   && python3 setup.py develop

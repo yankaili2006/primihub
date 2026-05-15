@@ -43,6 +43,20 @@ cc_test(
 )
 
 cc_test(
+    name = "logistic_regression_test",
+    size = "small",
+    srcs = ["algorithm/logistic_regression_test.cc"],
+    deps = TEST_DEPS + [
+        "//src/primihub/algorithm:logistic_regression",
+        "//src/primihub/data_store:data_store_factory",
+        "//src/primihub/service/dataset:dataset_service",
+        "//src/primihub/service/dataset/meta_service:localkv_impl",
+        "//src/primihub/util/network:mem_channel",
+    ],
+    defines = ["GOOGLE_TEST"],
+)
+
+cc_test(
     name = "statistics_avg_test",
     size = "small",
     srcs = ["algorithm/statistics_avg_test.cc"],
@@ -78,6 +92,17 @@ cc_test(
     srcs = ["algorithm/statistics_min_test.cc"],
     deps = TEST_DEPS + [
         "//src/primihub/algorithm:mpc_statistics",
+    ],
+    defines = ["GOOGLE_TEST"],
+)
+
+cc_test(
+    name = "statistics_all_test",
+    size = "small",
+    srcs = ["algorithm/mpc_statistics_test.cc"],
+    deps = TEST_DEPS + [
+        "//src/primihub/algorithm:mpc_statistics",
+        "//src/primihub/service/dataset/meta_service:meta_service_factory",
     ],
     defines = ["GOOGLE_TEST"],
 )
@@ -129,4 +154,17 @@ cc_test(
     deps = TEST_DEPS + [
         "//src/primihub/util/network:network_channel",
     ],
+)
+
+# ================ PSI Tests ================
+
+cc_test(
+    name = "psi_operator_test",
+    size = "small",
+    srcs = ["kernel/psi_operator_test.cc"],
+    deps = TEST_DEPS + [
+        "//src/primihub/kernel/psi/operator:factory",
+        "//src/primihub/kernel/psi/operator:base_psi_operator",
+    ],
+    defines = ["GOOGLE_TEST"],
 )
