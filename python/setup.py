@@ -83,7 +83,10 @@ def solib2sitepackage(solib_path=None):
       deps_libs = ["librelic.so"]
       for dep_lib in deps_libs:
           lib_path = find_file(dep_lib, bazel_bin_path)
-          shutil.copyfile(lib_path, "{}/{}".format(paths, dep_lib))
+          if lib_path:
+              shutil.copyfile(lib_path, "{}/{}".format(paths, dep_lib))
+          else:
+              print("Ignore {} due to file not found.".format(dep_lib))
       # chrpath -r [new_rpath] [lib_name]
       # chrpath -r paths ph_secure_lib.so
       sys_cmd = f"chrpath -r {paths} {paths}/ph_secure_lib.so"
