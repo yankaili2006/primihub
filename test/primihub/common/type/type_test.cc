@@ -1,19 +1,36 @@
-// Copyright [2023] <PrimiHub>.com>
-#include <string>
-#include <vector>
-
 #include "gtest/gtest.h"
-#include "src/primihub/common/type/type.h"
+#include "src/primihub/common/type.h"
 
-namespace primihub {
+using namespace primihub;
 
-TEST(TypeTest, si64_add) {
-  si64 a_share({1, 2});
-  si64 b_share({10, 20});
-  si64 c_share;
-  c_share = a_share + b_share;
-  EXPECT_EQ(c_share[0], 11);
-  EXPECT_EQ(c_share[1], 22);
+TEST(ColumnDtypeTest, ToString) {
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::STRING), "STRING");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::INTEGER), "INT64");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::DOUBLE), "FP64");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::BOOLEAN), "BOOLEAN");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::LONG), "INT64");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::ENUM), "ENUM");
+  EXPECT_EQ(columnDtypeToString(ColumnDtype::UNKNOWN), "UNKNOWN TYPE");
 }
 
-}  // namespace primihub
+TEST(ColumnDtypeTest, FromInteger) {
+  ColumnDtype type;
+  columnDtypeFromInteger(0, type);
+  EXPECT_EQ(type, ColumnDtype::STRING);
+  columnDtypeFromInteger(1, type);
+  EXPECT_EQ(type, ColumnDtype::INTEGER);
+  columnDtypeFromInteger(2, type);
+  EXPECT_EQ(type, ColumnDtype::DOUBLE);
+  columnDtypeFromInteger(3, type);
+  EXPECT_EQ(type, ColumnDtype::LONG);
+  columnDtypeFromInteger(4, type);
+  EXPECT_EQ(type, ColumnDtype::ENUM);
+  columnDtypeFromInteger(5, type);
+  EXPECT_EQ(type, ColumnDtype::BOOLEAN);
+}
+
+TEST(ColumnDtypeTest, FromInteger_Default) {
+  ColumnDtype type;
+  columnDtypeFromInteger(99, type);
+  EXPECT_EQ(type, ColumnDtype::UNKNOWN);
+}

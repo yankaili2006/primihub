@@ -1,4 +1,4 @@
-#include "src/primihub/pybind_warpper/algorithm/opt_paillier_c2py.hpp"
+#include "src/primihub/pybind_wrapper/algorithm/opt_paillier_c2py.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;

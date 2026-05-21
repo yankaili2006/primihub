@@ -15,7 +15,7 @@
  */
 #include "src/primihub/common/config/config.h"
 
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 9) && !defined(__clang__)
 #include <experimental/filesystem>
 #else
 #include <filesystem>

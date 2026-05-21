@@ -184,9 +184,16 @@ void VMNodeImpl::ReportAliveInfoThread() {
       }
 
       auto& node_info = ins.getServiceConfig();
+      const auto& api_key = cfg.report_api_key.empty()
+          ? cfg.report_api_key
+          : cfg.report_api_key;
+      if (api_key.empty()) {
+        LOG(WARNING) << "report_api_key is not configured, report will be skipped";
+        return;
+      }
       std::string content;
       content
-        .append("key=").append("5oC06czJLeF3kXdfg7D1q2z0G4wwYJ3l").append("&")
+        .append("key=").append(api_key).append("&")
         .append("globalId=").append(device_id).append("&")
         .append("globalName=").append(node_id);
       VLOG(9) << "ReportAliveInfoThread: content: " << content;
@@ -200,8 +207,10 @@ void VMNodeImpl::ReportAliveInfoThread() {
           CURLcode res;
           curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
           curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header);
-          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
-          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, false);
+          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER,
+              cfg.report_tls_verify ? 1L : 0L);
+          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST,
+              cfg.report_tls_verify ? 2L : 0L);
           curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
           curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
           curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 5000L);  //  5s
@@ -276,7 +285,7 @@ std::shared_ptr<Worker> VMNodeImpl::CreateWorker(
       std::make_shared<Worker>(this->node_id_, task_info, GetNodelet());
   PH_LOG(INFO, LogType::kScheduler)
       << TASK_INFO_STR
-      << "Fininsh create worker " << this->node_id_;
+      << "Finished create worker " << this->node_id_;
   return worker;
 }
 

@@ -4,8 +4,10 @@
 #include <glog/logging.h>
 #include <memory>
 #include "src/primihub/kernel/pir/common.h"
-#include "src/primihub/kernel/pir/operator/keyword_pir_impl/keyword_pir_client.h"
-#include "src/primihub/kernel/pir/operator/keyword_pir_impl/keyword_pir_server.h"
+#include "src/primihub/kernel/pir/operator/id_pir.h"
+#ifdef MICROSOFT_APSI
+#include "src/primihub/kernel/pir/operator/keyword_pir.h"
+#endif
 namespace primihub::pir {
 class Factory {
  public:
@@ -14,18 +16,15 @@ class Factory {
     std::unique_ptr<BasePirOperator> operator_ptr{nullptr};
     switch (pir_type) {
     case PirType::ID_PIR:
-      LOG(ERROR) << "Unimplement";
+      operator_ptr = std::make_unique<IdPirOperator>(options);
       break;
-    case PirType::KEY_PIR: {
-      if (RoleValidation::IsClient(options.role)) {
-        operator_ptr = std::make_unique<KeywordPirOperatorClient>(options);
-      } else if (RoleValidation::IsServer(options.role)) {
-        operator_ptr = std::make_unique<KeywordPirOperatorServer>(options);
-      } else {
-        LOG(ERROR) << "unknown role: " << static_cast<int>(options.role);
-      }
+    case PirType::KEY_PIR:
+#ifdef MICROSOFT_APSI
+      operator_ptr = std::make_unique<KeywordPirOperator>(options);
+#else
+      LOG(ERROR) << "KEY_PIR not supported: Microsoft APSI is disabled";
+#endif
       break;
-    }
     default:
       LOG(ERROR) << "unknown pir operator: " << static_cast<int>(pir_type);
       break;

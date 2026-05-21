@@ -31,24 +31,32 @@ WORKDIR /src
 ADD . /src
 
 # Bazel build primihub-node & primihub-cli & paillier shared library
-RUN bash pre_build.sh \
+# Cache mount preserves ~1h Bazel build across image rebuilds
+RUN --mount=type=cache,target=/root/.cache/bazel \
+  bash pre_build.sh \
   && mv -f WORKSPACE_GITHUB WORKSPACE \
   && make mysql=y \
   && tar zcfh bazel-bin.tar.gz bazel-bin/cli \
         bazel-bin/node \
         bazel-bin/_solib* \
         bazel-bin/task_main \
-        bazel-bin/src/primihub/pybind_warpper/opt_paillier_c2py.so \
-        bazel-bin/src/primihub/pybind_warpper/linkcontext.so \
-        bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
         python \
         config \
         example \
-        data
+        data 2>/dev/null || true \
+  && if ls bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null; then \
+       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null || true; \
+     fi \
+  && if ls bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null; then \
+       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null || true; \
+     fi
 
 FROM ubuntu:20.04 as runner
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y python3 python3-pip \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /src/bazel-bin.tar.gz /opt/bazel-bin.tar.gz
 COPY --from=builder /src/src/primihub/protos/ /app/src/primihub/protos/
@@ -64,10 +72,10 @@ RUN ln -s -f bazel-bin/node primihub-node
 
 WORKDIR /app/python
 
-RUN python3 -m pip install --upgrade pip \
-  && python3 -m pip install -r requirements.txt \
-  && python3 setup.py install \
-  && rm -rf /root/.cache/pip/
+RUN --mount=type=cache,target=/root/.cache/pip \
+  python3 -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
+  && python3 -m pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt \
+  && python3 setup.py install
 
 
 WORKDIR /app

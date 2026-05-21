@@ -1,0 +1,21 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "jsoncpp",
+    srcs = [
+        "src/lib_json/json_reader.cpp",
+        "src/lib_json/json_value.cpp",
+        "src/lib_json/json_writer.cpp",
+    ],
+    hdrs = glob([
+        "include/json/*.h",
+        "src/lib_json/*.h",
+        "src/lib_json/*.inl",
+    ]),
+    includes = [
+        "include",
+        "src/lib_json",
+    ],
+    visibility = ["//visibility:public"],
+    copts = ["-DJSON_USE_EXCEPTION=0"],
+)

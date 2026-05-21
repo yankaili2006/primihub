@@ -51,8 +51,14 @@ def run(task_params):
         role_params['others_role'] = role_params['others_role'][0]
 
     # load model and run
-    with open('python/primihub/FL/model_map.json', 'r') as f:
-        model_map = json.load(f)
+    import pkgutil
+    model_map_data = pkgutil.get_data(__name__, 'FL/model_map.json')
+    if model_map_data is None:
+        model_map_path = os.path.join(os.path.dirname(__file__), 'FL/model_map.json')
+        with open(model_map_path, 'r') as f:
+            model_map = json.load(f)
+    else:
+        model_map = json.loads(model_map_data.decode())
 
     model = common_params['model']
     logger.info(f'model: {model}')

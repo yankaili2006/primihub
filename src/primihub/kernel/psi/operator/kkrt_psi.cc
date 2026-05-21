@@ -81,8 +81,7 @@ retcode KkrtPsiOperator::KkrtRecv(oc::Channel& chl,
                                   const std::vector<std::string>& input,
                                   std::vector<uint64_t>* result_index) {
   u8 dummy[1];
-  // oc::PRNG prng(_mm_set_epi32(4253465, 3434565, 234435, 23987045));
-  oc::PRNG prng(oc::block(time(nullptr), time(nullptr)));
+  oc::PRNG prng(oc::sysRandomSeed());
   u64 sendSize;
   // u64 recvSize = 10;
   u64 recvSize = input.size();
@@ -141,8 +140,7 @@ retcode KkrtPsiOperator::KkrtRecv(oc::Channel& chl,
 retcode KkrtPsiOperator::KkrtSend(oc::Channel& chl,
                                   const std::vector<std::string>& input) {
   u8 dummy[1];
-  // osuCrypto::PRNG prng(_mm_set_epi32(4253465, 3434565, 234435, 23987045));
-  oc::PRNG prng(oc::block(time(nullptr), time(nullptr)));
+  oc::PRNG prng(oc::sysRandomSeed());
   u64 sendSize = input.size();
   u64 recvSize;
 

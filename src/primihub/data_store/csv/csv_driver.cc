@@ -492,7 +492,16 @@ std::shared_ptr<Dataset> CSVCursor::read() {
 }
 
 std::shared_ptr<Dataset> CSVCursor::read(int64_t offset, int64_t limit) {
-  return nullptr;
+  auto dataset = read();
+  if (dataset == nullptr) {
+    return nullptr;
+  }
+  auto table = std::get<std::shared_ptr<arrow::Table>>(dataset->data);
+  if (offset >= table->num_rows()) {
+    return nullptr;
+  }
+  auto sliced = table->Slice(offset, limit);
+  return std::make_shared<Dataset>(sliced, this->driver_);
 }
 
 std::shared_ptr<Dataset> CSVCursor::ReadImpl(const std::string& file_path,

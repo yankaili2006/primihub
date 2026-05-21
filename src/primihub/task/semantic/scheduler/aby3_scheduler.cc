@@ -148,7 +148,7 @@ retcode ABY3Scheduler::dispatch(const PushTaskRequest *actorPushTaskRequest) {
   LOG(INFO) << "Dispatch SubmitTask to " << party_count << " node";
 
   // schedule
-  std::vector<std::thread> thrds;
+  auto& pool = getThreadPool();
   std::vector<std::future<retcode>> result_fut;
   const auto& party_access_info = send_request.task().party_access_info();
   for (const auto& [party_name, node] : party_access_info) {
@@ -159,9 +159,8 @@ retcode ABY3Scheduler::dispatch(const PushTaskRequest *actorPushTaskRequest) {
     pbNode2Node(node, &dest_node);
     LOG(INFO) << "Dispatch Task to party: " << dest_node.to_string() << " "
         << "party_name: " << party_name;
-      result_fut.emplace_back(
-        std::async(
-          std::launch::async,
+      result_fut.push_back(
+        pool.enqueue(
         &ABY3Scheduler::ScheduleTask,
         this,
         party_name,

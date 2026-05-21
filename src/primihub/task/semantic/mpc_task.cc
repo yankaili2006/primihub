@@ -36,24 +36,17 @@ MPCTask::MPCTask(const std::string &node_id, const std::string &function_name,
     using LRExecutor = primihub::LogisticRegressionExecutor;
     algorithm_ = std::make_shared<LRExecutor>(config, dataset_service);
   } else if (function_name == "linear_regression") {
-    // TODO(XXX): implement linear regression
+    LOG(ERROR) << "linear_regression not implemented in C++, use Python FL SDK";
+    return;
   } else if (function_name == "mpc_statistics") {
     using StatisticsExecutor = primihub::MPCStatisticsExecutor;
     algorithm_ = std::make_shared<StatisticsExecutor>(config, dataset_service);
-  } else if (function_name == "xgboost") {
-    // TODO(XXX): implement xgboost
-  } else if (function_name == "lightgbm") {
-    // TODO(XXX): implement lightgbm
-  } else if (function_name == "catboost") {
-    // TODO(XXX): implement catboost
-  } else if (function_name == "dnn") {
-    // TODO(XXX): implement dnn
-  } else if (function_name == "cnn") {
-    // TODO(XXX): implement cnn
-  } else if (function_name == "rnn") {
-    // TODO(XXX): implement rnn
-  } else if (function_name == "lstm") {
-    // TODO(XXX): implement lstm
+  } else if (function_name == "xgboost" || function_name == "lightgbm"
+      || function_name == "catboost" || function_name == "dnn"
+      || function_name == "cnn" || function_name == "rnn"
+      || function_name == "lstm") {
+    LOG(ERROR) << function_name << " not implemented in C++, use Python FL SDK";
+    return;
   } else if (function_name == "AbnormalProcessTask") {
     using MissingProcess = primihub::MissingProcess;
     algorithm_ = std::make_shared<MissingProcess>(config, dataset_service);

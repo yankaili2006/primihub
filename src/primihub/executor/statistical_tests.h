@@ -54,7 +54,7 @@ private:
 class MPCFTest : public MPCStatisticsOperator {
 public:
   MPCFTest() {
-    type_ = MPCStatisticsType::F_TEST;
+    type_ = MPCStatisticsType::STAT_F_TEST;
   }
   
   virtual ~MPCFTest() {

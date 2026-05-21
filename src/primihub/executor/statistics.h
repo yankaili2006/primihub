@@ -20,10 +20,10 @@ public:
   enum MPCStatisticsType {
     AVG,
     SUM,
-    MAX,
-    MIN,
+    STAT_MAX,
+    STAT_MIN,
     T_TEST,
-    F_TEST,
+    STAT_F_TEST,
     CHI_SQUARE_TEST,
     REGRESSION,
     CORRELATION,
@@ -69,16 +69,16 @@ public:
     case MPCStatisticsType::SUM:
       str = "SUM";
       break;
-    case MPCStatisticsType::MAX:
+    case MPCStatisticsType::STAT_MAX:
       str = "MAX";
       break;
-    case MPCStatisticsType::MIN:
+    case MPCStatisticsType::STAT_MIN:
       str = "MIN";
       break;
     case MPCStatisticsType::T_TEST:
       str = "T_TEST";
       break;
-    case MPCStatisticsType::F_TEST:
+    case MPCStatisticsType::STAT_F_TEST:
       str = "F_TEST";
       break;
     case MPCStatisticsType::CHI_SQUARE_TEST:
@@ -176,7 +176,7 @@ private:
 
   template <class T1, class T2>
   void minOrMax(std::shared_ptr<T1> &array, T2 &val) {
-    if (type_ == MPCStatisticsType::MAX) {
+    if (this->type_ == MPCStatisticsType::STAT_MAX) {
       for (int i = 0; i < array->length(); i++) {
         if (val <= array->Value(i))
           val = array->Value(i);
@@ -191,7 +191,7 @@ private:
 
   template <class T> void fillInitValue(T &val) {
     if (std::is_same<T, int32_t>::value) {
-      if (type_ == MPCStatisticsType::MAX)
+      if (this->type_ == MPCStatisticsType::STAT_MAX)
         val = std::numeric_limits<int32_t>::min();
       else
         val = std::numeric_limits<int32_t>::max();
@@ -199,7 +199,7 @@ private:
     }
 
     if (std::is_same<T, int64_t>::value) {
-      if (type_ == MPCStatisticsType::MAX)
+      if (this->type_ == MPCStatisticsType::STAT_MAX)
         val = std::numeric_limits<int64_t>::min();
       else
         val = std::numeric_limits<int64_t>::max();
@@ -207,7 +207,7 @@ private:
     }
 
     if (std::is_same<T, double>::value) {
-      if (type_ == MPCStatisticsType::MAX)
+      if (this->type_ == MPCStatisticsType::STAT_MAX)
         val = std::numeric_limits<double>::min();
       else
         val = std::numeric_limits<double>::max();
@@ -219,14 +219,14 @@ private:
 
   template <class T>
   void fillChunkResult(double &cur_val, T &new_val) {
-    if (type_ == MPCStatisticsType::MIN) {
+    if (this->type_ == MPCStatisticsType::STAT_MIN) {
       if (cur_val > static_cast<double>(new_val))
         cur_val = new_val;
 
       return;
     }
 
-    if (type_ == MPCStatisticsType::MAX) {
+    if (this->type_ == MPCStatisticsType::STAT_MAX) {
       if (cur_val < static_cast<double>(new_val))
         cur_val = new_val;
       return;

@@ -43,12 +43,9 @@
 #define PadToRegisterSize(x) 		(PadToMultiple(x, OTEXT_BLOCK_SIZE_BITS))
 #define PadToMultiple(x, y) 		( ceil_divide(x, y) * (y))
 
-//TODO: this is bad, fix occurrences of ceil_log2 and replace by ceil_log2_min1 where log(1) = 1 is necessary. For all else use ceil_log2_real
-uint32_t ceil_log2(int bits);
-
-uint32_t ceil_log2_min1(int bits);
-
 uint32_t ceil_log2_real(int bits);
+uint32_t ceil_log2(int bits);
+uint32_t ceil_log2_min1(int bits);
 
 uint32_t floor_log2(int bits);
 

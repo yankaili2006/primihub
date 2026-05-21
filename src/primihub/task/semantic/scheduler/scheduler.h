@@ -32,6 +32,7 @@
 #include "src/primihub/util/network/link_context.h"
 #include "src/primihub/util/network/link_factory.h"
 #include "src/primihub/common/config/server_config.h"
+#include "src/primihub/common/thread_pool.h"
 
 using primihub::rpc::PushTaskReply;
 using primihub::rpc::PushTaskRequest;
@@ -39,6 +40,11 @@ using primihub::rpc::VMNode;
 using primihub::service::DatasetWithParamTag;
 
 namespace primihub::task {
+
+inline ThreadPool& getThreadPool() {
+  static ThreadPool pool;
+  return pool;
+}
 using PeerDatasetMap = std::map<std::string, std::vector<DatasetWithParamTag>>;
 
 class VMScheduler {

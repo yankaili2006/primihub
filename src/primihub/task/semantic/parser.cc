@@ -139,7 +139,7 @@ retcode ProtocolSemanticParser::ParseDatasetToPartyAccessInfo(
       auto datasets_with_tag = _parser->getDatasets();
       VLOG(2) << task_info_str << "Finding meta list from datasets...";
       // get party access info from dataset meta service using dataset id
-      dataset_service_->MetaService()->FindPeerListFromDatasets(
+      auto ret = dataset_service_->MetaService()->FindPeerListFromDatasets(
         datasets_with_tag,
         [&, this](std::vector<DatasetMetaWithParamTag>& metas_with_param_tag) {
           VLOG(2) << task_info_str
@@ -150,11 +150,20 @@ retcode ProtocolSemanticParser::ParseDatasetToPartyAccessInfo(
           _parser->MergePartyAccessInfo(party_access_info);
           VLOG(2) << task_info_str << "end of MergePartyAccessInfo";
         });
+      if (ret != retcode::SUCCESS) {
+        LOG(WARNING) << task_info_str
+                     << "FindPeerListFromDatasets failed, "
+                     << "falling back to local party access info";
+        // Generate party access info from local datasets
+        _parser->MergePartyAccessInfo(
+            dataset_service_->getLocalPartyAccessInfo(datasets_with_tag));
+      }
       // process auxiliary server if search by dataset
       ProcessAuxiliaryServer(_parser);
     }
   }
-  LOG(INFO) << "number of parties: " << party_access_info.size();
+  const auto& updated_pai = task_request.task().party_access_info();
+  LOG(INFO) << "number of parties: " << updated_pai.size();
 
   return retcode::SUCCESS;
 }

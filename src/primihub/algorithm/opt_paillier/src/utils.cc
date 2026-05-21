@@ -25,14 +25,17 @@
 #include <unistd.h>
 
 
-//TODO: this is bad, fix occurrences of ceil_log2 and replace by ceil_log2_min1 where log(1) = 1 is necessary. For all else use ceil_log2_real
+uint32_t ceil_log2_real(int bits) {
+  if (bits <= 1)
+    return 0;
+  int targetlevel = 0, bitstemp = bits;
+  while (bitstemp >>= 1)
+    ++targetlevel;
+  return targetlevel + ((1 << targetlevel) < bits);
+}
+
 uint32_t ceil_log2(int bits) {
-	if (bits == 1)
-		return 1;
-	int targetlevel = 0, bitstemp = bits;
-	while (bitstemp >>= 1)
-		++targetlevel;
-	return targetlevel + ((1 << targetlevel) < bits);
+  return ceil_log2_real(bits);
 }
 
 uint32_t ceil_log2_min1(int bits) {

@@ -16,6 +16,8 @@
 
 #include "src/primihub/node/worker/worker.h"
 #include <memory>
+#include <fstream>
+#include <cstdio>
 #include <string>
 #include "src/primihub/task/semantic/factory.h"
 #include "src/primihub/task/semantic/task.h"
@@ -158,17 +160,20 @@ retcode Worker::ExecuteTaskByProcess(const PushTaskRequest* task_request) {
     LOG(ERROR) << TASK_INFO_STR << "serialize task config failed";
     return retcode::FAIL;
   }
-  std::string request_base64_str = base64_encode(task_config_str);
-
-  // std::future<std::string> data;
   std::string current_process_dir = getCurrentProcessDir();
   VLOG(5) << TASK_INFO_STR << "current_process_dir: " << current_process_dir;
   std::string execute_app = current_process_dir + "/task_main";
-  std::string execute_cmd;
+  std::string task_request_file = current_process_dir
+      + "/.task_request_" + task_info.request_id();
+  {
+    std::ofstream f(task_request_file, std::ios::binary);
+    f << task_config_str;
+    f.close();
+  }
   std::vector<std::string> args;
   args.push_back("--node_id=" + this->node_id);
   args.push_back("--config_file=" + server_config.getConfigFile());
-  args.push_back("--request=" + request_base64_str);
+  args.push_back("--task_request_file=" + task_request_file);
   args.push_back("--request_id=" + task_info.request_id());
   // using POCO process
   Poco::Pipe outPipe;
@@ -211,6 +216,7 @@ retcode Worker::ExecuteTaskByProcess(const PushTaskRequest* task_request) {
     return retcode::FAIL;
   }
   process_handler_.reset();
+  std::remove(task_request_file.c_str());
   // POCO process end
   return retcode::SUCCESS;
 }

@@ -76,7 +76,7 @@ enum StatisticsOpType {
   AVG = 2;
   SUM = 3;
   T_TEST = 4;
-  F_TEST = 5;
+  F_STAT_TEST = 5;
   CHI_SQUARE_TEST = 6;
   REGRESSION = 7;
   CORRELATION = 8;

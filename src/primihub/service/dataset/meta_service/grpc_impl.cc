@@ -6,6 +6,8 @@
 #include <utility>
 #include <tuple>
 #include <string>
+#include <thread>
+#include <chrono>
 #include "src/primihub/common/value_check_util.h"
 
 namespace primihub::service {
@@ -64,6 +66,7 @@ retcode GrpcDatasetMetaService::PutMeta(const DatasetMeta& meta) {
                 << status.error_code() << ": " << status.error_message();
       if (retry_time < retry_max_times_) {
         retry_time++;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         continue;
       } else {
         LOG(WARNING) << "PutMeta to Node ["

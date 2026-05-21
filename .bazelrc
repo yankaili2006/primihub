@@ -45,6 +45,11 @@ build:linux_asan --copt=-msse4.1
 build:linux_asan --copt=-mpclmul
 build:linux_asan --define enable_mysql_driver=true
 
+# Coverage configuration
+coverage --collect_code_coverage
+coverage --instrumentation_filter="//src/primihub[:]"
+coverage --combined_report=lcov
+coverage --lcov_report=coverage_report.lcov
 
 # Enable remote execution so actions are performed on the remote systems.
 build:remote --remote_executor=grpc://118.190.39.100:27941

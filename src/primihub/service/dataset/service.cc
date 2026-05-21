@@ -24,6 +24,7 @@
 
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/data_store/factory.h"
+#include "src/primihub/common/common.h"
 #include "src/primihub/common/config/config.h"
 #include "src/primihub/service/dataset/util.hpp"
 #include "src/primihub/util/redis_helper.h"
@@ -264,15 +265,42 @@ primihub::retcode DatasetService::registerDriver(
   return primihub::retcode::SUCCESS;
 }
 
+std::map<std::string, Node> DatasetService::getLocalPartyAccessInfo(
+    const std::vector<DatasetWithParamTag>& datasets_with_tag) {
+  std::map<std::string, Node> party_access_info;
+  Node local_node;
+  local_node.fromString(nodelet_addr_);
+  for (const auto& pair : datasets_with_tag) {
+    const auto& dataset_id = std::get<0>(pair);
+    const auto& party_name = std::get<1>(pair);
+    VLOG(5) << "looking up local dataset: " << dataset_id
+            << " for party: " << party_name;
+    {
+      std::shared_lock<std::shared_mutex> lck(driver_mtx_);
+      auto it = driver_manager_.find(dataset_id);
+      if (it != driver_manager_.end()) {
+        party_access_info[party_name] = local_node;
+        LOG(INFO) << "found local dataset: " << dataset_id
+                  << " for party: " << party_name;
+      } else {
+        LOG(WARNING) << "dataset: " << dataset_id
+                     << " not found in local driver manager, "
+                     << "driver_manager_ size: " << driver_manager_.size();
+      }
+    }
+  }
+  return party_access_info;
+}
+
 std::shared_ptr<primihub::DataDriver>
 DatasetService::getDriver(const std::string& dataset_id, bool is_acces_info) {
-  // {
-  //   std::shared_lock<std::shared_mutex> lck(driver_mtx_);
-  //   auto it = driver_manager_.find(dataset_id);
-  //   if (it != driver_manager_.end()) {
-  //     return it->second;
-  //   }
-  // }
+  {
+    std::shared_lock<std::shared_mutex> lck(driver_mtx_);
+    auto it = driver_manager_.find(dataset_id);
+    if (it != driver_manager_.end()) {
+      return it->second;
+    }
+  }
   if (is_acces_info) {
     DatasetMetaInfo meta_info;
     VLOG(5) << dataset_id;

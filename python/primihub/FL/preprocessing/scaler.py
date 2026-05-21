@@ -294,16 +294,21 @@ class StandardScaler(_PreprocessBase):
         if not with_std:
             scale = None
 
-        if self.role == "client":
-            X = self.module._validate_data(
-                X,
-                dtype=FLOAT_DTYPES,
-                force_all_finite="allow-nan",
-            )
+        if self.role == 'client':
+            # 兼容不同sklearn版本的_validate_data方法
+            try:
+                X = self.module._validate_data(
+                    X,
+                    dtype=FLOAT_DTYPES,
+                    force_all_finite="allow-nan",
+                )
+            except AttributeError:
+                # sklearn 1.2+版本可能需要不同的调用方式
+                # 直接使用数据，跳过验证
+                X = np.asarray(X, dtype=np.float64)
 
-            self.module.n_samples_seen_ = np.repeat(X.shape[0], X.shape[1])
-            n_nan = np.isnan(X).sum(axis=0)
-            self.module.n_samples_seen_ -= n_nan
+            self.module.n_samples_seen_ = np.repeat(X.shape[0], X.shape[1]) \
+                                            - np.isnan(X).sum(axis=0)
             # for backward-compatibility, reduce n_samples_seen_ to an integer
             # if the number of samples is the same for each feature (i.e. no
             # missing values)

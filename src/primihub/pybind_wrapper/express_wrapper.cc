@@ -3,7 +3,7 @@
 #include <sstream>
 #include <vector>
 
-#include "src/primihub/pybind_warpper/express_wrapper.h"
+#include "src/primihub/pybind_wrapper/express_wrapper.h"
 
 namespace primihub {
 PyMPCExpressExecutor::PyMPCExpressExecutor(uint32_t party_id, string prefix,

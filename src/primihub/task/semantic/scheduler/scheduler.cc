@@ -23,7 +23,7 @@ retcode VMScheduler::dispatch(const PushTaskRequest* task_request_ptr) {
   const auto& task_info = task_request_ptr->task().task_info();
   auto TASK_INFO_STR = proto::util::TaskInfoToString(task_info);
   const auto& participate_node = task_request.task().party_access_info();
-  std::vector<std::thread> thrds;
+  auto& pool = getThreadPool();
   std::vector<std::future<retcode>> result_fut;
   for (const auto& [party_name, node] : participate_node) {
     this->error_msg_.insert({party_name, ""});
@@ -34,9 +34,8 @@ retcode VMScheduler::dispatch(const PushTaskRequest* task_request_ptr) {
     VLOG(2) << TASK_INFO_STR
         << "Dispatch Task to party: " << dest_node.to_string() << " "
         << "party_name: " << party_name;
-    result_fut.emplace_back(
-      std::async(
-        std::launch::async,
+    result_fut.push_back(
+      pool.enqueue(
         &VMScheduler::ScheduleTask,
         this,
         party_name,
