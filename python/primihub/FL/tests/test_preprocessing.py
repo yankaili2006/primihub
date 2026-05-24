@@ -14,7 +14,11 @@ except ImportError:
     HAS_SKLEARN = False
 
 
+_no_sklearn = pytest.mark.skipif(not HAS_SKLEARN, reason="sklearn not installed")
+
+
 class TestScaler:
+    @_no_sklearn
     def test_standard_scaler(self):
         from sklearn.preprocessing import StandardScaler
         x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -24,6 +28,7 @@ class TestScaler:
         assert abs(result.mean()) < 1e-10
         assert abs(result.std(axis=0)[0] - 1.0) < 1e-10
 
+    @_no_sklearn
     def test_minmax_scaler(self):
         from sklearn.preprocessing import MinMaxScaler
         x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -32,6 +37,7 @@ class TestScaler:
         assert result.min() >= 0.0
         assert result.max() <= 1.0
 
+    @_no_sklearn
     def test_standard_scaler_transform(self):
         from sklearn.preprocessing import StandardScaler
         x_train = np.array([[1.0, 2.0], [3.0, 4.0]])
@@ -41,6 +47,7 @@ class TestScaler:
         result = scaler.transform(x_test)
         assert result.shape == (1, 2)
 
+    @_no_sklearn
     def test_robust_scaler(self):
         from sklearn.preprocessing import RobustScaler
         x = np.array([[1.0, 2.0], [3.0, 4.0], [100.0, 200.0]])
@@ -50,6 +57,7 @@ class TestScaler:
 
 
 class TestImputer:
+    @_no_sklearn
     def test_mean_imputation(self):
         from sklearn.impute import SimpleImputer
         x = np.array([[1.0, np.nan], [3.0, 4.0], [np.nan, 6.0]])
@@ -57,6 +65,7 @@ class TestImputer:
         result = imputer.fit_transform(x)
         assert not np.any(np.isnan(result))
 
+    @_no_sklearn
     def test_median_imputation(self):
         from sklearn.impute import SimpleImputer
         x = np.array([[1.0, np.nan], [3.0, 4.0], [5.0, 6.0]])
@@ -66,6 +75,7 @@ class TestImputer:
 
 
 class TestEncoder:
+    @_no_sklearn
     def test_onehot_encoder(self):
         from sklearn.preprocessing import OneHotEncoder
         x = np.array([['a'], ['b'], ['a'], ['c']])
@@ -73,6 +83,7 @@ class TestEncoder:
         result = encoder.fit_transform(x)
         assert result.shape[1] >= 3
 
+    @_no_sklearn
     def test_label_encoder(self):
         from sklearn.preprocessing import LabelEncoder
         x = np.array(['a', 'b', 'a', 'c'])
@@ -82,6 +93,7 @@ class TestEncoder:
 
 
 class TestDiscretizer:
+    @_no_sklearn
     def test_kbins_discretizer(self):
         from sklearn.preprocessing import KBinsDiscretizer
         x = np.array([[1.0], [2.0], [3.0], [4.0], [5.0]])
@@ -92,6 +104,7 @@ class TestDiscretizer:
 
 
 class TestTransformer:
+    @_no_sklearn
     def test_power_transformer(self):
         from sklearn.preprocessing import PowerTransformer
         np.random.seed(42)
