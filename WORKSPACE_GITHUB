@@ -426,6 +426,11 @@ new_git_repository(
   remote = "https://github.com/primihub/SEAL.git",
   branch = "change_submodule_resource",
   #branch = "main",
+  patch_cmds = [
+    "sed -i 's|gitee.com/mirrors_madler/zlib|github.com/madler/zlib|' cmake/ExternalZLIB.cmake",
+    "sed -i 's|gitee.com/mirrors_microsoft/GSL|github.com/microsoft/GSL|' cmake/ExternalMSGSL.cmake",
+    "sed -i 's|gitee.com/cs-beegfs/zstd|github.com/facebook/zstd|' cmake/ExternalZSTD.cmake",
+  ],
 )
 
 http_archive(
@@ -610,7 +615,7 @@ new_git_repository(
 git_repository(
     name = "com_google_cityhash",
     commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
-    remote = "https://gitee.com/primihub/cityhash.git",
+    remote = "https://github.com/primihub/cityhash.git",
 )
 
 # needed by APSI

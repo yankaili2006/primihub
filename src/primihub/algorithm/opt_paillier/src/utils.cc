@@ -47,15 +47,6 @@ uint32_t ceil_log2_min1(int bits) {
 	return targetlevel + ((1 << targetlevel) < bits);
 }
 
-uint32_t ceil_log2_real(int bits) {
-	if (bits == 1)
-		return 0;
-	int targetlevel = 0, bitstemp = bits;
-	while (bitstemp >>= 1)
-		++targetlevel;
-	return targetlevel + ((1 << targetlevel) < bits);
-}
-
 uint32_t floor_log2(int bits) {
 	if (bits == 1)
 		return 1;

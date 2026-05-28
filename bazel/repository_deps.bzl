@@ -630,5 +630,5 @@ def primihub_deps_cn():
     git_repository(
       name = "com_google_cityhash",
       commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
-      remote = "https://gitee.com/primihub/cityhash.git",
+      remote = "https://github.com/primihub/cityhash.git",
     )
