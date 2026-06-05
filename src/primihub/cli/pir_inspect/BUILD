@@ -11,6 +11,9 @@ cc_binary(
         "//src/primihub/kernel/pir/operator:id_pir_operator",
         "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
         "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
         "@com_github_glog_glog//:glog",
         # The legacy id_pir operator is alwayslink so its registrar runs
         # at startup. Future algorithms (spiral / double / etc) get pulled
