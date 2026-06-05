@@ -25,6 +25,7 @@
 
 #include "src/primihub/kernel/pir/operator/base_pir.h"
 #include "src/primihub/kernel/pir/operator/factory.h"
+#include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/common/config/server_config.h"
 #include "src/primihub/util/file_util.h"
 #include "src/primihub/common/value_check_util.h"
@@ -220,6 +221,45 @@ retcode PirTask::ParsePirType(const rpc::Task& task_config) {
   return retcode::SUCCESS;
 }
 
+retcode PirTask::ParseAlgorithmSelection(const rpc::Task& task_config) {
+  // See proto/common.proto PirType enum block for the full key list.
+  const auto& param_map = task_config.params().param_map();
+  auto iter = param_map.find("algorithm");
+  if (iter != param_map.end()) {
+    const auto& algo_bytes = iter->second.value_string();
+    algorithm_.assign(algo_bytes.begin(), algo_bytes.end());
+  }
+
+  auto backend_it = param_map.find("preferred_backend");
+  if (backend_it != param_map.end()) {
+    const auto& b = backend_it->second.value_string();
+    std::string s(b.begin(), b.end());
+    if (s == "cpu") {
+      options_.preferred_backend = pir::Backend::CPU;
+    } else if (s == "avx2") {
+      options_.preferred_backend = pir::Backend::AVX2;
+    } else if (s == "cuda") {
+      options_.preferred_backend = pir::Backend::CUDA;
+    } else {
+      options_.preferred_backend = pir::Backend::AUTO;
+    }
+  }
+
+  auto nc_it = param_map.find("assume_non_colluding");
+  if (nc_it != param_map.end()) {
+    options_.assume_non_colluding = nc_it->second.value_int32() != 0;
+  }
+
+  auto hint_it = param_map.find("hint_path");
+  if (hint_it != param_map.end()) {
+    const auto& h = hint_it->second.value_string();
+    options_.hint_path.assign(h.begin(), h.end());
+  }
+  // latency_budget is a selector-side hint only; operators do not consume
+  // it directly, so we deliberately don't echo it into Options here.
+  return retcode::SUCCESS;
+}
+
 retcode PirTask::ParseResultPathConfig(const rpc::Task& task_config) {
   const auto& param_map = task_config.params().param_map();
   if (RoleValidation::IsClient(this->party_name())) {
@@ -246,6 +286,10 @@ retcode PirTask::LoadParams(const rpc::Task& task) {
                << party_name() << " failed";
     return retcode::FAIL;
   }
+  // Parse the multi-algo selection AFTER BuildOptions so the new options
+  // fields (preferred_backend / assume_non_colluding / hint_path) populate
+  // the just-initialised options_ struct.
+  ParseAlgorithmSelection(task);
   ParseResultPathConfig(task);
   return retcode::SUCCESS;
 }
@@ -470,10 +514,34 @@ retcode PirTask::SaveResult() {
 }
 
 retcode PirTask::InitOperator() {
+  // Make sure every registrar in this binary has had a chance to run.
+  // Static init ordering does the right thing in normal builds, but
+  // EnsureRegistered() is the documented contract for late-arrival
+  // executors (e.g. when libraries are dlopen'd or tests link a subset).
+  primihub::pir::PirRegistry::EnsureRegistered();
+
+  if (!algorithm_.empty()) {
+    // New caller path: select operator by registry name.
+    VLOG(2) << "PirTask InitOperator via Registry, algorithm='"
+            << algorithm_ << "'";
+    this->operator_ =
+        primihub::pir::PirRegistry::Instance().Create(algorithm_, options_);
+    if (this->operator_ == nullptr) {
+      LOG(ERROR) << "create pir operator failed for algorithm: '"
+                 << algorithm_ << "' — algorithm not registered or not "
+                 << "linked into this binary. Use `pir_inspect list` to see "
+                 << "available algorithms.";
+      return retcode::FAIL;
+    }
+    return retcode::SUCCESS;
+  }
+
+  // Legacy caller path: route via PirType -> name shim in Factory.
   auto type = static_cast<primihub::pir::PirType>(pir_type_);
   this->operator_ = primihub::pir::Factory::Create(type, options_);
   if (this->operator_ == nullptr) {
-    LOG(ERROR) << "create pir operator failed";
+    LOG(ERROR) << "create pir operator failed for legacy PirType="
+               << pir_type_;
     return retcode::FAIL;
   }
   return retcode::SUCCESS;

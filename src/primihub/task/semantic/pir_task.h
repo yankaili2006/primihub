@@ -55,11 +55,15 @@ class PirTask : public TaskBase {
   retcode ParseQueryConfig(const rpc::Task& task_config);
   retcode ParseDataset(const rpc::Task& task_config);
   retcode ParsePirType(const rpc::Task& task_config);
+  retcode ParseAlgorithmSelection(const rpc::Task& task_config);
   retcode ParseResultPathConfig(const rpc::Task& task_config);
   retcode ParsePirRole(const rpc::Task& task_config, Role* role);
 
  private:
   int pir_type_{rpc::PirType::KEY_PIR};
+  // Algorithm name resolved from Params["algorithm"]. Empty -> legacy path
+  // via pir_type_ (LegacyNameFor(static_cast<PirType>(pir_type_))).
+  std::string algorithm_;
   std::string dataset_path_;
   std::string dataset_id_;
   std::string result_file_path_;

@@ -89,10 +89,28 @@ retcode PIRScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
       node2PbNode(local_node, &party_info);
     }
   }
+  // Resolve the selected algorithm for diagnostic / routing context. The
+  // routing decision itself (which parties to dispatch to) is determined
+  // by party_access_info; algorithm + pirType are propagated through
+  // params verbatim and consumed on the node side (see PirTask::InitOperator).
+  std::string algorithm;
+  auto algo_it = params.find("algorithm");
+  if (algo_it != params.end()) {
+    const auto& algo_bytes = algo_it->second.value_string();
+    algorithm.assign(algo_bytes.begin(), algo_bytes.end());
+  }
   int pirType = PirType::ID_PIR;
   auto param_it = params.find("pirType");
   if (param_it != params.end()) {
     pirType = param_it->second.value_int32();
+  }
+  if (!algorithm.empty()) {
+    LOG(INFO) << TASK_INFO_STR << "PIR algorithm=" << algorithm
+              << " (pirType=" << pirType
+              << " present but algorithm takes precedence)";
+  } else {
+    LOG(INFO) << TASK_INFO_STR << "PIR legacy pirType=" << pirType
+              << " (no algorithm field set)";
   }
   const auto& participate_node = push_request.task().party_access_info();
   do {
