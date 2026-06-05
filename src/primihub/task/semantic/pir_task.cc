@@ -101,7 +101,7 @@ retcode PirTask::BuildOptions(const rpc::Task& task, pir::Options* options) {
   }
   auto it = party_info.find(peer_party_name);
   if (it != party_info.end()) {
-    options->peer_node = it->second;
+    options->set_peer_node(it->second);
   } else {
     LOG(WARNING) << "find peer node info failed for party: " << party_name();
   }
