@@ -75,3 +75,18 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "double_pir_test",
+    srcs = ["double_pir_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator:capabilities",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator:selector",
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
