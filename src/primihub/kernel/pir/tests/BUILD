@@ -48,3 +48,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "multi_peer_test",
+    srcs = ["multi_peer_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator:multi_peer_pir",
+        "//src/primihub/util/network:communication_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

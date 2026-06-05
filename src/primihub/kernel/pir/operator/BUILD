@@ -60,6 +60,18 @@ cc_library(
 )
 
 cc_library(
+    name = "multi_peer_pir",
+    hdrs = ["multi_peer_pir.h"],
+    srcs = ["multi_peer_pir.cc"],
+    deps = [
+        ":base_pir_operator",
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/util/network:communication_lib",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "id_pir_operator",
     hdrs = ["id_pir.h"],
     srcs = ["id_pir.cc"],
@@ -69,7 +81,7 @@ cc_library(
         "//src/primihub/kernel/pir:common_def",
         "//src/primihub/util/network:communication_lib",
     ],
-    alwayslink = True,  # static registrar must not be DCE'd
+    alwayslink = True,
 )
 
 cc_library(
