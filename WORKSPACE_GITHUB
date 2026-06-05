@@ -726,3 +726,26 @@ git_repository(
   commit = "84108f9340ee177617950b08c97062590381c66b",
   remote = "https://github.com/primihub/communication.git",
 )
+
+# ---------------------------------------------------------------------------
+# Multi-algo PIR — external algorithm vendoring (openspec primihub-pir-multi-algo)
+# ---------------------------------------------------------------------------
+# Each new_git_repository entry below pins an upstream PIR algorithm impl
+# and points at a primihub-maintained BUILD wrapper under thirdparty/pir/.
+# The corresponding kernel/pir/operator/<algo>_pir/ wraps it in a
+# BasePirOperator and self-registers via PirRegistrar.
+
+# SpiralPIR (Menon & Wu, USENIX'22). Pinned at last upstream commit
+# (repo dormant since 2022-05-02). Wrapper at //thirdparty/pir:BUILD.spiral.
+# Depends on Intel HExL — must be added separately when activating this
+# WORKSPACE entry. Currently DECLARED but not yet referenced by any
+# cc_library deps, so bazel does not fetch it. Activate by adding
+# "@spiral_pir//:spiral_lib" to src/primihub/kernel/pir/operator/spiral_pir
+# BUILD when implementing OnExecute.
+new_git_repository(
+    name = "spiral_pir",
+    remote = "https://github.com/menonsamir/spiral.git",
+    commit = "361ee47f92214d4fcd03c4205c9c2729e8369afb",
+    shallow_since = "1651472347 +0000",
+    build_file = "@//thirdparty/pir:BUILD.spiral",
+)
