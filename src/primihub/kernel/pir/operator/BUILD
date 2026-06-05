@@ -35,6 +35,18 @@ cc_library(
 )
 
 cc_library(
+    name = "selector",
+    hdrs = ["selector.h"],
+    srcs = ["selector.cc"],
+    deps = [
+        ":capabilities",
+        ":registry",
+        "//src/primihub/kernel/pir:common_def",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "base_pir_operator",
     hdrs = ["base_pir.h"],
     srcs = ["base_pir.cc"],

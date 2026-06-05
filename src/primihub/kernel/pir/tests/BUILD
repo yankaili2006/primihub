@@ -23,3 +23,28 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "backend_test",
+    srcs = ["backend_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/backend:backend",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
+    name = "selector_test",
+    srcs = ["selector_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator:capabilities",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator:selector",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
