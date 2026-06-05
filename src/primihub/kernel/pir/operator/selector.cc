@@ -62,7 +62,7 @@ void Evaluate(const std::string& algo, const PirCapabilities& caps,
     m->failed_checks.push_back("non-colluding assumption not declared");
   }
   if (!c.client_can_cache_hint && caps.typical_hint_size_bytes > 0 &&
-      !caps.hint_per_database) {
+      caps.hint_per_database) {
     m->failed_checks.push_back("hint required but client cannot cache");
   }
   if (ThreatModelRank(caps.threat_model) < ThreatModelRank(c.min_threat_model)) {
@@ -103,7 +103,7 @@ void Evaluate(const std::string& algo, const PirCapabilities& caps,
   // Reward better threat model
   score += static_cast<uint64_t>(ThreatModelRank(caps.threat_model)) * 1'000;
   // Penalize big hint when client is the one caching
-  if (caps.typical_hint_size_bytes > 0 && !caps.hint_per_database) {
+  if (caps.typical_hint_size_bytes > 0 && caps.hint_per_database) {
     score -= std::min<uint64_t>(caps.typical_hint_size_bytes / (1ull << 20), 50'000);
   }
   // Soft penalty for backend mismatch

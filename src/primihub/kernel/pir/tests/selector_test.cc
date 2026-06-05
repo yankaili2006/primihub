@@ -124,6 +124,7 @@ TEST(PirSelectorTest, TwoServerNonColludingAtScaleDoubleWinsOverSpiral) {
   c.allow_two_server = true;
   c.assume_non_colluding = true;
   c.latency_budget = LatencyBudget::Seconds;
+  c.client_can_cache_hint = true;
 
   auto algos = PirSelector{}.Recommend(c);
   ASSERT_FALSE(algos.empty());
@@ -167,6 +168,7 @@ TEST(PirSelectorTest, MsBudgetExcludesSlowAlgos) {
   c.allow_two_server = true;
   c.assume_non_colluding = true;
   c.latency_budget = LatencyBudget::Ms;
+  c.client_can_cache_hint = true;
 
   auto algos = PirSelector{}.Recommend(c);
   EXPECT_EQ(std::find(algos.begin(), algos.end(), "sel_test_spiral_e"),
@@ -206,6 +208,52 @@ TEST(PirSelectorTest, RationaleReportsFailureReasons) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+
+// Regression coverage for the hint-cacheability predicate bug fix.
+// Before the fix, the selector filtered per-client hint algorithms (hint
+// size > 0 AND hint_per_database == false), which is the inverted
+// semantic — per-client hints are generated fresh per query and can never
+// be cached. The real cacheability question is about per-database hints
+// (shared across queries against the same DB), so an honest
+// client_can_cache_hint=false caller MUST see those filtered out.
+TEST(PirSelectorTest, PerDatabaseHintFilteredWhenClientCannotCache) {
+  PirCapabilities caps;
+  caps.query_types = {QueryType::Index};
+  caps.min_servers = 1;
+  caps.max_servers = 1;
+  caps.needs_preprocess = true;
+  caps.hint_per_database = true;
+  caps.threat_model = ThreatModel::SemiHonest;
+  caps.perf_class = PerfClass::Ms;
+  caps.recommended_max_db_size = 1'000'000'000ULL;
+  caps.backends = {Backend::CPU};
+  caps.typical_query_comm_bytes = 1024;
+  caps.typical_hint_size_bytes = 16ULL * 1024 * 1024;
+  RegisterFake("sel_test_hint_per_db", caps);
+
+  Constraints c;
+  c.db_size = 100'000'000ULL;
+  c.query_type = QueryType::Index;
+  c.latency_budget = LatencyBudget::Ms;
+  c.client_can_cache_hint = false;
+
+  auto matches = PirSelector{}.RecommendWithRationale(c);
+  bool found_failing = false;
+  for (const auto& m : matches) {
+    if (m.algorithm == "sel_test_hint_per_db") {
+      EXPECT_FALSE(m.passes);
+      bool has_cache_failure = false;
+      for (const auto& f : m.failed_checks) {
+        if (f.find("cache") != std::string::npos) has_cache_failure = true;
+      }
+      EXPECT_TRUE(has_cache_failure)
+          << "Filter must cite the cacheability constraint";
+      found_failing = true;
+    }
+  }
+  EXPECT_TRUE(found_failing);
 }
 
 }  // namespace

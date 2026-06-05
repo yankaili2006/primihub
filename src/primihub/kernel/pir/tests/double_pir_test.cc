@@ -126,6 +126,7 @@ TEST_F(DoublePirSkeletonTest, SelectorPicksDoublePirWhenAllConditionsMet) {
   c.latency_budget = LatencyBudget::Ms;
   c.allow_two_server = true;
   c.assume_non_colluding = true;
+  c.client_can_cache_hint = true;
   auto matches = PirSelector{}.RecommendWithRationale(c);
   bool double_pir_passes = false;
   for (const auto& m : matches) {
