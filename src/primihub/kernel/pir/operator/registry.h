@@ -25,9 +25,16 @@ class PirRegistry {
 
   static PirRegistry& Instance();
 
-  // Bootstrap entry that the main binary MUST call before serving any task.
-  // Defends against static initialization order across translation units by
-  // forcing the link-time presence of registrations to be observable.
+  // Bootstrap entry that the main binary MUST call before serving any task,
+  // AFTER InitGoogleLogging. Drains the pending-registration list populated by
+  // PirRegistrar instances at static-initialization time and installs them
+  // into the real registry. Until EnsureRegistered runs, ListAlgorithms /
+  // Create / GetCapabilities will all behave as if no algorithms are present.
+  //
+  // Splitting registration into a "pending" phase (TU-scope statics, glog
+  // not yet ready) and a "drain" phase (called from main after glog init)
+  // avoids the static-initialization-order fiasco that previously crashed
+  // any binary linking id_pir_operator before initializing logging.
   static void EnsureRegistered();
 
   bool Register(const std::string& algo, Creator creator,
@@ -40,6 +47,12 @@ class PirRegistry {
   const PirCapabilities* GetCapabilities(const std::string& algo) const;
 
   std::vector<std::string> ListAlgorithms() const;
+
+  // Internal — called by PirRegistrar at static-initialization time. Never
+  // touches glog. Stores the registration in a TU-scope pending list that
+  // EnsureRegistered() drains later.
+  static void AddPending(const std::string& algo, Creator creator,
+                         const PirCapabilities& caps);
 
  private:
   PirRegistry() = default;
@@ -54,11 +67,13 @@ class PirRegistry {
 //   namespace {
 //     PirRegistrar<SpiralPirOperator> reg_("spiral", caps);
 //   }
+// Pushes the registration onto a TU-scope pending list at static-init time;
+// the entry is moved into the real registry by PirRegistry::EnsureRegistered.
 template <typename T>
 class PirRegistrar {
  public:
   PirRegistrar(const std::string& algo, const PirCapabilities& caps) {
-    PirRegistry::Instance().Register(
+    PirRegistry::AddPending(
         algo,
         [](const Options& opt) -> std::unique_ptr<BasePirOperator> {
           return std::unique_ptr<BasePirOperator>(new T(opt));
