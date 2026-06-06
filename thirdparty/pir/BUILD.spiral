@@ -52,20 +52,25 @@ SPIRAL_COPTS = [
     "-Wno-unused-function",
     "-Wno-unused-parameter",
     "-Wno-sign-compare",
-    # Compile-time params for the v1 "wiki" config (matches Menon & Wu USENIX'22 §6
-    # Table 1 row for 1M-record / 256-byte items, query_size = 14336 bytes).
-    # Spiral hardcodes these via add_compile_definitions in upstream CMakeLists;
-    # we mirror them here so spiral_lib is a single fixed-config artifact.
-    # Switching to a different scheme requires a different copts set.
-    "-DTEXP=8",
-    "-DTEXPRIGHT=56",
-    "-DTCONV=4",
-    "-DTGSW=10",
-    "-DQPBITS=22",
-    "-DPVALUE=256",
-    "-DQNUMFIRST=1",
-    "-DQNUMREST=0",
-    "-DOUTN=2",
+]
+
+# Compile-time params for the v1 "wiki" config (matches Menon & Wu USENIX'22 §6
+# Table 1 row for 1M-record / 256-byte items, query_size = 14336 bytes).
+# Spiral hardcodes these via add_compile_definitions in upstream CMakeLists;
+# we mirror them here as `defines` (not `copts`) so consumers that #include
+# spiral.h get the same macros — without these, values.h fails to declare
+# p_db / arb_qprime / out_n. Switching to a different scheme requires a
+# different SPIRAL_DEFINES set.
+SPIRAL_DEFINES = [
+    "TEXP=8",
+    "TEXPRIGHT=56",
+    "TCONV=4",
+    "TGSW=10",
+    "QPBITS=22",
+    "PVALUE=256",
+    "QNUMFIRST=1",
+    "QNUMREST=0",
+    "OUTN=2",
 ]
 
 config_setting(
@@ -80,6 +85,7 @@ cc_library(
     srcs = SPIRAL_CORE_SRCS,
     hdrs = SPIRAL_CORE_HDRS,
     includes = ["include"],
+    defines = SPIRAL_DEFINES,
     copts = SPIRAL_COPTS + select({
         ":disable_avx512": ["-mno-avx512f"],
         "//conditions:default": [],
@@ -99,6 +105,7 @@ cc_binary(
     name = "spiral_bench",
     srcs = ["src/spiral.cpp"] + SPIRAL_CORE_SRCS,
     copts = SPIRAL_COPTS,
+    defines = SPIRAL_DEFINES,
     deps = [
         "@hexl//:hexl",
     ],
