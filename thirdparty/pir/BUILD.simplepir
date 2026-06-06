@@ -1,0 +1,86 @@
+# Bazel BUILD wrapper for ahenzinger/simplepir (USENIX'23 SimplePIR + DoublePIR).
+#
+# This file is loaded by WORKSPACE via:
+#   new_git_repository(
+#       name = "simplepir",
+#       remote = "https://github.com/ahenzinger/simplepir.git",
+#       commit = "e9020b03bf2872c75b8954e749e32408b5db87ed",
+#       build_file = "@//thirdparty/pir:BUILD.simplepir",
+#       shallow_since = "1673650769 -0500",
+#   )
+#
+# UPSTREAM LANGUAGE INVENTORY (drives the wrapper shape):
+#   * pir/pir.h, pir/pir.c
+#       Pure C. Matrix multiplication / transposition / packed
+#       matMul primitives over uint32 (Elem). Hand-written, hot-loop
+#       arithmetic. No external deps. SAFE to wrap directly as
+#       cc_library — exported below.
+#   * pir/*.go (pir.go, simple_pir.go, double_pir.go, database.go,
+#       matrix.go, params.go, gauss.go, rand.go, utils.go, logging.go)
+#       Go module github.com/ahenzinger/simplepir. Implements the
+#       SimplePIR + DoublePIR algorithm cores (hint generation,
+#       LWE-based query/answer, preprocessing). NOT wrapped here —
+#       primihub's bazel toolchain does not yet pull in rules_go and
+#       running `go build -buildmode=c-archive` from a genrule would
+#       impose a host-Go toolchain requirement that diverges from the
+#       rest of the cc-only WORKSPACE.
+#   * pir/params.csv
+#       LWE parameter table consumed by Go params.go. Exported as a
+#       data file so a future C++ port can mirror the lookup logic
+#       without re-keying the table.
+#
+# IMPLICATION FOR PRIMIHUB DOUBLE_PIR OPERATOR (task 5.5):
+#   The C++ DoublePirOperator must port the algorithmic Go layer (~600
+#   LOC across simple_pir.go + double_pir.go + matrix.go) to call the
+#   C kernels exposed below. This is intentional design — it keeps the
+#   primihub C++ ABI clean and avoids dragging in Go runtime. The
+#   `simplepir_c_kernels` target gives the port a stable, identical-
+#   semantics base layer so only the LWE/hint/answer algebra and the
+#   matrix-formatting glue need re-implementing.
+#
+# ALTERNATIVE PATHS DOCUMENTED (not taken):
+#   Path A — rules_go + cgo c-archive: Add @io_bazel_rules_go to the
+#     WORKSPACE, expose pir/ as a go_library, then a c-archive
+#     buildmode produces a static .a + .h linkable from C++. ~1 day
+#     of WORKSPACE plumbing + ~0.5 day of cgo ABI shim, but adds
+#     several hundred MB to the build closure (Go SDK download).
+#   Path B — Cross-compile pir/ via shell genrule calling system go:
+#     Faster to wire (no rules_go), but makes Bazel builds depend on
+#     an unhermetic host `go` binary. Rejected.
+#   Path C — Port to Rust (geometryxyz/simplepir-rs): same ABI
+#     problem with rules_rust, plus we'd inherit research-quality
+#     code in a third language.
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# The C matrix-multiplication kernels.
+# pir.c uses -O3 -march=native semantics for hot loops; reproduce that
+# via copts. The kernels are pure functions (no global state), so the
+# library is safe to alwayslink off and let the primihub side opt in.
+cc_library(
+    name = "simplepir_c_kernels",
+    srcs = ["pir/pir.c"],
+    hdrs = ["pir/pir.h"],
+    copts = [
+        "-O3",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-sign-compare",
+        # -march=native is intentionally NOT applied at the wrapper
+        # level; primihub's BUILD passes it (or an AVX2-conditional
+        # equivalent) when DoublePIR is linked into a binary that
+        # commits to a target CPU set. Keeping the wrapper portable
+        # lets older CI hosts still compile.
+    ],
+    includes = ["pir"],
+)
+
+# LWE parameter table. Exposed as a data file so a future C++ port can
+# parse it at compile time (generated header) or at runtime. Not a
+# library target — clients should depend on this via `data` or `srcs`.
+filegroup(
+    name = "params_csv",
+    srcs = ["pir/params.csv"],
+)

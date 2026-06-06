@@ -757,3 +757,21 @@ new_git_repository(
         "sed -i \"s|^int main(int argc, char \\\\*argv\\\\[\\\\])|int spiral_main_disabled(int argc, char *argv[])|\" src/spiral.cpp",
     ],
 )
+
+# SimplePIR + DoublePIR (Henzinger et al., USENIX Security 2023).
+# Upstream is Go + a tiny C kernel (pir/pir.c, pir/pir.h). The wrapper
+# at //thirdparty/pir:BUILD.simplepir exposes ONLY the C matrix
+# multiplication kernels as :simplepir_c_kernels; the Go algorithmic
+# core is intentionally left to be ported into C++ by the primihub
+# DoublePirOperator (see openspec/changes/primihub-pir-multi-algo
+# task 5.5). See BUILD.simplepir for the architectural rationale and
+# the rejected alternatives (rules_go + cgo, host-go genrule, Rust
+# port). DECLARED but not yet referenced — bazel will not fetch
+# until the DoublePIR operator adds the dep.
+new_git_repository(
+    name = "simplepir",
+    remote = "https://github.com/ahenzinger/simplepir.git",
+    commit = "e9020b03bf2872c75b8954e749e32408b5db87ed",
+    shallow_since = "1673650769 -0500",
+    build_file = "@//thirdparty/pir:BUILD.simplepir",
+)
