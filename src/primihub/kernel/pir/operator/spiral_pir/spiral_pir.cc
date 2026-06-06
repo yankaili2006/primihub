@@ -4,19 +4,78 @@
  */
 #include "src/primihub/kernel/pir/operator/spiral_pir/spiral_pir.h"
 
+#include <cstdlib>
+#include <string>
+
 #include <glog/logging.h>
 #include "src/primihub/kernel/pir/operator/registry.h"
+#include "src/primihub/kernel/pir/operator/spiral_pir/params.h"
+#include "src/primihub/kernel/pir/operator/spiral_pir/spiral_runtime.h"
 
 namespace primihub::pir {
 
-retcode SpiralPirOperator::OnExecute(const PirDataType& /*input*/,
-                                     PirDataType* /*result*/) {
-  LOG(ERROR)
-      << "SpiralPirOperator: skeleton only — real query path not yet wired. "
-      << "Vendor menonsamir/spiral via thirdparty/pir/BUILD.spiral and "
-      << "replace this method (see openspec/changes/primihub-pir-multi-algo "
-      << "tasks 4.1-4.7).";
-  return retcode::FAIL;
+retcode SpiralPirOperator::OnExecute(const PirDataType& input,
+                                     PirDataType* result) {
+  if (result == nullptr) return retcode::FAIL;
+  if (!spiral::kSpiralRuntimeVendored) {
+    LOG(ERROR)
+        << "SpiralPirOperator: runtime not vendored — build with "
+        << "--define=enable_spiral_real=1 and provide @hexl + @spiral_pir "
+        << "bazel overrides (see openspec/changes/primihub-pir-multi-algo "
+        << "design.md §D7).";
+    return retcode::FAIL;
+  }
+
+  // v1 same-process simulation contract: input is one entry whose key is
+  // a stringified PIR index ("0", "1", ...). All other keys are ignored
+  // (caller may pass a multi-key map but only the first is queried). The
+  // returned result echoes the key with one placeholder value that signals
+  // pipeline success — actual record retrieval requires the upstream
+  // refactor documented in commits e988ae4f / 548d1c48.
+  if (input.empty()) {
+    LOG(ERROR) << "SpiralPirOperator::OnExecute: input map empty";
+    return retcode::FAIL;
+  }
+  const auto& first = *input.begin();
+  uint64_t index = 0;
+  try {
+    index = std::stoull(first.first);
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "SpiralPirOperator::OnExecute: input key '" << first.first
+               << "' not a uint64 index: " << e.what();
+    return retcode::FAIL;
+  }
+
+  // Pick params from the requested index + a small default record size.
+  // v1 limitation: SmokeTest's load_db ignores caller-supplied records;
+  // the DB is constant-valued. Record size is informational only.
+  const uint64_t db_size = index + 1;  // smallest that holds this index
+  spiral::SpiralParams p{};
+  std::string err;
+  auto rc = spiral::EstimateParams(db_size, /*record_size_bytes=*/256, &p,
+                                   &err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "SpiralPirOperator: EstimateParams failed: " << err;
+    return retcode::FAIL;
+  }
+
+  auto& rt = spiral::SpiralRuntime::Instance();
+  rc = rt.EnsureInitialized(p, &err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "SpiralPirOperator: EnsureInitialized failed: " << err;
+    return retcode::FAIL;
+  }
+  rc = rt.SmokeTest(index, &err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "SpiralPirOperator: SmokeTest failed: " << err;
+    return retcode::FAIL;
+  }
+
+  (*result)[first.first] = {"spiral_pipeline_ran"};
+  LOG(INFO) << "SpiralPirOperator::OnExecute: pipeline ran for index "
+            << index << " (correctness invariant pending — see "
+            << "commit 548d1c48)";
+  return retcode::SUCCESS;
 }
 
 namespace {

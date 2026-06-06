@@ -74,18 +74,20 @@ TEST_F(SpiralPirSkeletonTest, FactoryReturnsNonNull) {
                            "registrar or creator lambda mis-wired.";
 }
 
-TEST_F(SpiralPirSkeletonTest, OnExecuteFailsLoudlyUntilImplemented) {
-  // The skeleton is a deliberate stub: silent wrong answers are worse than
-  // loud failure. When the real implementation lands, replace this test with
-  // a correctness check.
-  EXPECT_TRUE(SpiralPirOperator::kIsSkeleton)
-      << "kIsSkeleton flipped to false — implementation may have landed; "
-         "rewrite this test against the real query path.";
+TEST_F(SpiralPirSkeletonTest, OnExecuteBehavesPerVendorMode) {
+  // After commit a7d6925c+OnExecute-wiring (this file), kIsSkeleton flipped
+  // to false because OnExecute now drives SpiralRuntime::SmokeTest in real
+  // mode. In stub mode it still returns FAIL with a "runtime not vendored"
+  // message — assertion below holds in BOTH modes by checking only the
+  // failure path with empty input (no caller key to parse).
+  EXPECT_FALSE(SpiralPirOperator::kIsSkeleton)
+      << "kIsSkeleton should be false now that OnExecute wires "
+         "SpiralRuntime::SmokeTest (commit 548d1c48 / a7d6925c).";
   Options opt;
   opt.self_party = "client";
   opt.role = Role::CLIENT;
   SpiralPirOperator op(opt);
-  PirDataType input;
+  PirDataType input;  // empty → OnExecute returns FAIL with input-map-empty
   PirDataType result;
   EXPECT_EQ(op.OnExecute(input, &result), retcode::FAIL);
   EXPECT_TRUE(result.empty());

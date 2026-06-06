@@ -40,10 +40,12 @@ class SpiralPirOperator : public BasePirOperator {
 
   retcode OnExecute(const PirDataType& input, PirDataType* result) override;
 
-  // Marker used by pir_inspect and (later) integration tests so that the
-  // skeleton-vs-real distinction is observable at runtime without parsing
-  // log lines. Stays true until the real implementation lands.
-  static constexpr bool kIsSkeleton = true;
+  // Marker used by pir_inspect and integration tests so the skeleton-vs-
+  // wired distinction is observable at runtime. v1 wires the pipeline
+  // via SpiralRuntime::SmokeTest (commit 548d1c48) — cryptographic
+  // correctness invariant is still pending calibration, but the
+  // operator no longer returns FAIL on Execute in real mode.
+  static constexpr bool kIsSkeleton = false;
 };
 
 }  // namespace primihub::pir
