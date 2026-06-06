@@ -13,7 +13,7 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "spiral_pir_operator",
     srcs = ["spiral_pir.cc"],
-    hdrs = ["spiral_pir.h"],
+    hdrs = ["spiral_pir.h", "params.h"],
     alwayslink = True,
     deps = [
         "//src/primihub/kernel/pir:common_def",

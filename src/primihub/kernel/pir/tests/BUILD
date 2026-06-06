@@ -129,3 +129,16 @@ cc_test(
     ],
     size = "small",
 )
+
+# Phase 3 / task 4.5 — EstimateParams unit tests. Header-only target, so the
+# only dep is the operator (which exports params.h via its hdrs list).
+cc_test(
+    name = "spiral_params_test",
+    srcs = ["spiral_params_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
