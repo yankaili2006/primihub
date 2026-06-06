@@ -95,25 +95,41 @@ TEST(SpiralRuntimeTest, RejectsConflictingParamsInRealMode) {
   EXPECT_NE(err.find("single-params-per-process"), std::string::npos) << err;
 }
 
-TEST(SpiralRuntimeTest, CryptoMethodsRemainTodo) {
+TEST(SpiralRuntimeTest, ClientEncodeReturnsArchitecturalBlocker) {
+  // v1 finding (verified empirically 2026-06-06): upstream Spiral cannot be
+  // cleanly split into client-encode / server-process roles because
+  // generate_setup at spiral.cpp L1546 leaves g_Ws_fft unwritten unless
+  // direct_upload=true, and the wiki config we picked has direct_upload
+  // off. ClientEncode therefore returns FAIL with a refactor-pointer
+  // message in BOTH stub and real modes — the same outcome for different
+  // reasons, but the user-facing contract is identical: don't depend on
+  // ClientEncode in v1.
   SpiralParams p{};
   std::string err;
   ASSERT_EQ(EstimateParams(1024, 64, &p, &err), retcode::SUCCESS);
   auto& rt = SpiralRuntime::Instance();
-  rt.EnsureInitialized(p, &err);  // ok in real mode, fail in stub — both fine
+  rt.EnsureInitialized(p, &err);  // success real / fail stub — both fine
 
   std::vector<uint8_t> blob;
-  std::vector<uint8_t> response;
-  std::string val;
-
-  EXPECT_EQ(rt.ClientEncode(0, &blob, &err), retcode::FAIL);
+  auto rc = rt.ClientEncode(0, &blob, &err);
+  EXPECT_EQ(rc, retcode::FAIL);
   if (kSpiralRuntimeVendored) {
-    EXPECT_NE(err.find("not yet implemented"), std::string::npos) << err;
+    EXPECT_NE(err.find("upstream refactor"), std::string::npos) << err;
+    EXPECT_NE(err.find("single-process"), std::string::npos) << err;
+  } else {
+    EXPECT_NE(err.find("not vendored"), std::string::npos) << err;
   }
-  EXPECT_EQ(
-      rt.ServerProcess(blob, std::vector<std::string>{"a", "b"}, &response, &err),
-      retcode::FAIL);
-  EXPECT_EQ(rt.ClientDecode(response, &val, &err), retcode::FAIL);
+}
+
+TEST(SpiralRuntimeTest, ServerAndDecodeStillTodo) {
+  // ServerProcess + ClientDecode remain stubs pending the multi-day crypto
+  // refactor (see commit message of e2248a12 / 21a73ad6).
+  std::vector<uint8_t> in, out;
+  std::string val, err;
+  auto& rt = SpiralRuntime::Instance();
+  EXPECT_EQ(rt.ServerProcess(in, std::vector<std::string>{"a"}, &out, &err),
+            retcode::FAIL);
+  EXPECT_EQ(rt.ClientDecode(out, &val, &err), retcode::FAIL);
 }
 
 }  // namespace primihub::pir::spiral

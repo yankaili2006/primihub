@@ -40,6 +40,11 @@ void setup_constants();
 void testHighRate(size_t, size_t, size_t) {}
 void generate_gadgets();
 void build_table();
+void generate_setup_and_query(size_t idx,
+                              uint64_t** g_C_fft_crtd,
+                              uint64_t** g_Q_crtd,
+                              uint64_t** g_Ws_fft,
+                              bool encodeCompressedSetupData);
 #endif
 
 namespace primihub::pir::spiral {
@@ -131,14 +136,44 @@ retcode SpiralRuntime::ClientEncode(uint64_t /*index*/,
                                     std::vector<uint8_t>* /*wire_blob*/,
                                     std::string* err) {
   if (err == nullptr) return retcode::FAIL;
-  // TODO(task 4.4 followup): implement against upstream
-  //   generate_setup_and_query(idx, &g_C_fft_crtd, &g_Q_crtd, &g_Ws_fft, false);
-  // serialize {keys_len, keys, query1_len, query1, query2_len, query2} into
-  // wire_blob; retain S_mp / Sp_mp / sr_mp on the singleton for ClientDecode.
+  // Architectural blocker (verified empirically by attempt 21a73ad6
+  // followup): upstream menonsamir/spiral cannot be cleanly split into
+  // client-encode + server-process roles. Specifically:
+  //
+  //   * src/spiral.cpp L1546: generate_setup runs keygen, writing secret
+  //     key into globals S_mp/Sp_mp/sr_mp. It does NOT write the public
+  //     setup data (g_Ws_fft) unless direct_upload=true. With the wiki
+  //     config we picked (direct_upload=false, query_size=14KB), g_Ws_fft
+  //     stays nullptr after generate_setup_and_query returns.
+  //
+  //   * src/spiral.cpp L2046: runConversionImproved (called from
+  //     process_crtd_query) reads IDX_TARGET from globals AND constructs
+  //     the public encryptions (W_exp_v / W_exp_right_v) via
+  //     getPublicEncryptions, which itself uses S_mp/Sp_mp (the secret
+  //     key). Upstream is a single-process benchmark, not a true
+  //     client/server PIR.
+  //
+  // True client-server split therefore requires upstream refactor:
+  // (a) move getPublicEncryptions out of runConversionImproved so the
+  // client can call it with the secret key and ship g_Ws_fft to the
+  // server; (b) thread IDX_TARGET through runConversionImproved as a
+  // parameter rather than a global. That's multi-week deep-crypto work.
+  //
+  // For v1 the SpiralPirOperator will either (i) run client+server roles
+  // in the same OnExecute (no real PIR security, but functional smoke
+  // test) or (ii) bundle the secret key with the query (defeats PIR,
+  // explicit toy mode). Both are documented as v1 limitations.
+#ifdef PIR_SPIRAL_RUNTIME_VENDORED
   *err =
-      "SpiralRuntime::ClientEncode not yet implemented — see "
-      "openspec/changes/primihub-pir-multi-algo task 4.4 followup. "
-      "Upstream API: spiral.cpp L1540 generate_setup_and_query.";
+      "SpiralRuntime::ClientEncode requires upstream refactor — "
+      "menonsamir/spiral is a single-process benchmark; generate_setup "
+      "does not populate g_Ws_fft (verified). See spiral_runtime.cc "
+      "comment block for refactor scope.";
+#else
+  *err =
+      "SpiralRuntime::ClientEncode not vendored. Build with "
+      "--define=enable_spiral_real=1 (see EnsureInitialized error).";
+#endif
   return retcode::FAIL;
 }
 
