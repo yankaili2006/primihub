@@ -157,3 +157,35 @@ cc_test(
     ],
     size = "small",
 )
+
+# P0 / task 1.8 — verifies the real APSI registrar fires when the binary is
+# built with --define=microsoft-apsi=true. Built only under that flag,
+# otherwise the keyword_pir_registrar cc_library is not part of the
+# aggregator and the test would have no symbol to link against.
+config_setting(
+    name = "with_microsoft_apsi",
+    define_values = {"microsoft-apsi": "true"},
+)
+
+cc_test(
+    name = "keyword_pir_registrar_test",
+    srcs = ["keyword_pir_registrar_test.cc"],
+    target_compatible_with = select({
+        ":with_microsoft_apsi": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator:capabilities",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator:factory",
+        "@com_google_googletest//:gtest_main",
+    ] + select({
+        ":with_microsoft_apsi": [
+            "//src/primihub/kernel/pir/operator:keyword_pir_operator",
+        ],
+        "//conditions:default": [],
+    }),
+    size = "small",
+)

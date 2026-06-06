@@ -89,5 +89,6 @@ cc_library(
     deps = [
         "//src/primihub/kernel/pir/operator/keyword_pir_impl:keyword_pir_server_impl",
         "//src/primihub/kernel/pir/operator/keyword_pir_impl:keyword_pir_client_impl",
+        "//src/primihub/kernel/pir/operator/keyword_pir_impl:keyword_pir_registrar",
     ],
 )
