@@ -775,3 +775,30 @@ new_git_repository(
     shallow_since = "1673650769 -0500",
     build_file = "@//thirdparty/pir:BUILD.simplepir",
 )
+
+# YPIR (Menon & Wu, USENIX Security 2024). Rust crate with hand-tuned
+# C++ matrix kernels (src/matmul.cpp). The wrapper at
+# //thirdparty/pir:BUILD.ypir exposes ONLY the C++ matmul kernels as
+# :ypir_matmul_kernels; the Rust algorithmic core is intentionally left
+# for the C++ port in primihub YpirOperator (task 7.3 cc). DECLARED but
+# not yet referenced by any cc_library deps, so bazel does not fetch.
+new_git_repository(
+    name = "ypir",
+    remote = "https://github.com/menonsamir/ypir.git",
+    commit = "a73e550a469605c2fa23945a4d96c20fb2f4a839",
+    shallow_since = "1743542300 -0700",
+    build_file = "@//thirdparty/pir:BUILD.ypir",
+)
+
+# FrodoPIR (Davidson, Pestana, Celi, PETS 2023). Pure-Rust crate
+# brave-experiments/frodo-pir. No C/C++ surface to wrap; the
+# //thirdparty/pir:BUILD.frodo_pir wrapper is documentation-only,
+# exposing test-vector data for future C++ port correctness checks.
+# DECLARED but not yet referenced by any cc_library deps.
+new_git_repository(
+    name = "frodo_pir",
+    remote = "https://github.com/brave-experiments/frodo-pir.git",
+    commit = "1557396058e2bf89a5aad8fc82adccb0d7141454",
+    shallow_since = "1704897297 +0100",
+    build_file = "@//thirdparty/pir:BUILD.frodo_pir",
+)
