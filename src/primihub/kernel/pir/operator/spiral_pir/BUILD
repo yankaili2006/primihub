@@ -35,8 +35,8 @@ cc_library(
         "spiral_pir.h",
         "spiral_runtime.h",
     ],
-    copts = select({
-        ":enable_real": ["-DPIR_SPIRAL_RUNTIME_VENDORED=1"],
+    defines = select({
+        ":enable_real": ["PIR_SPIRAL_RUNTIME_VENDORED=1"],
         "//conditions:default": [],
     }),
     alwayslink = True,

@@ -142,3 +142,18 @@ cc_test(
     ],
     size = "small",
 )
+
+# Phase 3 / task 4.4 — SpiralRuntime end-to-end test. Behavior splits on
+# PIR_SPIRAL_RUNTIME_VENDORED; the operator BUILD select() handles the
+# define + dep wiring, so this target just inherits everything from the
+# operator dep.
+cc_test(
+    name = "spiral_runtime_test",
+    srcs = ["spiral_runtime_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

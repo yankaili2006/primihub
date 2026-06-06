@@ -748,4 +748,12 @@ new_git_repository(
     commit = "361ee47f92214d4fcd03c4205c9c2729e8369afb",
     shallow_since = "1651472347 +0000",
     build_file = "@//thirdparty/pir:BUILD.spiral",
+    # Rename upstream main so spiral.cpp can be compiled into spiral_lib
+    # without conflicting with primihub-node main; spiral_main_disabled is
+    # never called at runtime — see
+    # src/primihub/kernel/pir/operator/spiral_pir/spiral_runtime.cc for
+    # the testHighRate stub that satisfies link-time references.
+    patch_cmds = [
+        "sed -i \"s|^int main(int argc, char \\\\*argv\\\\[\\\\])|int spiral_main_disabled(int argc, char *argv[])|\" src/spiral.cpp",
+    ],
 )

@@ -34,6 +34,10 @@ package(default_visibility = ["//visibility:public"])
 # Translation units shared by both the library and the standalone binary.
 # Excludes spiral.cpp (has main) and testing.cpp (standalone tester).
 SPIRAL_CORE_SRCS = [
+    # Compiled with main()->spiral_main_disabled (see WORKSPACE_GITHUB
+    # patch_cmds). Needed for setup_constants/generate_gadgets symbols
+    # which upstream defines here without exposing in spiral.h.
+    "src/spiral.cpp",
     "src/core.cpp",
     "src/constants.cpp",
     "src/poly.cpp",
@@ -98,15 +102,3 @@ cc_library(
     linkstatic = True,
 )
 
-# Standalone benchmark / correctness binary — equivalent to running
-# `cmake --build && ./build/spiral` from upstream. Kept available so
-# bench scripts can use it before primihub's wrapper is finalized.
-cc_binary(
-    name = "spiral_bench",
-    srcs = ["src/spiral.cpp"] + SPIRAL_CORE_SRCS,
-    copts = SPIRAL_COPTS,
-    defines = SPIRAL_DEFINES,
-    deps = [
-        "@hexl//:hexl",
-    ],
-)

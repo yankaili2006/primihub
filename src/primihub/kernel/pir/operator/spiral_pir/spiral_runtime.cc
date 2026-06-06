@@ -37,6 +37,7 @@
 // Upstream defines these in spiral.cpp at namespace scope but never declares
 // them in spiral.h, so forward-declare for our use.
 void setup_constants();
+void testHighRate(size_t, size_t, size_t) {}
 void generate_gadgets();
 void build_table();
 #endif
