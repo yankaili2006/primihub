@@ -121,6 +121,35 @@ TEST(SpiralRuntimeTest, ClientEncodeReturnsArchitecturalBlocker) {
   }
 }
 
+TEST(SpiralRuntimeTest, SmokeTestRunsUpstreamPipeline) {
+  if (!kSpiralRuntimeVendored) GTEST_SKIP() << "stub mode";
+  SpiralParams p{};
+  std::string err;
+  ASSERT_EQ(EstimateParams(1024, 64, &p, &err), retcode::SUCCESS);
+  auto& rt = SpiralRuntime::Instance();
+  ASSERT_EQ(rt.EnsureInitialized(p, &err), retcode::SUCCESS) << err;
+
+  // Same-process simulation: runs upstream load_db (random_data path) +
+  // do_test (generate_setup_and_query -> process_crtd_query -> modswitch
+  // -> check_final) end-to-end. SUCCESS means the math ran to completion
+  // without abort.
+  auto rc = rt.SmokeTest(0, &err);
+  EXPECT_EQ(rc, retcode::SUCCESS) << err;
+}
+
+TEST(SpiralRuntimeTest, SmokeTestRejectsOutOfRange) {
+  if (!kSpiralRuntimeVendored) GTEST_SKIP() << "stub mode";
+  SpiralParams p{};
+  std::string err;
+  ASSERT_EQ(EstimateParams(1024, 64, &p, &err), retcode::SUCCESS);
+  auto& rt = SpiralRuntime::Instance();
+  ASSERT_EQ(rt.EnsureInitialized(p, &err), retcode::SUCCESS);
+
+  auto rc = rt.SmokeTest(p.total_n, &err);
+  EXPECT_EQ(rc, retcode::FAIL);
+  EXPECT_NE(err.find("out of range"), std::string::npos) << err;
+}
+
 TEST(SpiralRuntimeTest, ServerAndDecodeStillTodo) {
   // ServerProcess + ClientDecode remain stubs pending the multi-day crypto
   // refactor (see commit message of e2248a12 / 21a73ad6).

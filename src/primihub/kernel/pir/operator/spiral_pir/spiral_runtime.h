@@ -91,6 +91,15 @@ class SpiralRuntime {
                        std::string* out_value,
                        std::string* err);
 
+  // Same-process simulation roundtrip: runs upstream do_test() with
+  // random_data DB at the given index. Useful as a smoke test that the
+  // cryptographic primitives + setup wiring all work, and as the anchor
+  // for the latency benchmark (task 4.8). NOT a real PIR — DB has a
+  // constant value across all indices (load_db.random_data path).
+  // Returns SUCCESS if the pipeline runs to completion (do_test prints
+  // "Is correct?" to cout internally; cout is not captured in v1).
+  retcode SmokeTest(uint64_t index, std::string* err);
+
   // Returns the params currently locked in by EnsureInitialized, or
   // {0, 0, 0} if Init has never succeeded.
   SpiralParams locked_params() const;

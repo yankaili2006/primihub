@@ -45,6 +45,18 @@ void generate_setup_and_query(size_t idx,
                               uint64_t** g_Q_crtd,
                               uint64_t** g_Ws_fft,
                               bool encodeCompressedSetupData);
+void load_db();
+void do_test();
+// Upstream globals consumed by load_db / do_test, defined at namespace
+// scope in spiral.cpp L16-1013. Forward-declared here so SmokeTest can
+// configure the random_data branch of load_db without main()-style args.
+extern bool random_data;
+extern bool has_file;
+extern bool load;
+extern bool checking_for_debug;
+extern bool show_diff;
+extern unsigned long dummyWorkingSet;
+extern unsigned long max_trials;
 #endif
 
 namespace primihub::pir::spiral {
@@ -211,6 +223,52 @@ retcode SpiralRuntime::ClientDecode(
       "openspec/changes/primihub-pir-multi-algo task 4.4 followup. "
       "Need to factor recover-path out of upstream check_final.";
   return retcode::FAIL;
+}
+
+
+retcode SpiralRuntime::SmokeTest(uint64_t index, std::string* err) {
+  if (err == nullptr) return retcode::FAIL;
+  std::lock_guard<std::mutex> g(impl_->mu);
+  if (!impl_->initialized.load()) {
+    *err = "SpiralRuntime::SmokeTest requires EnsureInitialized first";
+    return retcode::FAIL;
+  }
+#ifdef PIR_SPIRAL_RUNTIME_VENDORED
+  if (index >= impl_->locked.total_n) {
+    *err = "SpiralRuntime::SmokeTest index " + std::to_string(index) +
+           " out of range; total_n=" + std::to_string(impl_->locked.total_n);
+    return retcode::FAIL;
+  }
+  // Same-process simulation. Configure upstream globals as if main() had
+  // been called with `nu_1 nu_2 index a --random-data`:
+  //   * IDX_TARGET / IDX_DIM0 select the query index
+  //   * random_data=true makes load_db skip the file-based TODO branch
+  //   * has_file/load=false keep load_db on the random_data path
+  //   * checking_for_debug=true makes do_test invoke check_final
+  ::IDX_TARGET = static_cast<long>(index);
+  ::IDX_DIM0 = static_cast<long>(index / (1ULL << impl_->locked.nu_2));
+  ::random_data = true;
+  ::has_file = false;
+  ::load = false;
+  ::checking_for_debug = true;
+  ::show_diff = false;
+  const unsigned long total_n_val = impl_->locked.total_n;
+  unsigned long ws = (1UL << 25) / (total_n_val ? total_n_val : 1);
+  if (ws > static_cast<unsigned long>(::poly_len)) ws = ::poly_len;
+  if (ws == 0) ws = 1;
+  ::dummyWorkingSet = ws;
+  ::max_trials = 1;
+
+  ::load_db();
+  ::do_test();
+  return retcode::SUCCESS;
+#else
+  (void)index;
+  *err =
+      "SpiralRuntime::SmokeTest not vendored. Build with "
+      "--define=enable_spiral_real=1 (see EnsureInitialized error).";
+  return retcode::FAIL;
+#endif
 }
 
 }  // namespace primihub::pir::spiral
