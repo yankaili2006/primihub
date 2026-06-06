@@ -802,3 +802,28 @@ new_git_repository(
     shallow_since = "1704897297 +0100",
     build_file = "@//thirdparty/pir:BUILD.frodo_pir",
 )
+
+# Tiptoe (Henzinger et al., SOSP 2023). 100% Go, no C/C++ surface.
+# Pulls in github.com/ahenzinger/underhood (BFV-on-SimplePIR via cgo
+# Microsoft SEAL) and a SimplePIR fork (henrycg/simplepir). The
+# //thirdparty/pir:BUILD.tiptoe wrapper is documentation-only and
+# exposes an empty placeholder cc_library only — actual integration
+# requires a full Go->C++ port of the protocol layer on top of
+# task 5.5 (SimplePIR core) plus a BFV transformation atop primihubs
+
+# Tiptoe (Henzinger et al., SOSP 2023). 100% Go, no C/C++ surface.
+# Pulls in github.com/ahenzinger/underhood (BFV-on-SimplePIR via cgo
+# Microsoft SEAL) and a SimplePIR fork (henrycg/simplepir). The
+# //thirdparty/pir:BUILD.tiptoe wrapper is documentation-only and
+# exposes an empty placeholder cc_library only — actual integration
+# requires a full Go->C++ port of the protocol layer on top of
+# task 5.5 (SimplePIR core) plus a BFV transformation atop primihub's
+# existing SEAL toolchain. DECLARED but not yet referenced by any
+# cc_library deps.
+new_git_repository(
+    name = "tiptoe",
+    remote = "https://github.com/ahenzinger/tiptoe.git",
+    commit = "ba7cae43ab8686328897aabd3b7f861622d8ac8a",
+    shallow_since = "1696180302 -0400",
+    build_file = "@//thirdparty/pir:BUILD.tiptoe",
+)
