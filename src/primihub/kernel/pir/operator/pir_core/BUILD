@@ -25,6 +25,18 @@ config_setting(
 )
 
 cc_library(
+    name = "database",
+    srcs = ["database.cc"],
+    hdrs = ["database.h"],
+    deps = [
+        ":lwe_params",
+        ":matrix",
+        "//src/primihub/common:common_defination",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "gaussian",
     srcs = ["gaussian.cc"],
     hdrs = ["gaussian.h"],

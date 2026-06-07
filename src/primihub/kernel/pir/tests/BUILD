@@ -263,3 +263,17 @@ cc_test(
     ],
     size = "small",
 )
+
+# Database unit tests — pure arithmetic on top of LweParams + Matrix.
+# Runs the same in both stub and vendored modes (uses Matrix factories
+# only; no kernel calls).
+cc_test(
+    name = "database_test",
+    srcs = ["database_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
