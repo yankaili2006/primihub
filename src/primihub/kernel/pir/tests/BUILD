@@ -252,3 +252,14 @@ cc_test(
     ],
     size = "small",
 )
+
+# GaussianSampler unit tests — pure arithmetic, statistical sanity.
+cc_test(
+    name = "gaussian_test",
+    srcs = ["gaussian_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/pir_core:gaussian",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

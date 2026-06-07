@@ -25,6 +25,13 @@ config_setting(
 )
 
 cc_library(
+    name = "gaussian",
+    srcs = ["gaussian.cc"],
+    hdrs = ["gaussian.h"],
+    deps = [],
+)
+
+cc_library(
     name = "lwe_params",
     srcs = ["lwe_params.cc"],
     hdrs = ["lwe_params.h"],
