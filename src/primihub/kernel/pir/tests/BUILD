@@ -216,6 +216,21 @@ cc_test(
     size = "small",
 )
 
+# task 7.2 final wiring — SimplePirOperator OnExecute integration test.
+# Drives the full SimplePirProtocol pipeline through the operator's
+# PirDataType interface; bifurcates on core::kPirCoreKernelsVendored.
+cc_test(
+    name = "simple_pir_operator_test",
+    srcs = ["simple_pir_operator_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
 # Phase 6 / task 7.3 scaffolding — YpirRuntime end-to-end smoke.
 cc_test(
     name = "ypir_runtime_test",

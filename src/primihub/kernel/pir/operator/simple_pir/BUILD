@@ -33,6 +33,14 @@ cc_library(
         "//src/primihub/kernel/pir/operator:base_pir_operator",
         "//src/primihub/kernel/pir/operator:capabilities",
         "//src/primihub/kernel/pir/operator:registry",
+        # Operator now drives the full SimplePirProtocol pipeline; the
+        # protocol depends on pir_core which has its OWN activation flag
+        # (enable_pir_core_real) independent of enable_simple_pir_real.
+        # Real-mode integration tests should pass BOTH flags.
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_protocol",
         "@com_github_glog_glog//:glog",
     ] + select({
         ":enable_real": ["@simplepir//:simplepir_c_kernels"],
