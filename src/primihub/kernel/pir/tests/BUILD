@@ -278,15 +278,17 @@ cc_test(
     size = "small",
 )
 
-# SimplePirProtocol::Init / Setup tests. Init unconditional, Setup
-# bifurcates on core::kPirCoreKernelsVendored. Run with
-# --define=enable_pir_core_real=1 + --override_repository=simplepir=<p>
-# to exercise the Matrix::Mul kernel path.
+# SimplePirProtocol::Init / Setup / GenSecret / Query tests. Init and
+# GenSecret unconditional; Setup and Query bifurcate on
+# core::kPirCoreKernelsVendored. Run with --define=enable_pir_core_real=1
+# + --override_repository=simplepir=<p> to exercise the Matrix::Mul
+# kernel path.
 cc_test(
     name = "simple_pir_protocol_test",
     srcs = ["simple_pir_protocol_test.cc"],
     deps = [
         "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:gaussian",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_protocol",

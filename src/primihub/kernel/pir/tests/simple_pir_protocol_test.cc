@@ -2,17 +2,21 @@
  * Copyright (c) 2026 by PrimiHub
  * Licensed under the Apache License, Version 2.0
  *
- * SimplePirProtocol::Init / Setup tests. Init has no kernel dependency
- * (only Matrix::UniformRandom), so its shape + bound tests are
- * unconditional. Setup needs Matrix::Mul under PIR_PIR_CORE_REAL, so
- * its real-mode tests bifurcate on core::kPirCoreKernelsVendored.
+ * SimplePirProtocol::Init / Setup / GenSecret / Query tests. Init and
+ * GenSecret have no kernel dependency (only Matrix::UniformRandom),
+ * so their shape + bound tests are unconditional. Setup and Query
+ * need Matrix::Mul under PIR_PIR_CORE_REAL, so their real-mode tests
+ * bifurcate on core::kPirCoreKernelsVendored.
  */
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <random>
 #include <string>
+#include <vector>
 
 #include "src/primihub/kernel/pir/operator/pir_core/database.h"
+#include "src/primihub/kernel/pir/operator/pir_core/gaussian.h"
 #include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 #include "src/primihub/kernel/pir/operator/simple_pir/simple_pir_protocol.h"
@@ -172,6 +176,189 @@ TEST(SimplePirSetupTest, ShiftDbByPHalf) {
           << "i=" << i << " j=" << j;
     }
   }
+}
+
+// --------------------------------------------------------------------
+// GenSecret
+// --------------------------------------------------------------------
+
+TEST(SimplePirGenSecretTest, ProducesNx1WithNonzeroCells) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(1'000, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS) << err;
+
+  core::Matrix s;
+  ASSERT_EQ(SimplePirProtocol::GenSecret(params, &s, &err), retcode::SUCCESS)
+      << err;
+  EXPECT_EQ(s.rows(), params.n);
+  EXPECT_EQ(s.cols(), 1u);
+  // params.n = 1024 — uniform random hitting all-zero by chance is
+  // astronomically unlikely.
+  bool saw_nonzero = false;
+  for (uint64_t i = 0; i < s.size(); ++i) {
+    if (s.data()[i] != 0u) { saw_nonzero = true; break; }
+  }
+  EXPECT_TRUE(saw_nonzero);
+}
+
+TEST(SimplePirGenSecretTest, FailsWhenParamsUninitialized) {
+  core::LweParams params;  // n, logq are zero
+  core::Matrix s;
+  std::string err;
+  EXPECT_EQ(SimplePirProtocol::GenSecret(params, &s, &err), retcode::FAIL);
+  EXPECT_NE(err.find("params not initialized"), std::string::npos)
+      << "must guide caller; got: " << err;
+}
+
+TEST(SimplePirGenSecretTest, FailsWhenSecretOutNull) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(1'000, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+  EXPECT_EQ(SimplePirProtocol::GenSecret(params, /*secret_out=*/nullptr, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("secret_out is null"), std::string::npos) << err;
+}
+
+// --------------------------------------------------------------------
+// Query
+// --------------------------------------------------------------------
+
+TEST(SimplePirQueryTest, BifurcatesOnVendoring) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS) << err;
+
+  // Deterministic A and secret so the test is reproducible.
+  core::Matrix A = core::Matrix::UniformRandom(params.m, params.n,
+                                               static_cast<uint32_t>(params.logq));
+  core::Matrix s = core::Matrix::UniformRandom(params.n, 1,
+                                               static_cast<uint32_t>(params.logq));
+  std::mt19937_64 rng(42);
+
+  core::Matrix query;
+  auto query_rc = SimplePirProtocol::Query(/*index=*/7, A, s, params, &rng,
+                                           &query, &err);
+  if (core::kPirCoreKernelsVendored) {
+    ASSERT_EQ(query_rc, retcode::SUCCESS)
+        << "vendored mode: query must succeed; err=" << err;
+    EXPECT_EQ(query.rows(), params.m);
+    EXPECT_EQ(query.cols(), 1u);
+  } else {
+    EXPECT_EQ(query_rc, retcode::FAIL);
+    EXPECT_NE(err.find("enable_pir_core_real=1"), std::string::npos)
+        << "stub error must guide callers to the activation flag; got: "
+        << err;
+  }
+}
+
+TEST(SimplePirQueryTest, EncodesIndexAtDelta) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "Query correctness piggybacks on Matrix::Mul";
+  }
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS) << err;
+
+  core::Matrix A = core::Matrix::UniformRandom(params.m, params.n,
+                                               static_cast<uint32_t>(params.logq));
+  core::Matrix s = core::Matrix::UniformRandom(params.n, 1,
+                                               static_cast<uint32_t>(params.logq));
+
+  // Replay the protocol's RNG path so we can subtract noise out.
+  std::mt19937_64 protocol_rng(/*seed=*/12345);
+  std::mt19937_64 replay_rng(/*seed=*/12345);
+
+  // Compute expected = A*s + replayed_noise + Delta * e_k. The
+  // replayed_noise must be sampled BEFORE Query is called so we get
+  // the same draws — GaussianSampler is deterministic for a fixed RNG
+  // sequence.
+  core::Matrix expected;
+  ASSERT_EQ(A.Mul(s, &expected, &err), retcode::SUCCESS) << err;
+  ASSERT_EQ(expected.rows(), params.m);
+  ASSERT_EQ(expected.cols(), 1u);
+
+  core::GaussianSampler replay_sampler(replay_rng);
+  std::vector<int64_t> noise(params.m);
+  for (uint64_t i = 0; i < params.m; ++i) {
+    noise[i] = replay_sampler.Sample();
+    const uint32_t curr = expected.Get(i, 0);
+    expected.Set(i, 0, curr + static_cast<uint32_t>(noise[i]));
+  }
+  const uint64_t index = 17;
+  const uint64_t k = index % params.m;
+  expected.Set(k, 0,
+               expected.Get(k, 0) + static_cast<uint32_t>(params.Delta()));
+
+  core::Matrix query;
+  ASSERT_EQ(SimplePirProtocol::Query(index, A, s, params, &protocol_rng,
+                                     &query, &err),
+            retcode::SUCCESS)
+      << err;
+
+  ASSERT_EQ(query.rows(), expected.rows());
+  ASSERT_EQ(query.cols(), expected.cols());
+  for (uint64_t i = 0; i < query.size(); ++i) {
+    ASSERT_EQ(query.data()[i], expected.data()[i])
+        << "mismatch at i=" << i << " (k=" << k
+        << ", noise=" << noise[i] << ")";
+  }
+}
+
+TEST(SimplePirQueryTest, NoiseBoundedByGaussianTail) {
+  // Statistical sanity that does NOT depend on Matrix::Mul: run a
+  // tight loop of GaussianSampler::Sample() at the embedded sigma and
+  // check that 100% of samples land in the table's [-128, 128] support.
+  // If the CDF or the RNG drift, this catches it before Query yields
+  // wrap-around chaos.
+  std::mt19937_64 rng(/*seed=*/2026);
+  core::GaussianSampler sampler(rng);
+  for (int n = 0; n < 10000; ++n) {
+    const int64_t e = sampler.Sample();
+    ASSERT_GE(e, -128);
+    ASSERT_LE(e, 128);
+  }
+}
+
+TEST(SimplePirQueryTest, FailsOnSecretShapeMismatch) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+
+  core::Matrix A = core::Matrix::Zeros(params.m, params.n);
+  // Wrong-shape secret: (n+1) x 1.
+  core::Matrix bad_s = core::Matrix::Zeros(params.n + 1, 1);
+  std::mt19937_64 rng(0);
+  core::Matrix q;
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, bad_s, params, &rng, &q, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("secret shape mismatch"), std::string::npos)
+      << "must surface mismatch up-front, not from kernel; got: " << err;
+}
+
+TEST(SimplePirQueryTest, FailsOnNullQueryOutOrRng) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+  core::Matrix A = core::Matrix::Zeros(params.m, params.n);
+  core::Matrix s = core::Matrix::Zeros(params.n, 1);
+  std::mt19937_64 rng(0);
+  core::Matrix q;
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, /*noise_rng=*/nullptr,
+                                     &q, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("noise_rng is null"), std::string::npos) << err;
+
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, &rng,
+                                     /*query_out=*/nullptr, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("query_out or noise_rng is null"), std::string::npos)
+      << err;
 }
 
 }  // namespace

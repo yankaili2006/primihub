@@ -41,12 +41,14 @@ cc_library(
 )
 
 
-# Algorithm-level static functions (Init / Setup) for SimplePIR. Built
-# separately from simple_pir_operator so the operator can keep its
-# current scaffolding flow while the protocol port lands in chunks.
-# Setup needs Matrix::Mul, so the cc_library deps include pir_core::matrix
-# which has its own enable_pir_core_real activation — keeps the two
-# concerns orthogonal from the operator's enable_simple_pir_real flag.
+# Algorithm-level static functions (Init / Setup / GenSecret / Query)
+# for SimplePIR. Built separately from simple_pir_operator so the
+# operator can keep its current scaffolding flow while the protocol
+# port lands in chunks. Setup + Query need Matrix::Mul, so the
+# cc_library deps include pir_core::matrix which has its own
+# enable_pir_core_real activation — keeps the two concerns orthogonal
+# from the operator's enable_simple_pir_real flag. Query also pulls
+# pir_core::gaussian for the LWE noise vector.
 cc_library(
     name = "simple_pir_protocol",
     srcs = ["simple_pir_protocol.cc"],
@@ -54,6 +56,7 @@ cc_library(
     deps = [
         "//src/primihub/common:common_defination",
         "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:gaussian",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "@com_github_glog_glog//:glog",
