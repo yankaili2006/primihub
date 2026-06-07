@@ -8,7 +8,13 @@
 #                checking the result file gets populated.
 #   apsi       — real keyword PIR. Same idea, conditional on APSI being
 #                built (--define microsoft-apsi=true).
-#   spiral, double_pir, simple_pir, frodo_pir, ypir
+#   simple_pir — real SimplePIR implementation (USENIX'23). Smoke invokes
+#                simple_pir_operator_test via bazel (which runs the full
+#                Init -> Setup -> Squish -> GenSecret -> Query -> Answer
+#                -> Recover pipeline end-to-end at N=64/l=8/m=8). Gated
+#                behind PIR_SMOKE_RUN_BAZEL=1 + SIMPLEPIR_UPSTREAM env
+#                var; otherwise reports SKIP with the activation hint.
+#   spiral, double_pir, frodo_pir, ypir, tiptoe_pir
 #              — registered as SKELETONS. Their OnExecute returns FAIL by
 #                design; smoke records SKIP-stub with the reason.
 #
@@ -86,7 +92,7 @@ declare -A IS_SKELETON=(
   [apsi]=0
   [spiral]=1
   [double_pir]=1
-  [simple_pir]=1
+  [simple_pir]=0
   [frodo_pir]=1
   [ypir]=1
   [tiptoe_pir]=1
@@ -100,6 +106,51 @@ run_real_smoke() {
     echo "SKIP(--skip-heavy)"
     return
   fi
+
+  # SimplePIR has a hermetic smoke: the bazel-built operator test runs the
+  # full Init -> ... -> Recover pipeline in-process. Gated behind a
+  # separate env var so the default `bench/pir_correctness_smoke.sh`
+  # invocation stays fast; CI gates can opt in via PIR_SMOKE_RUN_BAZEL=1.
+  if [[ "$algo" == "simple_pir" ]]; then
+    if [[ -z "${PIR_SMOKE_RUN_BAZEL:-}" ]]; then
+      echo "SKIP(set PIR_SMOKE_RUN_BAZEL=1 + SIMPLEPIR_UPSTREAM=<path> to run bazel smoke)"
+      return
+    fi
+    local upstream="${SIMPLEPIR_UPSTREAM:-}"
+    if [[ -z "$upstream" || ! -d "$upstream" ]]; then
+      echo "SKIP(SIMPLEPIR_UPSTREAM=$upstream is not a directory)"
+      return
+    fi
+    # Find the bazel WORKSPACE root by walking up from the script.
+    local root="$SCRIPT_DIR"
+    while [[ "$root" != "/" && ! -f "$root/WORKSPACE" && ! -f "$root/WORKSPACE.bazel" ]]; do
+      root="$(dirname "$root")"
+    done
+    if [[ ! -f "$root/WORKSPACE" && ! -f "$root/WORKSPACE.bazel" ]]; then
+      echo "SKIP(WORKSPACE not found above $SCRIPT_DIR — run from primihub clone)"
+      return
+    fi
+    if ! command -v bazel >/dev/null 2>&1; then
+      echo "SKIP(bazel not on PATH)"
+      return
+    fi
+    local log
+    log="$(mktemp)"
+    if (cd "$root" && bazel test --config=linux_x86_64 \
+            --define=enable_pir_core_real=1 \
+            --define=enable_simple_pir_real=1 \
+            --override_repository=simplepir="$upstream" \
+            //src/primihub/kernel/pir/tests:simple_pir_operator_test \
+            --test_output=summary) > "$log" 2>&1; then
+      rm -f "$log"
+      echo "PASS"
+    else
+      echo "FAIL(bazel test failed; last 5 lines: $(tail -5 "$log" | tr '\n' '; '))"
+      rm -f "$log"
+    fi
+    return
+  fi
+
   # Heavy path: actual primihub-cli invocation. We don't drive this from the
   # smoke yet because it requires a fully-provisioned cluster; gate it behind
   # an env-var so a future CI job can opt in.
