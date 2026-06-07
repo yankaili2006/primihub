@@ -219,4 +219,69 @@ Database Database::MakeRandom(uint64_t num, uint64_t row_length,
   return db;
 }
 
+retcode Database::Squish(uint64_t basis, uint64_t squishing,
+                         std::string* err) {
+  if (basis == 0 || squishing == 0) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Database::Squish: invalid input basis=" << basis
+          << " squishing=" << squishing
+          << " (both must be > 0; upstream picks 10/3)";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (info_.squishing != 0) {
+    if (err) {
+      *err =
+          "Database::Squish: already squished. Call Unsquish first or"
+          " operate on a fresh Database.";
+    }
+    return retcode::FAIL;
+  }
+  // Mirrors upstream's panic-on-bad-params check, surfaced as FAIL.
+  if (info_.p > (uint64_t{1} << basis)) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Database::Squish: p=" << info_.p << " > 2^basis (basis="
+          << basis
+          << "). Increase basis or pick a smaller p row in LweParams.";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (info_.logq < basis * squishing) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Database::Squish: logq=" << info_.logq
+          << " < basis*squishing=" << (basis * squishing)
+          << ". Each packed Z_q slot must fit `squishing` `basis`-bit"
+          << " Z_p values; the math runs but cells would alias.";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  info_.basis = basis;
+  info_.squishing = squishing;
+  info_.cols = data_.cols();
+  data_.Squish(basis, squishing);
+  return retcode::SUCCESS;
+}
+
+retcode Database::Unsquish(std::string* err) {
+  if (info_.squishing == 0) {
+    if (err) {
+      *err =
+          "Database::Unsquish: not squished (info.squishing == 0)."
+          " Squish must run first; this method is the inverse only.";
+    }
+    return retcode::FAIL;
+  }
+  data_.Unsquish(info_.basis, info_.squishing, info_.cols);
+  info_.basis = 0;
+  info_.squishing = 0;
+  info_.cols = 0;
+  return retcode::SUCCESS;
+}
+
 }  // namespace primihub::pir::core

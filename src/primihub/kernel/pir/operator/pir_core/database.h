@@ -127,6 +127,33 @@ class Database {
                              const LweParams& params, std::string* err,
                              retcode* rc);
 
+  // Direct mutable access to the DBinfo struct. Most callers should
+  // not need to mutate it directly — Squish/Unsquish update the
+  // relevant fields themselves. Exposed for tests + the protocol
+  // layer that reads fields like `ne` after SetupShape.
+  DBinfo& mutable_info() { return info_; }
+
+  // Squish — in-memory compression mirroring upstream's
+  //   DB.Info.Basis = 10;  DB.Info.Squishing = 3;  DB.Info.Cols = data.cols
+  //   DB.Data.Squish(basis, squishing)
+  // Returns FAIL if the params do not allow this compression
+  // (p > 2^basis OR logq < basis * squishing) — upstream panics on
+  // the same condition; we surface a FAIL with `err`. Caller must
+  // pass a populated LweParams whose `p` and `logq` match the
+  // database; we read them off info_ which Setup populated.
+  //
+  // POST: info_.basis = basis, info_.squishing = squishing,
+  // info_.cols = old_cols, data_ has ceil(old_cols / squishing)
+  // columns.
+  retcode Squish(uint64_t basis, uint64_t squishing, std::string* err);
+
+  // Unsquish — inverse of Squish. Uses info_.basis / info_.squishing /
+  // info_.cols stashed during Squish, so callers do not have to
+  // re-pass them. Returns FAIL if the Database was never Squished
+  // (info_.squishing == 0). POST: data_ restored to (l x cols), info_
+  // squishing/basis/cols zeroed.
+  retcode Unsquish(std::string* err);
+
  private:
   DBinfo info_;
   Matrix data_;

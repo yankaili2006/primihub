@@ -195,5 +195,95 @@ TEST(DatabaseMakeRandomTest, ProducesValuesInShiftedRange) {
       << "expected at least one wrapped-negative uint32 value";
 }
 
+// --------------------------------------------------------------------
+// Squish / Unsquish
+// --------------------------------------------------------------------
+
+// Builds a small, deterministic Database whose data fits in `basis_bits`
+// for byte-level checks. Uses mutable_info / mutable_data so we do not
+// have to go through SetupShape (which is heavier and unrelated here).
+Database MakeSquishableDatabase(uint64_t basis_bits) {
+  Database db;
+  db.mutable_info().p = (uint64_t{1} << (basis_bits - 2));  // p = 2^(b-2)
+  db.mutable_info().logq = 32;
+  Matrix data(4, 6);
+  const uint32_t mask = static_cast<uint32_t>((1ULL << basis_bits) - 1);
+  for (uint64_t i = 0; i < 4; ++i) {
+    for (uint64_t j = 0; j < 6; ++j) {
+      data.Set(i, j, static_cast<uint32_t>((i * 6 + j + 1) & mask));
+    }
+  }
+  db.mutable_data() = std::move(data);
+  return db;
+}
+
+TEST(DatabaseSquishTest, SquishUpdatesDBinfoAndShape) {
+  Database db = MakeSquishableDatabase(/*basis_bits=*/10);
+  const uint64_t orig_cols = db.data().cols();
+  std::string err;
+  ASSERT_EQ(db.Squish(/*basis=*/10, /*squishing=*/3, &err), retcode::SUCCESS)
+      << err;
+  EXPECT_EQ(db.info().basis, 10u);
+  EXPECT_EQ(db.info().squishing, 3u);
+  EXPECT_EQ(db.info().cols, orig_cols);
+  EXPECT_EQ(db.data().cols(), 2u);  // ceil(6/3) = 2
+  EXPECT_EQ(db.data().rows(), 4u);
+}
+
+TEST(DatabaseSquishTest, SquishUnsquishRoundtrip) {
+  Database db = MakeSquishableDatabase(/*basis_bits=*/10);
+  Matrix original_data = db.data();
+  std::string err;
+  ASSERT_EQ(db.Squish(10, 3, &err), retcode::SUCCESS) << err;
+  ASSERT_EQ(db.Unsquish(&err), retcode::SUCCESS) << err;
+
+  EXPECT_EQ(db.info().basis, 0u);
+  EXPECT_EQ(db.info().squishing, 0u);
+  EXPECT_EQ(db.info().cols, 0u);
+  ASSERT_EQ(db.data().rows(), original_data.rows());
+  ASSERT_EQ(db.data().cols(), original_data.cols());
+  for (uint64_t i = 0; i < db.data().rows(); ++i) {
+    for (uint64_t j = 0; j < db.data().cols(); ++j) {
+      EXPECT_EQ(db.data().Get(i, j), original_data.Get(i, j))
+          << "roundtrip mismatch i=" << i << " j=" << j;
+    }
+  }
+}
+
+TEST(DatabaseSquishTest, FailsWhenAlreadySquished) {
+  Database db = MakeSquishableDatabase(10);
+  std::string err;
+  ASSERT_EQ(db.Squish(10, 3, &err), retcode::SUCCESS);
+  EXPECT_EQ(db.Squish(10, 3, &err), retcode::FAIL);
+  EXPECT_NE(err.find("already squished"), std::string::npos)
+      << "got: " << err;
+}
+
+TEST(DatabaseSquishTest, FailsWhenPExceedsBasisCapacity) {
+  Database db = MakeSquishableDatabase(10);
+  db.mutable_info().p = 32;  // > 2^4
+  std::string err;
+  EXPECT_EQ(db.Squish(/*basis=*/4, /*squishing=*/3, &err), retcode::FAIL);
+  EXPECT_NE(err.find("p="), std::string::npos);
+  EXPECT_NE(err.find("> 2^basis"), std::string::npos) << "got: " << err;
+}
+
+TEST(DatabaseSquishTest, FailsWhenLogqInsufficientForPacking) {
+  Database db = MakeSquishableDatabase(10);
+  db.mutable_info().logq = 20;  // 10 * 3 = 30 > 20
+  std::string err;
+  EXPECT_EQ(db.Squish(10, 3, &err), retcode::FAIL);
+  EXPECT_NE(err.find("logq="), std::string::npos);
+  EXPECT_NE(err.find("< basis*squishing="), std::string::npos)
+      << "got: " << err;
+}
+
+TEST(DatabaseSquishTest, UnsquishFailsWhenNotSquished) {
+  Database db = MakeSquishableDatabase(10);
+  std::string err;
+  EXPECT_EQ(db.Unsquish(&err), retcode::FAIL);
+  EXPECT_NE(err.find("not squished"), std::string::npos) << "got: " << err;
+}
+
 }  // namespace
 }  // namespace primihub::pir::core

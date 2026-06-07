@@ -95,6 +95,27 @@ class Matrix {
   // shrinks the underlying vector + updates rows_.
   void DropLastRows(uint64_t n);
 
+  // Squish / Unsquish — pure-arithmetic in-memory compression used by
+  // the SimplePIR Answer path (matMulVecPacked). Pack `delta` adjacent
+  // Z_p columns into one Z_q column where each Z_p value lives in a
+  // `basis`-bit slot. Upstream simplepir uses basis=10, delta=3 so the
+  // 32-bit Z_q column carries 3 Z_p slots of up to 1024 each.
+  //
+  // After Squish: rows unchanged, cols = ceil(cols / delta), and each
+  // cell new[i, j] = sum_{k=0..delta-1, delta*j+k < old_cols}
+  //                      old[i, delta*j+k] << (k * basis).
+  //
+  // Unsquish is the inverse — `orig_cols` is the un-squished column
+  // count the caller stashed before calling Squish (Database mirrors
+  // this in DBinfo.cols). After Unsquish: rows unchanged, cols =
+  // orig_cols.
+  //
+  // Pure arithmetic — works in both stub and vendored modes. Database
+  // wraps these to also update DBinfo.basis/squishing/cols so callers
+  // pair the operations through the higher-level API.
+  void Squish(uint64_t basis, uint64_t delta);
+  void Unsquish(uint64_t basis, uint64_t delta, uint64_t orig_cols);
+
   // Kernel bridges. Vendored mode forwards to upstream pir.c; stub
   // mode returns retcode::FAIL with the activation-flag guidance.
   //

@@ -215,5 +215,71 @@ TEST(MatrixTest, MulVecNonColumnFailsUpFront) {
       << "expected column-vector error; got: " << err;
 }
 
+// --------------------------------------------------------------------
+// Squish / Unsquish — pure arithmetic, both modes equivalent.
+// --------------------------------------------------------------------
+
+TEST(MatrixTest, SquishPacksWithinSlots) {
+  // 2 x 6, basis=4, delta=3 — packs 3 cols per output cell; output is
+  // 2 x 2. Each cell low 12 bits = old[i, 3j+0] | old[i, 3j+1]<<4 |
+  // old[i, 3j+2]<<8.
+  Matrix m(2, 6);
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 6; ++j) {
+      m.Set(i, j, static_cast<uint32_t>(i * 6 + j + 1));
+    }
+  }
+  m.Squish(/*basis=*/4, /*delta=*/3);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 2u);
+  // Row 0 col 0: 1 | 2<<4 | 3<<8 = 0x321
+  EXPECT_EQ(m.Get(0, 0), 0x321u);
+  // Row 0 col 1: 4 | 5<<4 | 6<<8 = 0x654
+  EXPECT_EQ(m.Get(0, 1), 0x654u);
+  // Row 1 col 0: 7 | 8<<4 | 9<<8 = 0x987
+  EXPECT_EQ(m.Get(1, 0), 0x987u);
+  // Row 1 col 1: A | B<<4 | C<<8 = 0xCBA
+  EXPECT_EQ(m.Get(1, 1), 0xCBAu);
+}
+
+TEST(MatrixTest, SquishHandlesNonDivisibleCols) {
+  // 1 x 5, delta=3 — output 1 x 2; second cell has only 2 inputs.
+  Matrix m(1, 5);
+  for (uint64_t j = 0; j < 5; ++j) m.Set(0, j, static_cast<uint32_t>(j + 1));
+  m.Squish(/*basis=*/4, /*delta=*/3);
+  EXPECT_EQ(m.rows(), 1u);
+  EXPECT_EQ(m.cols(), 2u);
+  EXPECT_EQ(m.Get(0, 0), 0x321u);
+  // Second cell: only old cols 3, 4 contribute (delta*1+0=3, +1=4; +2=5 OOB).
+  // Value: 4 | 5<<4 | 0<<8 = 0x54.
+  EXPECT_EQ(m.Get(0, 1), 0x54u);
+}
+
+TEST(MatrixTest, SquishThenUnsquishRoundtrip) {
+  // 3 x 7, basis=10, delta=3 — upstream's chosen params. Values must
+  // fit in `basis` bits (so < 1024) for the roundtrip to be exact.
+  Matrix m(3, 7);
+  for (uint64_t i = 0; i < 3; ++i) {
+    for (uint64_t j = 0; j < 7; ++j) {
+      m.Set(i, j, static_cast<uint32_t>((i * 100 + j) % 1024));
+    }
+  }
+  Matrix original = m;  // value copy of internal vector
+
+  m.Squish(/*basis=*/10, /*delta=*/3);
+  // ceil(7/3) = 3 packed cols.
+  EXPECT_EQ(m.cols(), 3u);
+
+  m.Unsquish(/*basis=*/10, /*delta=*/3, /*orig_cols=*/7);
+  ASSERT_EQ(m.rows(), original.rows());
+  ASSERT_EQ(m.cols(), original.cols());
+  for (uint64_t i = 0; i < m.rows(); ++i) {
+    for (uint64_t j = 0; j < m.cols(); ++j) {
+      EXPECT_EQ(m.Get(i, j), original.Get(i, j))
+          << "i=" << i << " j=" << j;
+    }
+  }
+}
+
 }  // namespace
 }  // namespace primihub::pir::core
