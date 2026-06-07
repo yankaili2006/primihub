@@ -4,18 +4,46 @@
  */
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir.h"
 
+#include <string>
+
 #include <glog/logging.h>
+
+#include "src/primihub/kernel/pir/operator/double_pir/double_pir_runtime.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 
 namespace primihub::pir {
 
 retcode DoublePirOperator::OnExecute(const PirDataType& /*input*/,
                                      PirDataType* /*result*/) {
-  LOG(ERROR)
-      << "DoublePirOperator: skeleton only — real query path not yet wired. "
-      << "Vendor ahenzinger/simplepir via thirdparty/pir/BUILD.simplepir and "
-      << "replace this method (see openspec/changes/primihub-pir-multi-algo "
-      << "tasks 5.4-5.10).";
+  // Phase 4 scaffolding milestone — the operator now drives the
+  // DoublePirRuntime smoke path so we have a definitive signal that
+  // the @simplepir//:simplepir_c_kernels cc_library is linked. The
+  // real DoublePIR query path (LWE secret + hint + answer + decode)
+  // lands in a follow-up to task 5.5 once the Go algorithmic layer is
+  // ported into C++.
+  if (!double_pir::kDoublePirRuntimeVendored) {
+    LOG(ERROR)
+        << "DoublePirOperator: runtime not vendored — build with "
+        << "--define=enable_double_pir_real=1 and provide @simplepir "
+        << "bazel override (see openspec/changes/primihub-pir-multi-algo "
+        << "design.md Phase 4).";
+    return retcode::FAIL;
+  }
+
+  std::string err;
+  auto rc = double_pir::DoublePirRuntime::Instance().SmokeMatMulVec(&err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "DoublePirOperator: runtime smoke failed: " << err;
+    return retcode::FAIL;
+  }
+
+  // Honest skeleton signal: the kernel link works and matmul is correct,
+  // but the algorithmic core has not landed yet. Returning FAIL keeps
+  // callers from assuming a real PIR query happened.
+  LOG(WARNING)
+      << "DoublePirOperator: runtime smoke PASS but full DoublePIR "
+      << "query path not yet implemented; returning FAIL until task 5.5 "
+      << "lands the LWE protocol port.";
   return retcode::FAIL;
 }
 

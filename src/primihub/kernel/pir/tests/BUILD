@@ -189,3 +189,17 @@ cc_test(
     }),
     size = "small",
 )
+
+# Phase 4 / task 5.5 scaffolding — DoublePirRuntime end-to-end smoke.
+# Behaviour bifurcates on the operator BUILD select(); a single test
+# file covers both modes via kDoublePirRuntimeVendored introspection.
+cc_test(
+    name = "double_pir_runtime_test",
+    srcs = ["double_pir_runtime_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
