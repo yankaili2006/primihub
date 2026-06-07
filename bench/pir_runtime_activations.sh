@@ -58,7 +58,7 @@
 #   2  — bad arguments
 set -euo pipefail
 
-ALGOS_DEFAULT="double_pir,simple_pir,ypir"
+ALGOS_DEFAULT="double_pir,simple_pir,ypir,pir_core"
 ALGOS=""
 OUT_PATH=""
 DO_BUILD=1
@@ -102,6 +102,11 @@ DEFINE_FLAG[ypir]="enable_ypir_real"
 OVERRIDE_REPO[ypir]="ypir"
 OVERRIDE_PATH[ypir]="/tmp/ypir-upstream"
 TEST_TARGET[ypir]="//src/primihub/kernel/pir/tests:ypir_runtime_test"
+
+DEFINE_FLAG[pir_core]="enable_pir_core_real"
+OVERRIDE_REPO[pir_core]="simplepir"
+OVERRIDE_PATH[pir_core]="/tmp/simplepir-upstream"
+TEST_TARGET[pir_core]="//src/primihub/kernel/pir/tests:matrix_test"
 
 WRAPPER_COMMIT=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 HOST_UNAME=$(uname -srm)
@@ -170,7 +175,7 @@ for algo in ${ALGOS//,/ }; do
   BINARY_SHA=$(sha256sum "$BINARY" | awk '{print $1}')
   TMP_OUT=$(mktemp)
   T0=$(date +%s%N)
-  if "$BINARY" --gtest_filter='*SmokeMatchesVendoredFlag' \
+  if "$BINARY" --gtest_filter='*SmokeMatchesVendoredFlag:*BifurcatesOnVendoring' \
       > "$TMP_OUT" 2>&1; then
     TEST_RC=0
   else
