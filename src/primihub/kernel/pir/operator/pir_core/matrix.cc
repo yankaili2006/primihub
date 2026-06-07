@@ -21,6 +21,8 @@ void matMul(Elem* out, const Elem* a, const Elem* b,
             size_t aRows, size_t aCols, size_t bCols);
 void matMulVec(Elem* out, const Elem* a, const Elem* b,
                size_t aRows, size_t aCols);
+void matMulVecPacked(Elem* out, const Elem* a, const Elem* b,
+                     size_t aRows, size_t aCols);
 void transpose(Elem* out, const Elem* in, size_t rows, size_t cols);
 }  // extern "C"
 #endif  // PIR_PIR_CORE_REAL
@@ -245,6 +247,67 @@ retcode Matrix::Mul(const Matrix& b, Matrix* out, std::string* err) const {
   matMul(out->mutable_data(), data_.data(), b.data(),
          static_cast<size_t>(rows_), static_cast<size_t>(cols_),
          static_cast<size_t>(b.cols_));
+  return retcode::SUCCESS;
+#endif
+}
+
+retcode Matrix::MulVecPacked(const Matrix& b, uint64_t basis,
+                             uint64_t squishing, Matrix* out,
+                             std::string* err) const {
+  if (out == nullptr) {
+    if (err) *err = "Matrix::MulVecPacked: out is null";
+    return retcode::FAIL;
+  }
+  // Upstream pir.c hardcodes basis=10 / compression=3 for the SIMD
+  // shift constants. Reject anything else up-front so callers do not
+  // get silently-wrong answers.
+  if (basis != 10 || squishing != 3) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulVecPacked: basis=" << basis
+          << " squishing=" << squishing
+          << " — kernel hardcodes basis=10 squishing=3. Pass those"
+          << " literals or wait for a future kernel that parameterizes.";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (b.cols_ != 1) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulVecPacked: b must be a column vector; got cols="
+          << b.cols_;
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  // Upstream MatrixMulVecPacked requires `a.Cols * compression == b.Rows`,
+  // i.e. the unpacked query length matches the packed-DB column count
+  // times the compression factor. Surface that as a guard.
+  if (cols_ * squishing != b.rows_) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulVecPacked: dim mismatch — packed DB is "
+          << rows_ << "x" << cols_
+          << " (expects b.rows = cols * squishing = "
+          << (cols_ * squishing) << "); got b="
+          << b.rows_ << "x" << b.cols_ << ".";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+#ifndef PIR_PIR_CORE_REAL
+  WriteNotVendoredError(err);
+  return retcode::FAIL;
+#else
+  // Kernel writes rows_+8 elements (SIMD tail padding); allocate
+  // accordingly then DropLastRows(8) to surface the proper L x 1.
+  Matrix temp(rows_ + 8, 1);
+  matMulVecPacked(temp.mutable_data(), data_.data(), b.data(),
+                  static_cast<size_t>(rows_),
+                  static_cast<size_t>(cols_));
+  temp.DropLastRows(8);
+  *out = std::move(temp);
   return retcode::SUCCESS;
 #endif
 }

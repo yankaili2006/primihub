@@ -133,6 +133,7 @@ retcode SimplePirProtocol::Query(uint64_t index,
                                  const core::Matrix& A,
                                  const core::Matrix& secret,
                                  const core::LweParams& params,
+                                 const core::DBinfo& info,
                                  std::mt19937_64* noise_rng,
                                  core::Matrix* query_out,
                                  std::string* err) {
@@ -215,10 +216,180 @@ retcode SimplePirProtocol::Query(uint64_t index,
   query_out->Set(k, 0,
                  curr_k + static_cast<uint32_t>(params.Delta()));
 
-  // NOTE: Squishing padding (upstream's AppendZeros) intentionally
-  // skipped — Database::Squish is DoublePIR scope and DBinfo.squishing
-  // is 0 in this revision. When Squish lands, Query will need DBinfo
-  // and conditional padding; see openspec tasks 5.5 / 7.2.
+  // Squishing padding: when the DB has been Squished and params.m is
+  // not divisible by info.squishing, append zero rows so the packed
+  // Answer kernel can read (info.cols * info.squishing) elements.
+  // When info.squishing == 0 (no Squish), this is a no-op and query
+  // stays at native (m x 1) shape.
+  if (info.squishing > 0 && (params.m % info.squishing) != 0) {
+    const uint64_t pad = info.squishing - (params.m % info.squishing);
+    const uint64_t new_rows = params.m + pad;
+    core::Matrix padded = core::Matrix::Zeros(new_rows, 1);
+    for (uint64_t i = 0; i < params.m; ++i) {
+      padded.Set(i, 0, query_out->Get(i, 0));
+    }
+    *query_out = std::move(padded);
+  }
+  return retcode::SUCCESS;
+}
+
+retcode SimplePirProtocol::Answer(const core::Database& squished_db,
+                                  const core::Matrix& query,
+                                  core::Matrix* answer_out,
+                                  std::string* err) {
+  if (answer_out == nullptr) {
+    if (err) *err = "SimplePirProtocol::Answer: answer_out is null";
+    return retcode::FAIL;
+  }
+  const auto& info = squished_db.info();
+  if (info.squishing == 0 || info.basis == 0) {
+    if (err) {
+      *err =
+          "SimplePirProtocol::Answer: db not squished (info.squishing"
+          " == 0). Call Database::Squish before Answer.";
+    }
+    return retcode::FAIL;
+  }
+  // Query must equal (squished_cols * squishing) — MulVecPacked guards
+  // the same condition but we surface a SimplePIR-flavored error.
+  const uint64_t expected = squished_db.data().cols() * info.squishing;
+  if (query.cols() != 1 || query.rows() != expected) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Answer: query shape mismatch — got "
+          << query.rows() << "x" << query.cols()
+          << ", expected " << expected
+          << "x1 (squished_db.cols=" << squished_db.data().cols()
+          << " * squishing=" << info.squishing
+          << "). Caller must pass the squishing-padded query Query"
+          << " produced for the same Database.";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  return squished_db.data().MulVecPacked(query, info.basis,
+                                         info.squishing, answer_out,
+                                         err);
+}
+
+retcode SimplePirProtocol::Recover(uint64_t index,
+                                   const core::Matrix& query,
+                                   const core::Matrix& hint,
+                                   const core::Matrix& secret,
+                                   const core::Matrix& answer,
+                                   const core::LweParams& params,
+                                   const core::DBinfo& info,
+                                   uint64_t* recovered_out,
+                                   std::string* err) {
+  if (recovered_out == nullptr) {
+    if (err) *err = "SimplePirProtocol::Recover: recovered_out is null";
+    return retcode::FAIL;
+  }
+  if (params.p == 0 || params.m == 0 || params.n == 0 ||
+      params.logq == 0 || params.l == 0) {
+    if (err) *err = "SimplePirProtocol::Recover: params not initialized";
+    return retcode::FAIL;
+  }
+  if (info.ne == 0 || info.p == 0 || info.logq == 0) {
+    if (err) *err = "SimplePirProtocol::Recover: info not initialized";
+    return retcode::FAIL;
+  }
+  if (hint.rows() != params.l || hint.cols() != params.n) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: hint shape mismatch — got "
+          << hint.rows() << "x" << hint.cols()
+          << ", expected " << params.l << "x" << params.n;
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (secret.rows() != params.n || secret.cols() != 1) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: secret shape mismatch — got "
+          << secret.rows() << "x" << secret.cols()
+          << ", expected " << params.n << "x1";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (answer.rows() != params.l || answer.cols() != 1) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: answer shape mismatch — got "
+          << answer.rows() << "x" << answer.cols()
+          << ", expected " << params.l << "x1";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (query.cols() != 1 || query.rows() < params.m) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: query shape mismatch — got "
+          << query.rows() << "x" << query.cols()
+          << ", expected at least " << params.m << "x1 (Recover only"
+          << " reads the first params.m entries; the rest are"
+          << " squishing padding zeros).";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+
+  // Compute offset = -sum(query[j] * p/2) mod 2^logq. Upstream
+  // mirrors this exact formula. Use uint64 with explicit mod for the
+  // shift — params.logq is 32 in the current table; the formula
+  // handles up to logq=63 via (uint64_t{1} << logq).
+  const uint64_t q = uint64_t{1} << params.logq;
+  const uint64_t ratio = params.p / 2;
+  uint64_t offset = 0;
+  for (uint64_t j = 0; j < params.m; ++j) {
+    offset = (offset + ratio * query.Get(j, 0)) % q;
+  }
+  offset = q - offset;
+
+  // interm = H * secret  (L x 1)
+  core::Matrix interm;
+  auto rc = hint.Mul(secret, &interm, err);
+  if (rc != retcode::SUCCESS) return rc;
+  if (interm.rows() != params.l || interm.cols() != 1) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: interm shape unexpected — got "
+          << interm.rows() << "x" << interm.cols();
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+
+  // For SimplePIR, the index encodes which DB row was queried; row =
+  // index / params.m, and within that row we decode `info.ne` Z_p
+  // base-p digits.
+  const uint64_t row = index / params.m;
+  if ((row + 1) * info.ne > params.l) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "SimplePirProtocol::Recover: row=" << row
+          << " ne=" << info.ne << " runs past l=" << params.l;
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+
+  std::vector<uint64_t> vals;
+  vals.reserve(info.ne);
+  for (uint64_t j = row * info.ne; j < (row + 1) * info.ne; ++j) {
+    // noised = answer[j] - interm[j] + offset, all mod 2^logq.
+    const uint64_t answered = answer.Get(j, 0);
+    const uint64_t interm_j = interm.Get(j, 0);
+    // Subtract interm and add offset under modular arithmetic. Use
+    // uint64 then reduce by q to avoid signedness pitfalls.
+    uint64_t noised = (answered + q - (interm_j % q)) % q;
+    noised = (noised + offset) % q;
+    vals.push_back(params.Round(noised));
+  }
+  *recovered_out = core::ReconstructElem(std::move(vals), index, info);
   return retcode::SUCCESS;
 }
 

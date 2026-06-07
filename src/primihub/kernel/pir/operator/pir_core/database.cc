@@ -219,6 +219,28 @@ Database Database::MakeRandom(uint64_t num, uint64_t row_length,
   return db;
 }
 
+uint64_t ReconstructElem(std::vector<uint64_t> vals, uint64_t index,
+                          const DBinfo& info) {
+  if (info.p == 0) {
+    LOG(FATAL) << "ReconstructElem: info.p == 0";
+  }
+  if (info.logq == 0 || info.logq > 63) {
+    LOG(FATAL) << "ReconstructElem: invalid info.logq=" << info.logq;
+  }
+  const uint64_t q = uint64_t{1} << info.logq;
+  for (std::size_t i = 0; i < vals.size(); ++i) {
+    vals[i] = (vals[i] + info.p / 2) % q;
+    vals[i] = vals[i] % info.p;
+  }
+  uint64_t val = ReconstructFromBaseP(info.p, vals.data(), vals.size());
+  if (info.packing > 0) {
+    // Multiple DB entries packed in one Z_p; extract the right one.
+    const uint64_t row_modulus = uint64_t{1} << info.row_length;
+    val = BaseP(row_modulus, val, index % info.packing);
+  }
+  return val;
+}
+
 retcode Database::Squish(uint64_t basis, uint64_t squishing,
                          std::string* err) {
   if (basis == 0 || squishing == 0) {

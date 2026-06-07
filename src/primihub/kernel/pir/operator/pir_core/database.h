@@ -34,6 +34,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "src/primihub/common/common.h"
 #include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
@@ -101,6 +102,23 @@ retcode ApproxSquareDatabaseDims(uint64_t n, uint64_t row_length,
                                   uint64_t p,
                                   uint64_t* l, uint64_t* m,
                                   std::string* err);
+
+// Reconstruct a DB entry from base-p decomposed Z_p values. Mirrors
+// upstream simplepir's ReconstructElem in pir/database.go.
+//
+// Inputs:
+//   * `vals` — info.ne base-p digits that the Recover loop produced
+//     after applying Round() to the noisy answer cells. Passed by
+//     value because upstream mutates it (adds info.p/2 and reduces
+//     by p) before recombining; passing by value spares the caller.
+//   * `index` — the DB entry index the client originally queried. Only
+//     used when info.packing > 0 to extract the right sub-entry.
+//   * `info` — must have p, logq, packing, ne, row_length populated.
+//
+// Output: the recovered Z_p element (or, when info.packing > 0, the
+// recovered row_length-bit sub-entry of the packed element).
+uint64_t ReconstructElem(std::vector<uint64_t> vals, uint64_t index,
+                          const DBinfo& info);
 
 // --- Database class -------------------------------------------------
 

@@ -239,8 +239,10 @@ TEST(SimplePirQueryTest, BifurcatesOnVendoring) {
   std::mt19937_64 rng(42);
 
   core::Matrix query;
-  auto query_rc = SimplePirProtocol::Query(/*index=*/7, A, s, params, &rng,
-                                           &query, &err);
+  core::DBinfo no_squish_info;  // squishing == 0 -> no padding
+  auto query_rc = SimplePirProtocol::Query(/*index=*/7, A, s, params,
+                                           no_squish_info, &rng, &query,
+                                           &err);
   if (core::kPirCoreKernelsVendored) {
     ASSERT_EQ(query_rc, retcode::SUCCESS)
         << "vendored mode: query must succeed; err=" << err;
@@ -294,8 +296,9 @@ TEST(SimplePirQueryTest, EncodesIndexAtDelta) {
                expected.Get(k, 0) + static_cast<uint32_t>(params.Delta()));
 
   core::Matrix query;
-  ASSERT_EQ(SimplePirProtocol::Query(index, A, s, params, &protocol_rng,
-                                     &query, &err),
+  core::DBinfo no_squish_info;
+  ASSERT_EQ(SimplePirProtocol::Query(index, A, s, params, no_squish_info,
+                                     &protocol_rng, &query, &err),
             retcode::SUCCESS)
       << err;
 
@@ -334,7 +337,9 @@ TEST(SimplePirQueryTest, FailsOnSecretShapeMismatch) {
   core::Matrix bad_s = core::Matrix::Zeros(params.n + 1, 1);
   std::mt19937_64 rng(0);
   core::Matrix q;
-  EXPECT_EQ(SimplePirProtocol::Query(0, A, bad_s, params, &rng, &q, &err),
+  core::DBinfo no_squish_info;
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, bad_s, params, no_squish_info,
+                                     &rng, &q, &err),
             retcode::FAIL);
   EXPECT_NE(err.find("secret shape mismatch"), std::string::npos)
       << "must surface mismatch up-front, not from kernel; got: " << err;
@@ -349,16 +354,198 @@ TEST(SimplePirQueryTest, FailsOnNullQueryOutOrRng) {
   core::Matrix s = core::Matrix::Zeros(params.n, 1);
   std::mt19937_64 rng(0);
   core::Matrix q;
-  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, /*noise_rng=*/nullptr,
-                                     &q, &err),
+  core::DBinfo no_squish_info;
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, no_squish_info,
+                                     /*noise_rng=*/nullptr, &q, &err),
             retcode::FAIL);
   EXPECT_NE(err.find("noise_rng is null"), std::string::npos) << err;
 
-  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, &rng,
+  EXPECT_EQ(SimplePirProtocol::Query(0, A, s, params, no_squish_info, &rng,
                                      /*query_out=*/nullptr, &err),
             retcode::FAIL);
   EXPECT_NE(err.find("query_out or noise_rng is null"), std::string::npos)
       << err;
+}
+
+// --------------------------------------------------------------------
+// Answer + Recover (end-to-end, vendored-only)
+// --------------------------------------------------------------------
+
+TEST(SimplePirAnswerTest, FailsWhenDbNotSquished) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+  core::Database db = core::Database::MakeRandom(200, 8, params, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+  // Don't Squish — Answer should refuse.
+  core::Matrix query = core::Matrix::Zeros(params.m, 1);
+  core::Matrix answer;
+  EXPECT_EQ(SimplePirProtocol::Answer(db, query, &answer, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("not squished"), std::string::npos) << err;
+}
+
+TEST(SimplePirRecoverTest, FailsWhenInfoNotInitialized) {
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(200, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS);
+  core::DBinfo empty_info;  // ne=0 etc
+  core::Matrix query = core::Matrix::Zeros(params.m, 1);
+  core::Matrix hint = core::Matrix::Zeros(params.l, params.n);
+  core::Matrix secret = core::Matrix::Zeros(params.n, 1);
+  core::Matrix answer = core::Matrix::Zeros(params.l, 1);
+  uint64_t out = 0;
+  EXPECT_EQ(SimplePirProtocol::Recover(0, query, hint, secret, answer,
+                                       params, empty_info, &out, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("info not initialized"), std::string::npos) << err;
+}
+
+TEST(SimplePirAnswerTest, EndToEndRetrievesCorrectEntry) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "end-to-end retrieval needs the kernel bridge";
+  }
+  // Full pipeline: Init -> Setup -> Squish -> GenSecret -> Query ->
+  // Answer -> Recover. With row_length=8, p=991 (log_m=13 row), the
+  // DBinfo layout is packing=1, ne=1 — one Z_p value per DB entry,
+  // recovered value is `(Z_p value) % 2^row_length`. We pin DB
+  // entries in [0, 2^row_length) so the % step is the identity, and
+  // assert recovered equals the original byte.
+  //
+  // N=64 -> l=8, m=8. l must be a multiple of 8 because the
+  // matMulVecPacked C kernel processes rows in batches of 8 (uses
+  // `i += 8` loop) and reads a[i + 7*cols] regardless of whether the
+  // row is in bounds. The 14-row case (N=200 from earlier drafts)
+  // OOB-reads rows 14..15 which yields wrong noise terms in the
+  // partial last batch.
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(64, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS) << err;
+
+  core::Database db;
+  ASSERT_EQ(db.SetupShape(64, 8, params, &err), retcode::SUCCESS) << err;
+  // Pick a target inside (l x m) = (8 x 8) — index 27 → row 3, col 3.
+  const uint64_t target_index = 27;
+  ASSERT_LT(target_index, params.l * params.m);
+  const uint64_t target_row = target_index / params.m;
+  const uint64_t target_col = target_index % params.m;
+  // Fill with byte-sized deterministic values, then shift to the
+  // centered representation [-p/2, p/2) that upstream's MakeDB +
+  // ReconstructElem assume. Without the ScalarSub(p/2), the math
+  // recovers `byte + p/2 (mod p)` instead of `byte`.
+  for (uint64_t i = 0; i < params.l; ++i) {
+    for (uint64_t j = 0; j < params.m; ++j) {
+      const uint32_t v = static_cast<uint32_t>((i * 13 + j * 7) & 0xFF);
+      db.mutable_data().Set(i, j, v);
+    }
+  }
+  db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
+  const uint64_t expected =
+      static_cast<uint64_t>((target_row * 13 + target_col * 7) & 0xFF);
+
+  // Init + Setup (Setup shifts DB by p/2 internally)
+  core::Matrix A;
+  ASSERT_EQ(SimplePirProtocol::Init(params, &A, &err), retcode::SUCCESS);
+  core::Matrix H;
+  ASSERT_EQ(SimplePirProtocol::Setup(&db, A, params, &H, &err),
+            retcode::SUCCESS) << err;
+
+  // Squish the DB with upstream's params (basis=10, squishing=3).
+  ASSERT_EQ(db.Squish(/*basis=*/10, /*squishing=*/3, &err),
+            retcode::SUCCESS) << err;
+
+  // GenSecret
+  core::Matrix s;
+  ASSERT_EQ(SimplePirProtocol::GenSecret(params, &s, &err), retcode::SUCCESS);
+
+  // Query — pass the now-Squished DBinfo so Query pads to a multiple
+  // of squishing when params.m is not divisible by squishing.
+  std::mt19937_64 rng(/*seed=*/987654);
+  core::Matrix query;
+  ASSERT_EQ(SimplePirProtocol::Query(target_index, A, s, params,
+                                     db.info(), &rng, &query, &err),
+            retcode::SUCCESS) << err;
+  EXPECT_EQ(query.rows() % db.info().squishing, 0u);
+
+  // Answer
+  core::Matrix answer;
+  ASSERT_EQ(SimplePirProtocol::Answer(db, query, &answer, &err),
+            retcode::SUCCESS) << err;
+  EXPECT_EQ(answer.rows(), params.l);
+  EXPECT_EQ(answer.cols(), 1u);
+
+  // Recover — uses db.info() which still has ne/p/logq/packing/
+  // row_length populated even post-Squish.
+  uint64_t recovered = 0;
+  ASSERT_EQ(SimplePirProtocol::Recover(target_index, query, H, s, answer,
+                                       params, db.info(), &recovered, &err),
+            retcode::SUCCESS) << err;
+
+  EXPECT_EQ(recovered, expected)
+      << "DB entry at index=" << target_index << " (row=" << target_row
+      << ", col=" << target_col << ") expected " << expected
+      << " but recovered " << recovered;
+}
+
+// Validates the un-Squished Answer path: server uses regular Matrix::Mul
+// instead of MulVecPacked. This is the path SimplePirProtocol::Answer
+// would take if we later add a "no compression" mode. Kept around to
+// pin the math independently of the packed kernel.
+TEST(SimplePirAnswerTest, RecoverWithoutSquishWorks) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs kernel bridge";
+  }
+  std::string err;
+  retcode rc = retcode::FAIL;
+  core::LweParams params = MakeParams(64, 8, &err, &rc);
+  ASSERT_EQ(rc, retcode::SUCCESS) << err;
+  core::Database db;
+  ASSERT_EQ(db.SetupShape(64, 8, params, &err), retcode::SUCCESS);
+  const uint64_t target_index = 27;
+  const uint64_t target_row = target_index / params.m;
+  const uint64_t target_col = target_index % params.m;
+  for (uint64_t i = 0; i < params.l; ++i) {
+    for (uint64_t j = 0; j < params.m; ++j) {
+      db.mutable_data().Set(i, j,
+          static_cast<uint32_t>((i * 13 + j * 7) & 0xFF));
+    }
+  }
+  // Center the DB the same way upstream's MakeDB does (subtract p/2)
+  // so ReconstructElem's add-p/2 step recovers the original byte.
+  db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
+  const uint64_t expected =
+      static_cast<uint64_t>((target_row * 13 + target_col * 7) & 0xFF);
+
+  core::Matrix A;
+  ASSERT_EQ(SimplePirProtocol::Init(params, &A, &err), retcode::SUCCESS);
+  core::Matrix H;
+  ASSERT_EQ(SimplePirProtocol::Setup(&db, A, params, &H, &err),
+            retcode::SUCCESS) << err;
+
+  core::Matrix s;
+  ASSERT_EQ(SimplePirProtocol::GenSecret(params, &s, &err), retcode::SUCCESS);
+
+  std::mt19937_64 rng(/*seed=*/42);
+  core::Matrix query;
+  core::DBinfo no_squish_info;  // squishing=0 -> no padding
+  ASSERT_EQ(SimplePirProtocol::Query(target_index, A, s, params,
+                                     no_squish_info, &rng, &query, &err),
+            retcode::SUCCESS) << err;
+
+  // Compute answer manually via regular Mul (bypass MulVecPacked path).
+  core::Matrix answer;
+  ASSERT_EQ(db.data().Mul(query, &answer, &err), retcode::SUCCESS) << err;
+
+  uint64_t recovered = 0;
+  ASSERT_EQ(SimplePirProtocol::Recover(target_index, query, H, s, answer,
+                                       params, db.info(), &recovered, &err),
+            retcode::SUCCESS) << err;
+  EXPECT_EQ(recovered, expected)
+      << "Recover-without-Squish: expected " << expected
+      << " got " << recovered;
 }
 
 }  // namespace

@@ -30,27 +30,39 @@
  *                              q = A*s + e + Delta * e_{i mod m}
  *                              where `e` is M x 1 Gaussian noise from
  *                              pir_core::GaussianSampler driven by a
- *                              caller-supplied mt19937_64. Squishing
- *                              padding (upstream's AppendZeros when
- *                              p.M % info.Squishing != 0) is skipped
- *                              this revision: DBinfo.squishing is 0
- *                              until Database::Squish/Unsquish lands.
+ *                              caller-supplied mt19937_64. Pads the
+ *                              query to a multiple of info.squishing
+ *                              (AppendZeros at the bottom) when info
+ *                              has been Squished.
+ *   * Answer(squished_db, q) -> server-side compute over the squished
+ *                               DB: ans = squished_DB * q_packed via
+ *                               MulVecPacked. Returns L x 1 answer.
+ *   * Recover(i, q, H, s, ans, p, info)
+ *                            -> client-side decoding:
+ *                               offset = -sum(q[j] * p/2 for j in 0..M)
+ *                                        mod 2^logq
+ *                               interm = H * s
+ *                               ans = ans - interm
+ *                               for j in [row*ne, (row+1)*ne):
+ *                                   vals[j-row*ne] =
+ *                                     Round(ans[j] + offset)
+ *                               return ReconstructElem(vals, i, info)
  *
  * Intentionally deferred to follow-up commits:
- *   * Answer     — server-side compute over the squished DB. Needs
- *                  Squish/Unsquish in pir_core::Database first.
- *   * Recover    — client-side decoding with the hint. Symmetric to
- *                  Query; lands after Answer.
  *   * FakeSetup  — benchmark helper for hint-less timing runs.
  *   * Compressed seed paths — PRG-driven A regeneration to cut the
  *                             offline traffic. Lands after Init/Setup
  *                             prove correct.
+ *   * Batch path — Answer over multiple queries (`MsgSlice` upstream).
+ *                  Single-query is sufficient for the SimplePIR port
+ *                  correctness loop; batching is a benchmark concern.
  *
- * Activation: Setup and Query call Matrix::Mul which needs
- * PIR_PIR_CORE_REAL. Init and GenSecret are pure-arithmetic and run
- * in both stub and vendored modes. The kernel-calling methods forward
- * retcode::FAIL with caller-actionable `err` messages when the kernel
- * link is not vendored.
+ * Activation: Setup, Query, Answer, and Recover call Matrix::Mul or
+ * Matrix::MulVecPacked which need PIR_PIR_CORE_REAL. Init and
+ * GenSecret are pure-arithmetic and run in both stub and vendored
+ * modes. The kernel-calling methods forward retcode::FAIL with
+ * caller-actionable `err` messages when the kernel link is not
+ * vendored.
  */
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_SIMPLE_PIR_SIMPLE_PIR_PROTOCOL_H_
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_SIMPLE_PIR_SIMPLE_PIR_PROTOCOL_H_
@@ -138,13 +150,67 @@ class SimplePirProtocol {
   //
   // Activation: vendored mode required (Matrix::Mul). Stub mode
   // forwards retcode::FAIL with the activation-flag hint.
+  //
+  // Squishing padding: when `info` has been Squished (info.squishing
+  // > 0 AND params.m % info.squishing != 0), this method pads the
+  // output query with the right number of trailing zeros so that
+  // query.rows() is divisible by info.squishing — matches the layout
+  // Answer's MulVecPacked expects. When info.squishing == 0 (no
+  // Squish), query stays at native (m x 1) shape.
   static retcode Query(uint64_t index,
                        const core::Matrix& A,
                        const core::Matrix& secret,
                        const core::LweParams& params,
+                       const core::DBinfo& info,
                        std::mt19937_64* noise_rng,
                        core::Matrix* query_out,
                        std::string* err);
+
+  // Server-side compute: ans = squished_db.data * query via
+  // Matrix::MulVecPacked. Single-query path — batched Answer (upstream
+  // takes a `MsgSlice`) is deferred until a benchmark needs it.
+  //
+  // Pre: `squished_db` must be post-Squish (info.basis/squishing > 0).
+  // `query` must be (info.cols * info.squishing) x 1 — i.e. the
+  // un-packed query whose length matches the un-squished DB columns,
+  // including any padding zeros Query added.
+  //
+  // Post: `answer_out` is db.data.rows() x 1.
+  //
+  // Activation: vendored mode required (Matrix::MulVecPacked). Stub
+  // mode forwards retcode::FAIL with the activation-flag hint.
+  static retcode Answer(const core::Database& squished_db,
+                        const core::Matrix& query,
+                        core::Matrix* answer_out,
+                        std::string* err);
+
+  // Client-side decoding. Mirrors upstream's pir/simple_pir.go:Recover
+  // (single-query, single-batch). Computes the offset that undoes
+  // Setup's p/2 shift, subtracts H*secret from the noisy answer,
+  // rounds out the LWE noise, and reconstructs the original entry
+  // from base-p digits.
+  //
+  // Pre: hint is L x N (output of Setup); secret is N x 1 (output of
+  // GenSecret); answer is L x 1 (output of Answer); query is the
+  // matching client query (un-padded length is params.m — Recover
+  // only iterates the first params.m entries of `query`, ignoring any
+  // trailing Squishing padding zeros). `info` must have ne / p / logq
+  // / packing / row_length populated.
+  //
+  // Post: `*recovered_out` is the recovered Z_p element (or the
+  // row_length-bit sub-entry when info.packing > 0).
+  //
+  // Activation: vendored mode required (Matrix::Mul for H*secret).
+  // Stub mode forwards retcode::FAIL with the activation-flag hint.
+  static retcode Recover(uint64_t index,
+                         const core::Matrix& query,
+                         const core::Matrix& hint,
+                         const core::Matrix& secret,
+                         const core::Matrix& answer,
+                         const core::LweParams& params,
+                         const core::DBinfo& info,
+                         uint64_t* recovered_out,
+                         std::string* err);
 };
 
 }  // namespace primihub::pir::simple_pir

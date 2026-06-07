@@ -116,6 +116,19 @@ class Matrix {
   void Squish(uint64_t basis, uint64_t delta);
   void Unsquish(uint64_t basis, uint64_t delta, uint64_t orig_cols);
 
+  // MulVecPacked — kernel bridge for the SimplePIR Answer path. `*this`
+  // is a Squished matrix (L x C where C = ceil(M / squishing)). `b` is
+  // a (C * squishing) x 1 column vector (the un-squished query, padded
+  // with zeros if M is not divisible by squishing). Output is L x 1.
+  //
+  // The C kernel HARDCODES basis=10 and squishing=3 — passing other
+  // values returns FAIL up-front. The kernel internally allocates an
+  // (L+8) x 1 buffer to give itself room for SIMD tail iterations;
+  // we DropLastRows(8) after the call to return the proper L x 1.
+  retcode MulVecPacked(const Matrix& b, uint64_t basis,
+                       uint64_t squishing, Matrix* out,
+                       std::string* err) const;
+
   // Kernel bridges. Vendored mode forwards to upstream pir.c; stub
   // mode returns retcode::FAIL with the activation-flag guidance.
   //
