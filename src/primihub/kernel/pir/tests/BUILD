@@ -203,3 +203,27 @@ cc_test(
     ],
     size = "small",
 )
+
+# Phase 6 / task 7.2 scaffolding — SimplePirRuntime end-to-end smoke.
+cc_test(
+    name = "simple_pir_runtime_test",
+    srcs = ["simple_pir_runtime_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+# Phase 6 / task 7.3 scaffolding — YpirRuntime end-to-end smoke.
+cc_test(
+    name = "ypir_runtime_test",
+    srcs = ["ypir_runtime_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

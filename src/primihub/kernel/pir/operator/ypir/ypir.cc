@@ -4,13 +4,33 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir.h"
 
+#include <string>
+
 #include <glog/logging.h>
+
 #include "src/primihub/kernel/pir/operator/registry.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_runtime.h"
 
 namespace primihub::pir {
 
 retcode YpirOperator::OnExecute(const PirDataType&, PirDataType*) {
-  LOG(ERROR) << "YpirOperator: skeleton only (openspec follow-up).";
+  if (!ypir::kYpirRuntimeVendored) {
+    LOG(ERROR)
+        << "YpirOperator: runtime not vendored — build with "
+        << "--define=enable_ypir_real=1 and provide @ypir bazel "
+        << "override (see openspec task 7.3 Phase 6).";
+    return retcode::FAIL;
+  }
+  std::string err;
+  auto rc = ypir::YpirRuntime::Instance().SmokeMatMulVecPacked(&err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "YpirOperator: runtime smoke failed: " << err;
+    return retcode::FAIL;
+  }
+  LOG(WARNING)
+      << "YpirOperator: runtime smoke PASS but full YPIR query path "
+      << "not yet implemented; returning FAIL until task 7.3 lands the "
+      << "Rust-to-C++ algorithmic port.";
   return retcode::FAIL;
 }
 

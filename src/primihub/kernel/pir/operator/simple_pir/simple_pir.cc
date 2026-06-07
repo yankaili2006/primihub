@@ -4,13 +4,33 @@
  */
 #include "src/primihub/kernel/pir/operator/simple_pir/simple_pir.h"
 
+#include <string>
+
 #include <glog/logging.h>
+
 #include "src/primihub/kernel/pir/operator/registry.h"
+#include "src/primihub/kernel/pir/operator/simple_pir/simple_pir_runtime.h"
 
 namespace primihub::pir {
 
 retcode SimplePirOperator::OnExecute(const PirDataType&, PirDataType*) {
-  LOG(ERROR) << "SimplePirOperator: skeleton only (openspec task 5.4/5.5).";
+  if (!simple_pir::kSimplePirRuntimeVendored) {
+    LOG(ERROR)
+        << "SimplePirOperator: runtime not vendored — build with "
+        << "--define=enable_simple_pir_real=1 and provide @simplepir "
+        << "bazel override (see openspec task 7.2 Phase 6).";
+    return retcode::FAIL;
+  }
+  std::string err;
+  auto rc = simple_pir::SimplePirRuntime::Instance().SmokeMatMul(&err);
+  if (rc != retcode::SUCCESS) {
+    LOG(ERROR) << "SimplePirOperator: runtime smoke failed: " << err;
+    return retcode::FAIL;
+  }
+  LOG(WARNING)
+      << "SimplePirOperator: runtime smoke PASS but full SimplePIR "
+      << "query path not yet implemented; returning FAIL until task 7.2 "
+      << "lands the LWE port.";
   return retcode::FAIL;
 }
 
