@@ -1,0 +1,219 @@
+/*
+ * Copyright (c) 2026 by PrimiHub
+ * Licensed under the Apache License, Version 2.0
+ *
+ * primihub::pir::core::Matrix unit tests. Most tests are unconditional
+ * — Get/Set/MatrixAdd etc. live outside the kernel switch. The three
+ * kernel-bridge tests (Mul / MulVec / Transpose) bifurcate on
+ * kPirCoreKernelsVendored: vendored mode asserts the math is correct
+ * vs in-line expected; stub mode asserts the methods return FAIL with
+ * the activation-flag hint.
+ */
+#include <gtest/gtest.h>
+
+#include <cstdint>
+#include <string>
+
+#include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
+
+namespace primihub::pir::core {
+namespace {
+
+TEST(MatrixTest, ShapeAndAccessors) {
+  Matrix m(3, 4);
+  EXPECT_EQ(m.rows(), 3u);
+  EXPECT_EQ(m.cols(), 4u);
+  EXPECT_EQ(m.size(), 12u);
+  EXPECT_FALSE(m.empty());
+  // ctor zero-initializes.
+  for (uint64_t i = 0; i < 3; ++i) {
+    for (uint64_t j = 0; j < 4; ++j) {
+      EXPECT_EQ(m.Get(i, j), 0u) << "i=" << i << " j=" << j;
+    }
+  }
+  m.Set(1, 2, 42);
+  EXPECT_EQ(m.Get(1, 2), 42u);
+  // Other cells unchanged.
+  EXPECT_EQ(m.Get(0, 0), 0u);
+  EXPECT_EQ(m.Get(2, 3), 0u);
+}
+
+TEST(MatrixTest, ZerosFactory) {
+  auto m = Matrix::Zeros(2, 5);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 5u);
+  for (uint64_t i = 0; i < m.size(); ++i) {
+    EXPECT_EQ(m.data()[i], 0u);
+  }
+}
+
+TEST(MatrixTest, UniformRandomBound) {
+  auto m = Matrix::UniformRandom(10, 10, /*logmod=*/8);
+  EXPECT_EQ(m.size(), 100u);
+  // logmod=8 caps each element to [0, 256). Cannot assert distribution,
+  // but the bound is a hard invariant.
+  for (uint64_t i = 0; i < m.size(); ++i) {
+    EXPECT_LT(m.data()[i], 256u);
+  }
+}
+
+TEST(MatrixTest, MatrixAddMatrixSub) {
+  Matrix a(2, 2);
+  a.Set(0, 0, 1); a.Set(0, 1, 2); a.Set(1, 0, 3); a.Set(1, 1, 4);
+  Matrix b(2, 2);
+  b.Set(0, 0, 10); b.Set(0, 1, 20); b.Set(1, 0, 30); b.Set(1, 1, 40);
+  a.MatrixAdd(b);
+  EXPECT_EQ(a.Get(0, 0), 11u);
+  EXPECT_EQ(a.Get(0, 1), 22u);
+  EXPECT_EQ(a.Get(1, 0), 33u);
+  EXPECT_EQ(a.Get(1, 1), 44u);
+  a.MatrixSub(b);
+  EXPECT_EQ(a.Get(0, 0), 1u);
+  EXPECT_EQ(a.Get(0, 1), 2u);
+  EXPECT_EQ(a.Get(1, 0), 3u);
+  EXPECT_EQ(a.Get(1, 1), 4u);
+}
+
+TEST(MatrixTest, ScalarArithmetic) {
+  Matrix m(2, 2);
+  m.Set(0, 0, 10); m.Set(0, 1, 20); m.Set(1, 0, 30); m.Set(1, 1, 40);
+  m.ScalarAdd(5);
+  EXPECT_EQ(m.Get(0, 0), 15u);
+  EXPECT_EQ(m.Get(1, 1), 45u);
+  m.ScalarSub(15);
+  EXPECT_EQ(m.Get(0, 0), 0u);
+  EXPECT_EQ(m.Get(1, 1), 30u);
+}
+
+TEST(MatrixTest, ReduceMod) {
+  Matrix m(1, 3);
+  m.Set(0, 0, 17); m.Set(0, 1, 256); m.Set(0, 2, 100);
+  m.ReduceMod(10);
+  EXPECT_EQ(m.Get(0, 0), 7u);
+  EXPECT_EQ(m.Get(0, 1), 6u);
+  EXPECT_EQ(m.Get(0, 2), 0u);
+}
+
+TEST(MatrixTest, DropLastRows) {
+  Matrix m(5, 3);
+  // Fill so dropped rows are observable in the size count.
+  for (uint64_t i = 0; i < 5; ++i) {
+    for (uint64_t j = 0; j < 3; ++j) {
+      m.Set(i, j, static_cast<uint32_t>(i * 3 + j));
+    }
+  }
+  m.DropLastRows(2);
+  EXPECT_EQ(m.rows(), 3u);
+  EXPECT_EQ(m.size(), 9u);
+  // The first 3 rows are untouched.
+  EXPECT_EQ(m.Get(0, 0), 0u);
+  EXPECT_EQ(m.Get(2, 2), 8u);
+}
+
+TEST(MatrixTest, MulVecBifurcatesOnVendoring) {
+  // 3x3 * 3x1 — 3 row sums.
+  Matrix a(3, 3);
+  for (uint64_t r = 0; r < 3; ++r) {
+    for (uint64_t c = 0; c < 3; ++c) {
+      a.Set(r, c, static_cast<uint32_t>(r * 3 + c));
+    }
+  }
+  Matrix b(3, 1);
+  b.Set(0, 0, 1); b.Set(1, 0, 1); b.Set(2, 0, 1);
+  Matrix out;
+  std::string err;
+  auto rc = a.MulVec(b, &out, &err);
+  if (kPirCoreKernelsVendored) {
+    EXPECT_EQ(rc, retcode::SUCCESS) << "vendored mode: " << err;
+    EXPECT_EQ(out.rows(), 3u);
+    EXPECT_EQ(out.cols(), 1u);
+    // Expected row sums: [0+1+2, 3+4+5, 6+7+8] = [3, 12, 21].
+    EXPECT_EQ(out.Get(0, 0), 3u);
+    EXPECT_EQ(out.Get(1, 0), 12u);
+    EXPECT_EQ(out.Get(2, 0), 21u);
+  } else {
+    EXPECT_EQ(rc, retcode::FAIL);
+    EXPECT_NE(err.find("enable_pir_core_real=1"), std::string::npos)
+        << "stub error must name the activation flag; got: " << err;
+  }
+}
+
+TEST(MatrixTest, MulBifurcatesOnVendoring) {
+  // 2x3 * 3x2 -> 2x2. Use a known small case.
+  Matrix a(2, 3);
+  // a = [[1,2,3], [4,5,6]]
+  a.Set(0, 0, 1); a.Set(0, 1, 2); a.Set(0, 2, 3);
+  a.Set(1, 0, 4); a.Set(1, 1, 5); a.Set(1, 2, 6);
+  Matrix b(3, 2);
+  // b = [[7,8], [9,10], [11,12]]
+  b.Set(0, 0, 7);  b.Set(0, 1, 8);
+  b.Set(1, 0, 9);  b.Set(1, 1, 10);
+  b.Set(2, 0, 11); b.Set(2, 1, 12);
+  Matrix out;
+  std::string err;
+  auto rc = a.Mul(b, &out, &err);
+  if (kPirCoreKernelsVendored) {
+    EXPECT_EQ(rc, retcode::SUCCESS) << "vendored mode: " << err;
+    EXPECT_EQ(out.rows(), 2u);
+    EXPECT_EQ(out.cols(), 2u);
+    // 1*7+2*9+3*11 = 58; 1*8+2*10+3*12 = 64;
+    // 4*7+5*9+6*11 = 139; 4*8+5*10+6*12 = 154.
+    EXPECT_EQ(out.Get(0, 0), 58u);
+    EXPECT_EQ(out.Get(0, 1), 64u);
+    EXPECT_EQ(out.Get(1, 0), 139u);
+    EXPECT_EQ(out.Get(1, 1), 154u);
+  } else {
+    EXPECT_EQ(rc, retcode::FAIL);
+    EXPECT_NE(err.find("enable_pir_core_real=1"), std::string::npos);
+  }
+}
+
+TEST(MatrixTest, TransposeBifurcatesOnVendoring) {
+  Matrix a(2, 3);
+  a.Set(0, 0, 1); a.Set(0, 1, 2); a.Set(0, 2, 3);
+  a.Set(1, 0, 4); a.Set(1, 1, 5); a.Set(1, 2, 6);
+  Matrix out;
+  std::string err;
+  auto rc = a.Transpose(&out, &err);
+  if (kPirCoreKernelsVendored) {
+    EXPECT_EQ(rc, retcode::SUCCESS) << "vendored mode: " << err;
+    EXPECT_EQ(out.rows(), 3u);
+    EXPECT_EQ(out.cols(), 2u);
+    EXPECT_EQ(out.Get(0, 0), 1u);
+    EXPECT_EQ(out.Get(0, 1), 4u);
+    EXPECT_EQ(out.Get(1, 0), 2u);
+    EXPECT_EQ(out.Get(1, 1), 5u);
+    EXPECT_EQ(out.Get(2, 0), 3u);
+    EXPECT_EQ(out.Get(2, 1), 6u);
+  } else {
+    EXPECT_EQ(rc, retcode::FAIL);
+    EXPECT_NE(err.find("enable_pir_core_real=1"), std::string::npos);
+  }
+}
+
+TEST(MatrixTest, MulVecDimMismatchFailsWithoutKernelCall) {
+  // Even in vendored mode, dimension mismatches must FAIL up-front
+  // before touching the kernel.
+  Matrix a(3, 3);
+  Matrix b(2, 1);  // wrong row count
+  Matrix out;
+  std::string err;
+  auto rc = a.MulVec(b, &out, &err);
+  EXPECT_EQ(rc, retcode::FAIL);
+  EXPECT_NE(err.find("dim mismatch"), std::string::npos)
+      << "expected dim mismatch error; got: " << err;
+}
+
+TEST(MatrixTest, MulVecNonColumnFailsUpFront) {
+  Matrix a(3, 3);
+  Matrix b(3, 2);  // not a column vector
+  Matrix out;
+  std::string err;
+  auto rc = a.MulVec(b, &out, &err);
+  EXPECT_EQ(rc, retcode::FAIL);
+  EXPECT_NE(err.find("column vector"), std::string::npos)
+      << "expected column-vector error; got: " << err;
+}
+
+}  // namespace
+}  // namespace primihub::pir::core

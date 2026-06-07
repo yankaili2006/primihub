@@ -227,3 +227,17 @@ cc_test(
     ],
     size = "small",
 )
+
+# pir_core::Matrix unit tests. Most tests are unconditional; the three
+# kernel-bridge tests bifurcate on kPirCoreKernelsVendored. Build with
+# --define=enable_pir_core_real=1 + --override_repository=simplepir=<p>
+# to exercise the vendored branches.
+cc_test(
+    name = "matrix_test",
+    srcs = ["matrix_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
