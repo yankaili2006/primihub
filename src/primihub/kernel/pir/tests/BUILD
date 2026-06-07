@@ -241,3 +241,14 @@ cc_test(
     ],
     size = "small",
 )
+
+# LweParams unit tests — pure arithmetic, no kernel dependency.
+cc_test(
+    name = "lwe_params_test",
+    srcs = ["lwe_params_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

@@ -25,6 +25,16 @@ config_setting(
 )
 
 cc_library(
+    name = "lwe_params",
+    srcs = ["lwe_params.cc"],
+    hdrs = ["lwe_params.h"],
+    deps = [
+        "//src/primihub/common:common_defination",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+cc_library(
     name = "matrix",
     srcs = ["matrix.cc"],
     hdrs = ["matrix.h"],
