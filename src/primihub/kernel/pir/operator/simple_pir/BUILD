@@ -39,3 +39,23 @@ cc_library(
         "//conditions:default": [],
     }),
 )
+
+
+# Algorithm-level static functions (Init / Setup) for SimplePIR. Built
+# separately from simple_pir_operator so the operator can keep its
+# current scaffolding flow while the protocol port lands in chunks.
+# Setup needs Matrix::Mul, so the cc_library deps include pir_core::matrix
+# which has its own enable_pir_core_real activation — keeps the two
+# concerns orthogonal from the operator's enable_simple_pir_real flag.
+cc_library(
+    name = "simple_pir_protocol",
+    srcs = ["simple_pir_protocol.cc"],
+    hdrs = ["simple_pir_protocol.h"],
+    deps = [
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_github_glog_glog//:glog",
+    ],
+)
