@@ -1,6 +1,6 @@
 # PIR Multi-Algorithm Guide
 
-> Status: **6 algorithms registered (1 real + 5 skeletons)** as of 2026-06-06.
+> Status: **6 algorithms registered (1 real + 5 skeletons; 3 of those have C/C++ kernel link activated)** as of 2026-06-07.
 > See [benchmark.md](benchmark.md) for the live capability matrix output and
 > [threat-model.md](threat-model.md) for per-algo security assumptions.
 
@@ -206,5 +206,7 @@ a regression (then bisect and revert).
 
 - [threat-model.md](threat-model.md) — per-algorithm security assumptions
 - [hint-lifecycle.md](hint-lifecycle.md) — managing per-DB hint files
+- [activation-pattern.md](activation-pattern.md) — runtime facade contract for new operator ports
 - [benchmark.md](benchmark.md) — captured benchmark + selector results
+- `bench/pir_runtime_activations.sh` — unified CI signal for all activated operators
 - `openspec/changes/primihub-pir-multi-algo/` — original OpenSpec change
