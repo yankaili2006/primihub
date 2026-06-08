@@ -14,6 +14,7 @@
 
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_protocol.h"
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_runtime.h"
+#include "src/primihub/kernel/pir/operator/double_pir/hint_gen.h"
 #include "src/primihub/kernel/pir/operator/pir_core/database.h"
 #include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
@@ -148,30 +149,29 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   // Shift to centered [-p/2, p/2) representation (upstream MakeDB).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
-  // Init + Setup once for the whole batch. Setup mutates db.info()
-  // (basis/squishing) and produces H1_squished + A2_copy_transposed
-  // (server state) + H2_msg (per-database public hint). We chrono-
-  // instrument each stage so a single LOG(INFO) at the end can give
-  // observability into where time is spent without external profiling.
+  // Init + Setup once for the whole batch via HintGen::Compute
+  // (task 5.6 chunk 1). HintGen returns the bundled offline state
+  // plus per-stage timings, decoupling the precompute from the
+  // per-query loop. A future chunk will swap HintGen::Compute for
+  // a cache-aware variant that skips Setup when a matching hint
+  // already exists.
   using clock = std::chrono::steady_clock;
-  const auto t_init_start = clock::now();
-  core::Matrix A1, A2;
-  rc = double_pir::DoublePirProtocol::Init(params, db.info(), &A1, &A2, &err);
+  double_pir::DoublePirHint hint;
+  double_pir::HintGenStats hint_stats;
+  rc = double_pir::HintGen::Compute(&db, params, &hint, &err, &hint_stats);
   if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "DoublePirOperator: Init failed: " << err;
+    LOG(ERROR) << "DoublePirOperator: HintGen::Compute failed: " << err;
     return retcode::FAIL;
   }
-  const auto t_init_end = clock::now();
-  core::Matrix H1_squished, A2_copy_transposed, H2_msg;
-  rc = double_pir::DoublePirProtocol::Setup(&db, A1, A2, params, &H1_squished,
-                                             &A2_copy_transposed, &H2_msg,
-                                             &err);
-  if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "DoublePirOperator: Setup failed: " << err;
-    return retcode::FAIL;
-  }
+  const core::Matrix& A1 = hint.A1;
+  const core::Matrix& A2 = hint.A2;
+  const core::Matrix& H1_squished = hint.H1_squished;
+  const core::Matrix& A2_copy_transposed = hint.A2_copy_transposed;
+  const core::Matrix& H2_msg = hint.H2_msg;
+  const core::DBinfo info_after_setup = hint.info_after_setup;
+  // Reconstruct the "start of query loop" wall-clock anchor; init_ms
+  // / setup_ms are now sourced from hint_stats.
   const auto t_setup_end = clock::now();
-  const core::DBinfo info_after_setup = db.info();
 
   // Per-index Query / Answer / Recover loop. Noise RNG seeded once
   // per OnExecute call from std::random_device.
@@ -229,8 +229,8 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   const auto t_end = clock::now();
   (*result)[kOutRecovered] = std::move(recovered_strs);
   using ms_d = std::chrono::duration<double, std::milli>;
-  const double init_ms  = ms_d(t_init_end  - t_init_start).count();
-  const double setup_ms = ms_d(t_setup_end - t_init_end).count();
+  const double init_ms  = hint_stats.init_ms;
+  const double setup_ms = hint_stats.setup_ms;
   const double query_total_ms = ms_d(t_end - t_setup_end).count();
   LOG(INFO) << "DoublePirOperator: retrieved " << idx_strs.size()
             << " entries from " << n_entries << "-entry DB "

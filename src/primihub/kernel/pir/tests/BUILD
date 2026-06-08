@@ -76,6 +76,20 @@ cc_test(
     size = "small",
 )
 
+# HintGen unit tests — null guards + shape contract + per-stage timing.
+cc_test(
+    name = "hint_gen_test",
+    srcs = ["hint_gen_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/double_pir:hint_gen",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
 cc_test(
     name = "double_pir_test",
     srcs = ["double_pir_test.cc"],

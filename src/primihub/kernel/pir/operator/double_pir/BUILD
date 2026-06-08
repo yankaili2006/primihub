@@ -51,6 +51,7 @@ cc_library(
         "//src/primihub/kernel/pir/operator:multi_peer_pir",
         "//src/primihub/kernel/pir/operator:registry",
         "//src/primihub/kernel/pir/operator/double_pir:double_pir_protocol",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_gen",
         "//src/primihub/kernel/pir/operator/pir_core:database",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
@@ -76,6 +77,24 @@ cc_library(
         "//src/primihub/common:common_defination",
         "//src/primihub/kernel/pir/operator/pir_core:database",
         "//src/primihub/kernel/pir/operator/pir_core:gaussian",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+# HintGen — refactor of the Init + Setup sequence out of the operator
+# into a reusable helper. First chunk of task 5.6 (two-server hint
+# precomputation). Caching + LinkContext split land as follow-up
+# chunks once the data flow is settled.
+cc_library(
+    name = "hint_gen",
+    srcs = ["hint_gen.cc"],
+    hdrs = ["hint_gen.h"],
+    deps = [
+        ":double_pir_protocol",
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "@com_github_glog_glog//:glog",
