@@ -127,6 +127,45 @@ void Matrix::DropLastRows(uint64_t n) {
   data_.resize(rows_ * cols_);
 }
 
+void Matrix::AppendZeros(uint64_t n) {
+  if (cols_ != 1) {
+    LOG(FATAL) << "Matrix::AppendZeros requires column vector (cols == 1) "
+               << "but got cols_=" << cols_
+               << "; upstream simplepir's AppendZeros calls Concat with a "
+                  "(n, 1) zero matrix, which Concat rejects on cols mismatch";
+  }
+  if (n == 0) return;
+  data_.resize(data_.size() + n, 0);
+  rows_ += n;
+}
+
+void Matrix::ConcatCols(uint64_t n) {
+  if (n == 1) return;
+  if (n == 0) {
+    LOG(FATAL) << "Matrix::ConcatCols n == 0";
+  }
+  if (cols_ % n != 0) {
+    LOG(FATAL) << "Matrix::ConcatCols n=" << n
+               << " does not divide cols_=" << cols_;
+  }
+  // Output is (rows_ * n) x (cols_ / n). For each input cell (i, j):
+  //   new_col = j / n
+  //   new_row = i + rows_ * (j % n)
+  uint64_t new_rows = rows_ * n;
+  uint64_t new_cols = cols_ / n;
+  std::vector<uint32_t> out(new_rows * new_cols, 0);
+  for (uint64_t i = 0; i < rows_; ++i) {
+    for (uint64_t j = 0; j < cols_; ++j) {
+      uint64_t nc = j / n;
+      uint64_t nr = i + rows_ * (j % n);
+      out[nr * new_cols + nc] = data_[i * cols_ + j];
+    }
+  }
+  data_ = std::move(out);
+  rows_ = new_rows;
+  cols_ = new_cols;
+}
+
 void Matrix::Squish(uint64_t basis, uint64_t delta) {
   if (delta == 0) {
     LOG(FATAL) << "Matrix::Squish delta == 0";

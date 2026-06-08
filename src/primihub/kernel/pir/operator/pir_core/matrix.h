@@ -95,6 +95,25 @@ class Matrix {
   // shrinks the underlying vector + updates rows_.
   void DropLastRows(uint64_t n);
 
+  // AppendZeros — appends `n` rows of zeros to a COLUMN VECTOR (cols
+  // must equal 1). Mirrors upstream simplepir's matrix.go AppendZeros,
+  // which internally calls Concat(MatrixZeros(n, 1)). Used by Query
+  // paths that pad the M x 1 ciphertext up to a multiple of
+  // info.squishing so MulVecPacked sees a length divisible by 3.
+  // LOG(FATAL) when cols_ != 1.
+  void AppendZeros(uint64_t n);
+
+  // ConcatCols — reshapes columns by folding into rows. Pre: cols_ %
+  // n == 0. Post: rows_ becomes rows_ * n, cols_ becomes cols_ / n.
+  // The j-th input column is placed at output column (j / n), at row
+  // offset (j % n) * rows_ (i.e. column groups of size n are stacked
+  // vertically). Mirrors upstream simplepir's matrix.go ConcatCols(n)
+  // — used by DoublePIR Setup to pack the per-database H1 hint
+  // matrix before the second-level multiply. Pure arithmetic — works
+  // in both stub and vendored modes. n == 1 is a no-op; n == 0 LOG-
+  // FATALs (would divide by zero).
+  void ConcatCols(uint64_t n);
+
   // Squish / Unsquish — pure-arithmetic in-memory compression used by
   // the SimplePIR Answer path (matMulVecPacked). Pack `delta` adjacent
   // Z_p columns into one Z_q column where each Z_p value lives in a

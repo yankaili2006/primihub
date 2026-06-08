@@ -281,5 +281,101 @@ TEST(MatrixTest, SquishThenUnsquishRoundtrip) {
   }
 }
 
+
+// ---- AppendZeros (chunk 1 of DoublePIR port; task 5.5 dep) ----
+
+TEST(MatrixTest, AppendZerosAddsZeroRowsToColumnVector) {
+  Matrix v(3, 1);
+  v.Set(0, 0, 7);
+  v.Set(1, 0, 8);
+  v.Set(2, 0, 9);
+  v.AppendZeros(2);
+  EXPECT_EQ(v.rows(), 5u);
+  EXPECT_EQ(v.cols(), 1u);
+  EXPECT_EQ(v.Get(0, 0), 7u);
+  EXPECT_EQ(v.Get(1, 0), 8u);
+  EXPECT_EQ(v.Get(2, 0), 9u);
+  EXPECT_EQ(v.Get(3, 0), 0u);
+  EXPECT_EQ(v.Get(4, 0), 0u);
+}
+
+TEST(MatrixTest, AppendZerosZeroIsNoOp) {
+  Matrix v(2, 1);
+  v.Set(0, 0, 11);
+  v.Set(1, 0, 22);
+  v.AppendZeros(0);
+  EXPECT_EQ(v.rows(), 2u);
+  EXPECT_EQ(v.Get(0, 0), 11u);
+  EXPECT_EQ(v.Get(1, 0), 22u);
+}
+
+TEST(MatrixDeathTest, AppendZerosFatalOnMultiColumn) {
+  Matrix m(2, 3);
+  EXPECT_DEATH(m.AppendZeros(1), "AppendZeros");
+}
+
+// ---- ConcatCols ----
+
+TEST(MatrixTest, ConcatColsOneIsNoOp) {
+  Matrix m(2, 3);
+  m.Set(0, 0, 1); m.Set(0, 1, 2); m.Set(0, 2, 3);
+  m.Set(1, 0, 4); m.Set(1, 1, 5); m.Set(1, 2, 6);
+  m.ConcatCols(1);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 3u);
+  EXPECT_EQ(m.Get(0, 1), 2u);
+  EXPECT_EQ(m.Get(1, 2), 6u);
+}
+
+TEST(MatrixTest, ConcatColsFoldsByNVerticallyStackingColumnGroups) {
+  // Input 2x6, n=3 -> output (2*3)x(6/3) = 6x2.
+  // Upstream rule: new[i + rows*(j%n), j/n] = old[i, j].
+  // Input layout:
+  //   row 0: 1  2  3  4  5  6
+  //   row 1: 7  8  9 10 11 12
+  // Output column 0 (from input cols j=0,1,2):
+  //   row 0..1: input col 0 -> [1, 7]
+  //   row 2..3: input col 1 -> [2, 8]
+  //   row 4..5: input col 2 -> [3, 9]
+  // Output column 1 (from input cols j=3,4,5):
+  //   row 0..1: input col 3 -> [4, 10]
+  //   row 2..3: input col 4 -> [5, 11]
+  //   row 4..5: input col 5 -> [6, 12]
+  Matrix m(2, 6);
+  uint32_t v = 1;
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 6; ++j) {
+      m.Set(i, j, v++);
+    }
+  }
+  m.ConcatCols(3);
+  EXPECT_EQ(m.rows(), 6u);
+  EXPECT_EQ(m.cols(), 2u);
+  // Column 0
+  EXPECT_EQ(m.Get(0, 0), 1u);
+  EXPECT_EQ(m.Get(1, 0), 7u);
+  EXPECT_EQ(m.Get(2, 0), 2u);
+  EXPECT_EQ(m.Get(3, 0), 8u);
+  EXPECT_EQ(m.Get(4, 0), 3u);
+  EXPECT_EQ(m.Get(5, 0), 9u);
+  // Column 1
+  EXPECT_EQ(m.Get(0, 1), 4u);
+  EXPECT_EQ(m.Get(1, 1), 10u);
+  EXPECT_EQ(m.Get(2, 1), 5u);
+  EXPECT_EQ(m.Get(3, 1), 11u);
+  EXPECT_EQ(m.Get(4, 1), 6u);
+  EXPECT_EQ(m.Get(5, 1), 12u);
+}
+
+TEST(MatrixDeathTest, ConcatColsFatalOnNonDivisor) {
+  Matrix m(2, 5);
+  EXPECT_DEATH(m.ConcatCols(2), "ConcatCols");
+}
+
+TEST(MatrixDeathTest, ConcatColsZeroFatal) {
+  Matrix m(2, 2);
+  EXPECT_DEATH(m.ConcatCols(0), "ConcatCols");
+}
+
 }  // namespace
 }  // namespace primihub::pir::core
