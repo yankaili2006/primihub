@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "src/primihub/common/common.h"
 #include "src/primihub/kernel/pir/operator/pir_core/database.h"
@@ -104,6 +105,39 @@ class DoublePirProtocol {
   // Signatures here are forward-declarations to let the operator
   // wiring (chunk 7 mirroring SimplePIR's 2d77509a) compile against
   // the protocol header as soon as it's stable.
+  // Builds the encrypted (i1, i2)-pair query for retrieving entry
+  // `index`. Mirrors upstream simplepir/double_pir.go Query verbatim:
+  //
+  //   i1 = (index / params.m) * (info.ne / info.x)
+  //   i2 = index % params.m
+  //
+  //   secret1 = UniformRandom(N x 1, logq)
+  //   err1    = GaussianSampler.Sample (M x 1)
+  //   query1  = A1 * secret1 + err1 + Delta * e_{i2}
+  //   if params.m % info.squishing != 0:
+  //       query1.AppendZeros(info.squishing - params.m % info.squishing)
+  //
+  //   for j in [0, info.ne / info.x):
+  //       secret2 = UniformRandom(N x 1, logq)
+  //       err2    = GaussianSampler.Sample (L/X x 1)
+  //       query2  = A2 * secret2 + err2 + Delta * e_{i1+j}
+  //       if (L/X) % info.squishing != 0:
+  //           query2.AppendZeros(info.squishing - (L/X) % info.squishing)
+  //
+  // Pre: A1 shape m x n, A2 shape (l / info.x) x n, params populated,
+  // info.ne and info.x populated, info.ne divisible by info.x, info.x
+  // divides params.l, noise_rng + all out pointers non-null.
+  //
+  // Output:
+  //   secret1_out — N x 1
+  //   query1_out  — M (padded to multiple of info.squishing) x 1
+  //   secrets2_out -> exactly info.ne / info.x entries, each N x 1
+  //   queries2_out -> exactly info.ne / info.x entries, each
+  //                    (L / info.x padded to multiple of info.squishing) x 1
+  //
+  // Activation: vendored mode required (calls Matrix::Mul). Stub mode
+  // forwards retcode::FAIL with the activation-flag hint and the
+  // "A1 * secret1 failed" message.
   static retcode Query(uint64_t index,
                        const core::Matrix& A1,
                        const core::Matrix& A2,
@@ -112,27 +146,27 @@ class DoublePirProtocol {
                        std::mt19937_64* noise_rng,
                        core::Matrix* secret1_out,
                        core::Matrix* query1_out,
-                       core::Matrix* secrets2_out,
-                       core::Matrix* queries2_out,
+                       std::vector<core::Matrix>* secrets2_out,
+                       std::vector<core::Matrix>* queries2_out,
                        std::string* err);
 
   static retcode Answer(const core::Database& squished_db,
                         const core::Matrix& H1_squished,
                         const core::Matrix& A2_copy_transposed,
                         const core::Matrix& query1,
-                        const core::Matrix& queries2,
+                        const std::vector<core::Matrix>& queries2,
                         core::Matrix* answer1_out,
-                        core::Matrix* answer2_out,
+                        std::vector<core::Matrix>* answers2_out,
                         std::string* err);
 
   static retcode Recover(uint64_t index,
                          const core::Matrix& query1,
-                         const core::Matrix& queries2,
+                         const std::vector<core::Matrix>& queries2,
                          const core::Matrix& H2_msg,
                          const core::Matrix& secret1,
-                         const core::Matrix& secrets2,
+                         const std::vector<core::Matrix>& secrets2,
                          const core::Matrix& answer1,
-                         const core::Matrix& answer2,
+                         const std::vector<core::Matrix>& answers2,
                          const core::LweParams& params,
                          const core::DBinfo& info,
                          uint64_t* recovered_out,

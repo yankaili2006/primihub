@@ -10,6 +10,7 @@
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_protocol.h"
 
 #include <random>
+#include <vector>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -109,35 +110,25 @@ TEST(DoublePirProtocolTest, InitProducesUniformlyDistinctMatrices) {
 // FAIL message must point at the openspec task so callers know where
 // to look. Lets us delete them in chunks 4..6 with a clear signal.
 
-TEST(DoublePirProtocolSkeletonTest, QueryReturnsFailPointingAtChunk5) {
-  core::Matrix A1, A2, s1, q1, s2, q2;
-  core::LweParams params;
-  core::DBinfo info;
-  std::mt19937_64 rng(42);
-  std::string err;
-  EXPECT_EQ(DoublePirProtocol::Query(0, A1, A2, params, info, &rng,
-                                      &s1, &q1, &s2, &q2, &err),
-            retcode::FAIL);
-  EXPECT_NE(err.find("chunk 5"), std::string::npos) << err;
-}
-
 TEST(DoublePirProtocolSkeletonTest, AnswerReturnsFailPointingAtChunk6) {
   core::Database db;
-  core::Matrix H1, A2c, q1, q2, a1, a2;
+  core::Matrix H1, A2c, q1, a1;
+  std::vector<core::Matrix> q2s, a2s;
   std::string err;
-  EXPECT_EQ(DoublePirProtocol::Answer(db, H1, A2c, q1, q2, &a1, &a2, &err),
+  EXPECT_EQ(DoublePirProtocol::Answer(db, H1, A2c, q1, q2s, &a1, &a2s, &err),
             retcode::FAIL);
   EXPECT_NE(err.find("chunk 6"), std::string::npos) << err;
 }
 
 TEST(DoublePirProtocolSkeletonTest, RecoverReturnsFailPointingAtChunk6) {
-  core::Matrix q1, q2, H2, s1, s2, a1, a2;
+  core::Matrix q1, H2, s1, a1;
+  std::vector<core::Matrix> q2s, s2s, a2s;
   core::LweParams params;
   core::DBinfo info;
   uint64_t out = 0;
   std::string err;
-  EXPECT_EQ(DoublePirProtocol::Recover(0, q1, q2, H2, s1, s2, a1, a2, params,
-                                        info, &out, &err),
+  EXPECT_EQ(DoublePirProtocol::Recover(0, q1, q2s, H2, s1, s2s, a1, a2s,
+                                        params, info, &out, &err),
             retcode::FAIL);
   EXPECT_NE(err.find("chunk 6"), std::string::npos) << err;
 }
@@ -277,6 +268,135 @@ TEST_F(DoublePirSetupFixture, SetupProducesExpectedShapes) {
   }
   EXPECT_TRUE(h2_has_nonzero);
 }
+
+
+// ---- Query (chunk 5 of DoublePIR port) ----
+
+class DoublePirQueryFixture : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    // Same shape as the Setup fixture, plus the ne / squishing
+    // fields Query reads. Setup populates squishing as a side
+    // effect; we set it explicitly here so Query can run without
+    // calling Setup first (keeps the test surface narrow).
+    params_.m = 16;
+    params_.n = 4;
+    params_.l = 24;
+    params_.logq = 32;
+    params_.p = 4;
+    params_.sigma = core::kGaussianSigma;
+    info_.x = 3;
+    info_.ne = 6;     // info.ne must be divisible by info.x; 6 / 3 = 2 pairs.
+    info_.squishing = 3;
+    info_.p = params_.p;
+    info_.logq = params_.logq;
+    ASSERT_EQ(DoublePirProtocol::Init(params_, info_, &A1_, &A2_, &err_),
+              retcode::SUCCESS) << err_;
+  }
+  core::LweParams params_;
+  core::DBinfo info_;
+  core::Matrix A1_, A2_;
+  std::string err_;
+};
+
+TEST_F(DoublePirQueryFixture, QueryRejectsNullOutputs) {
+  core::Matrix s1, q1;
+  std::vector<core::Matrix> s2s, q2s;
+  std::mt19937_64 rng(1);
+  EXPECT_EQ(DoublePirProtocol::Query(0, A1_, A2_, params_, info_, &rng,
+                                      nullptr, &q1, &s2s, &q2s, &err_),
+            retcode::FAIL);
+  EXPECT_NE(err_.find("non-null"), std::string::npos) << err_;
+}
+
+TEST_F(DoublePirQueryFixture, QueryRejectsNeNotDivisibleByX) {
+  info_.ne = 7;  // 7 % 3 != 0
+  core::Matrix s1, q1;
+  std::vector<core::Matrix> s2s, q2s;
+  std::mt19937_64 rng(1);
+  EXPECT_EQ(DoublePirProtocol::Query(0, A1_, A2_, params_, info_, &rng,
+                                      &s1, &q1, &s2s, &q2s, &err_),
+            retcode::FAIL);
+  EXPECT_NE(err_.find("divisible by"), std::string::npos) << err_;
+}
+
+TEST_F(DoublePirQueryFixture, QueryRejectsZeroSquishing) {
+  info_.squishing = 0;
+  core::Matrix s1, q1;
+  std::vector<core::Matrix> s2s, q2s;
+  std::mt19937_64 rng(1);
+  EXPECT_EQ(DoublePirProtocol::Query(0, A1_, A2_, params_, info_, &rng,
+                                      &s1, &q1, &s2s, &q2s, &err_),
+            retcode::FAIL);
+  EXPECT_NE(err_.find("squishing"), std::string::npos) << err_;
+}
+
+TEST_F(DoublePirQueryFixture, QueryFailsLoudlyInStubMode) {
+  if (core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "vendored mode succeeds — see QueryProducesExpectedShapes";
+  }
+  core::Matrix s1, q1;
+  std::vector<core::Matrix> s2s, q2s;
+  std::mt19937_64 rng(1);
+  EXPECT_EQ(DoublePirProtocol::Query(0, A1_, A2_, params_, info_, &rng,
+                                      &s1, &q1, &s2s, &q2s, &err_),
+            retcode::FAIL);
+  EXPECT_NE(err_.find("A1 * secret1"), std::string::npos) << err_;
+}
+
+TEST_F(DoublePirQueryFixture, QueryProducesExpectedShapes) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "Query correctness piggybacks on Matrix::Mul";
+  }
+  core::Matrix s1, q1;
+  std::vector<core::Matrix> s2s, q2s;
+  std::mt19937_64 rng(1);
+  ASSERT_EQ(DoublePirProtocol::Query(0, A1_, A2_, params_, info_, &rng,
+                                      &s1, &q1, &s2s, &q2s, &err_),
+            retcode::SUCCESS) << err_;
+  // secret1: N x 1.
+  EXPECT_EQ(s1.rows(), params_.n);
+  EXPECT_EQ(s1.cols(), 1u);
+  // query1: M padded to multiple of squishing, x 1.
+  const uint64_t q1_rows_expected =
+      params_.m + ((params_.m % info_.squishing == 0)
+                       ? 0
+                       : info_.squishing - (params_.m % info_.squishing));
+  EXPECT_EQ(q1.rows(), q1_rows_expected);
+  EXPECT_EQ(q1.cols(), 1u);
+  // secrets2 / queries2: exactly info.ne / info.x entries.
+  const uint64_t num_pairs = info_.ne / info_.x;
+  ASSERT_EQ(s2s.size(), num_pairs);
+  ASSERT_EQ(q2s.size(), num_pairs);
+  const uint64_t lx = params_.l / info_.x;
+  const uint64_t q2_rows_expected =
+      lx + ((lx % info_.squishing == 0)
+                ? 0
+                : info_.squishing - (lx % info_.squishing));
+  for (uint64_t j = 0; j < num_pairs; ++j) {
+    EXPECT_EQ(s2s[j].rows(), params_.n);
+    EXPECT_EQ(s2s[j].cols(), 1u);
+    EXPECT_EQ(q2s[j].rows(), q2_rows_expected);
+    EXPECT_EQ(q2s[j].cols(), 1u);
+  }
+  // Sanity: query1 must contain at least one non-zero entry (the
+  // Delta bump and Gaussian noise both contribute, A1 * secret1 is
+  // uniformly random in Z_q, so all-zero is astronomically unlikely).
+  bool q1_nonzero = false;
+  for (uint64_t i = 0; i < q1.size(); ++i) {
+    if (q1.data()[i] != 0) { q1_nonzero = true; break; }
+  }
+  EXPECT_TRUE(q1_nonzero);
+}
+
+// NOTE: a "QueryEncodesIndexAtCorrectPosition" test was attempted
+// here but removed — it would have required deterministic
+// reproducibility of the secret1 / secret2 random draws, which
+// Matrix::UniformRandom does NOT provide (it seeds from
+// std::random_device). End-to-end correctness of the index encoding
+// is covered by the full Query-Answer-Recover round-trip test that
+// lands in chunk 7 (DoublePirOperator wiring), where the recovered
+// cell value at a specific index proves the bump position is right.
 
 }  // namespace
 }  // namespace primihub::pir::double_pir

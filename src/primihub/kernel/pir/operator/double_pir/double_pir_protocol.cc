@@ -4,6 +4,8 @@
  */
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_protocol.h"
 
+#include "src/primihub/kernel/pir/operator/pir_core/gaussian.h"
+
 #include <sstream>
 
 #include <glog/logging.h>
@@ -164,34 +166,144 @@ retcode DoublePirProtocol::Setup(core::Database* db,
   return retcode::SUCCESS;
 }
 
-retcode DoublePirProtocol::Query(uint64_t /*index*/,
-                                 const core::Matrix& /*A1*/,
-                                 const core::Matrix& /*A2*/,
-                                 const core::LweParams& /*params*/,
-                                 const core::DBinfo& /*info*/,
-                                 std::mt19937_64* /*noise_rng*/,
-                                 core::Matrix* /*secret1_out*/,
-                                 core::Matrix* /*query1_out*/,
-                                 core::Matrix* /*secrets2_out*/,
-                                 core::Matrix* /*queries2_out*/,
-                                 std::string* err) {
-  if (err) {
-    *err =
-        "DoublePirProtocol::Query: not yet implemented — chunk 5 of "
-        "openspec task 5.5 will land the two-step LWE encrypt for "
-        "the row and column indices.";
+retcode DoublePirProtocol::Query(
+    uint64_t index, const core::Matrix& A1, const core::Matrix& A2,
+    const core::LweParams& params, const core::DBinfo& info,
+    std::mt19937_64* noise_rng, core::Matrix* secret1_out,
+    core::Matrix* query1_out,
+    std::vector<core::Matrix>* secrets2_out,
+    std::vector<core::Matrix>* queries2_out, std::string* err) {
+  auto fail = [&](const std::string& msg) {
+    if (err) *err = msg;
+    return retcode::FAIL;
+  };
+  if (noise_rng == nullptr || secret1_out == nullptr ||
+      query1_out == nullptr || secrets2_out == nullptr ||
+      queries2_out == nullptr) {
+    return fail("DoublePirProtocol::Query: out pointers / noise_rng must be non-null");
   }
-  return retcode::FAIL;
+  if (params.m == 0 || params.n == 0 || params.l == 0 ||
+      params.p == 0 || params.logq == 0) {
+    return fail(
+        "DoublePirProtocol::Query: params must have m/n/l/p/logq populated");
+  }
+  if (info.x == 0 || info.ne == 0) {
+    return fail(
+        "DoublePirProtocol::Query: info.x / info.ne must be nonzero");
+  }
+  if (info.ne % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Query: info.ne=" << info.ne
+        << " must be divisible by info.x=" << info.x;
+    return fail(oss.str());
+  }
+  if (params.l % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Query: info.x=" << info.x
+        << " must divide params.l=" << params.l;
+    return fail(oss.str());
+  }
+  if (info.squishing == 0) {
+    return fail(
+        "DoublePirProtocol::Query: info.squishing must be populated "
+        "(call DoublePirProtocol::Setup first which Squishes the DB)");
+  }
+  if (A1.rows() != params.m || A1.cols() != params.n) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Query: A1 shape mismatch — expected "
+        << params.m << "x" << params.n << ", got " << A1.rows() << "x"
+        << A1.cols();
+    return fail(oss.str());
+  }
+  const uint64_t lx = params.l / info.x;
+  if (A2.rows() != lx || A2.cols() != params.n) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Query: A2 shape mismatch — expected "
+        << lx << "x" << params.n << ", got " << A2.rows() << "x"
+        << A2.cols();
+    return fail(oss.str());
+  }
+
+  const uint64_t i1 = (index / params.m) * (info.ne / info.x);
+  const uint64_t i2 = index % params.m;
+
+  // ---- secret1 + query1 (row index ciphertext).
+  *secret1_out =
+      core::Matrix::UniformRandom(params.n, 1, params.logq);
+  std::string mul_err;
+  if (A1.Mul(*secret1_out, query1_out, &mul_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Query: A1 * secret1 failed: " + mul_err);
+  }
+  // Add Gaussian noise vector (M x 1) and the Delta * e_{i2} bump.
+  // GaussianSampler matches the SimplePIR Query pattern (see
+  // simple_pir_protocol.cc); reads from the caller-owned mt19937_64
+  // so tests can pin the noise.
+  core::GaussianSampler sampler(*noise_rng);
+  for (uint64_t i = 0; i < params.m; ++i) {
+    const int64_t e = sampler.Sample();
+    const uint32_t curr = query1_out->Get(i, 0);
+    query1_out->Set(i, 0, curr + static_cast<uint32_t>(e));
+  }
+  const uint32_t curr_i2 = query1_out->Get(i2, 0);
+  query1_out->Set(i2, 0,
+                  curr_i2 + static_cast<uint32_t>(params.Delta()));
+  // Pad to a multiple of info.squishing — matches upstream
+  // AppendZeros for the row-query.
+  if (params.m % info.squishing != 0) {
+    query1_out->AppendZeros(info.squishing - (params.m % info.squishing));
+  }
+
+  // ---- secret2[j] + query2[j] (per-column ciphertexts).
+  // info.ne / info.x distinct (secret, query) pairs; each pair has
+  // its own LWE secret and noise vector.
+  secrets2_out->clear();
+  queries2_out->clear();
+  const uint64_t num_pairs = info.ne / info.x;
+  secrets2_out->reserve(num_pairs);
+  queries2_out->reserve(num_pairs);
+  for (uint64_t j = 0; j < num_pairs; ++j) {
+    core::Matrix secret2 =
+        core::Matrix::UniformRandom(params.n, 1, params.logq);
+    core::Matrix query2;
+    std::string m2_err;
+    if (A2.Mul(secret2, &query2, &m2_err) != retcode::SUCCESS) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Query: A2 * secret2[" << j << "] failed: "
+          << m2_err;
+      return fail(oss.str());
+    }
+    for (uint64_t i = 0; i < lx; ++i) {
+      const int64_t e = sampler.Sample();
+      const uint32_t curr = query2.Get(i, 0);
+      query2.Set(i, 0, curr + static_cast<uint32_t>(e));
+    }
+    const uint64_t k = i1 + j;
+    if (k >= lx) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Query: index=" << index
+          << " produced i1+j=" << k << " >= L/X=" << lx
+          << " — index out of bounds for the database";
+      return fail(oss.str());
+    }
+    const uint32_t curr_k = query2.Get(k, 0);
+    query2.Set(k, 0, curr_k + static_cast<uint32_t>(params.Delta()));
+    if (lx % info.squishing != 0) {
+      query2.AppendZeros(info.squishing - (lx % info.squishing));
+    }
+    secrets2_out->push_back(std::move(secret2));
+    queries2_out->push_back(std::move(query2));
+  }
+  return retcode::SUCCESS;
 }
 
-retcode DoublePirProtocol::Answer(const core::Database& /*squished_db*/,
-                                  const core::Matrix& /*H1_squished*/,
-                                  const core::Matrix& /*A2_copy_transposed*/,
-                                  const core::Matrix& /*query1*/,
-                                  const core::Matrix& /*queries2*/,
-                                  core::Matrix* /*answer1_out*/,
-                                  core::Matrix* /*answer2_out*/,
-                                  std::string* err) {
+retcode DoublePirProtocol::Answer(
+    const core::Database& /*squished_db*/,
+    const core::Matrix& /*H1_squished*/,
+    const core::Matrix& /*A2_copy_transposed*/,
+    const core::Matrix& /*query1*/,
+    const std::vector<core::Matrix>& /*queries2*/,
+    core::Matrix* /*answer1_out*/,
+    std::vector<core::Matrix>* /*answers2_out*/, std::string* err) {
   if (err) {
     *err =
         "DoublePirProtocol::Answer: not yet implemented — chunk 6 of "
@@ -201,18 +313,15 @@ retcode DoublePirProtocol::Answer(const core::Database& /*squished_db*/,
   return retcode::FAIL;
 }
 
-retcode DoublePirProtocol::Recover(uint64_t /*index*/,
-                                   const core::Matrix& /*query1*/,
-                                   const core::Matrix& /*queries2*/,
-                                   const core::Matrix& /*H2_msg*/,
-                                   const core::Matrix& /*secret1*/,
-                                   const core::Matrix& /*secrets2*/,
-                                   const core::Matrix& /*answer1*/,
-                                   const core::Matrix& /*answer2*/,
-                                   const core::LweParams& /*params*/,
-                                   const core::DBinfo& /*info*/,
-                                   uint64_t* /*recovered_out*/,
-                                   std::string* err) {
+retcode DoublePirProtocol::Recover(
+    uint64_t /*index*/, const core::Matrix& /*query1*/,
+    const std::vector<core::Matrix>& /*queries2*/,
+    const core::Matrix& /*H2_msg*/, const core::Matrix& /*secret1*/,
+    const std::vector<core::Matrix>& /*secrets2*/,
+    const core::Matrix& /*answer1*/,
+    const std::vector<core::Matrix>& /*answers2*/,
+    const core::LweParams& /*params*/, const core::DBinfo& /*info*/,
+    uint64_t* /*recovered_out*/, std::string* err) {
   if (err) {
     *err =
         "DoublePirProtocol::Recover: not yet implemented — chunk 6 of "
