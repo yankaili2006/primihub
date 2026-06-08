@@ -68,6 +68,9 @@ struct OpTiming {
   uint64_t queries = 0;
   double query_total_ms = 0.0;
   bool parsed = false;
+  // -1 = unparsed / v1 operator without hint_hit; 0 = cache miss;
+  // 1 = cache hit. Populated by the v2 regex.
+  int hint_hit = -1;
 };
 
 // Drive op.OnExecute() with stderr captured to a tmpfile, then parse
@@ -112,15 +115,24 @@ primihub::retcode ExecuteAndTime(DoublePirOperator* op,
   // line that includes hint_hit. The v2 form is emitted after the
   // HintCache landing — we tolerate both to keep this binary
   // compatible with older operator builds.
-  std::regex re_v2(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) hint_hit=\d+ queries=(\d+) query_total_ms=([\d.eE+-]+))");
+  // v2 regex captures the hint_hit digit so we can surface
+  // cold-start vs warm-start in the bench output.
+  std::regex re_v2(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) hint_hit=(\d+) queries=(\d+) query_total_ms=([\d.eE+-]+))");
   std::regex re_v1(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) queries=(\d+) query_total_ms=([\d.eE+-]+))");
   std::smatch m;
-  if ((std::regex_search(captured, m, re_v2) && m.size() == 5) ||
-      (std::regex_search(captured, m, re_v1) && m.size() == 5)) {
+  if (std::regex_search(captured, m, re_v2) && m.size() == 6) {
+    timing->init_ms = std::stod(m[1]);
+    timing->setup_ms = std::stod(m[2]);
+    timing->hint_hit = std::stoi(m[3]);
+    timing->queries = std::stoull(m[4]);
+    timing->query_total_ms = std::stod(m[5]);
+    timing->parsed = true;
+  } else if (std::regex_search(captured, m, re_v1) && m.size() == 5) {
     timing->init_ms = std::stod(m[1]);
     timing->setup_ms = std::stod(m[2]);
     timing->queries = std::stoull(m[3]);
     timing->query_total_ms = std::stod(m[4]);
+    timing->hint_hit = -1;
     timing->parsed = true;
   }
   return rc;
@@ -133,6 +145,7 @@ int main(int argc, char** argv) {
   uint64_t n = 1024;
   uint64_t queries = 16;
   bool csv = false;
+  std::string hint_path;
 
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -140,11 +153,14 @@ int main(int argc, char** argv) {
       n = std::strtoull(argv[++i], nullptr, 10);
     } else if (a == "--queries" && i + 1 < argc) {
       queries = std::strtoull(argv[++i], nullptr, 10);
+    } else if (a == "--hint-path" && i + 1 < argc) {
+      hint_path = argv[++i];
     } else if (a == "--csv") {
       csv = true;
     } else if (a == "-h" || a == "--help") {
       std::fprintf(stderr,
-                   "Usage: %s --n N --queries Q [--csv]\n",
+                   "Usage: %s --n N --queries Q [--csv] "
+                   "[--hint-path /path/to/hint_cache.bin]\n",
                    argv[0]);
       return 0;
     }
@@ -172,6 +188,7 @@ int main(int argc, char** argv) {
   Options opt;
   opt.self_party = "bench";
   opt.role = Role::CLIENT;
+  opt.hint_path = hint_path;  // empty string = persistence disabled
   DoublePirOperator op(opt);
 
   // Single OnExecute with all queries. Capture per-stage timing from
@@ -209,10 +226,12 @@ int main(int argc, char** argv) {
   const double pmax = per_query_ms;
 
   if (csv) {
-    // CSV schema (v2): n,init_ms,setup_ms,per_query_ms,wall_ms,status
-    std::printf("%llu,%.3f,%.3f,%.3f,%.3f,ok\n",
+    // CSV schema (v3): n,init_ms,setup_ms,per_query_ms,wall_ms,hint_hit,status
+    // hint_hit = -1 when timing line wasn't parsed (v1 operator) or
+    // wasn't emitted (no persistence integration).
+    std::printf("%llu,%.3f,%.3f,%.3f,%.3f,%d,ok\n",
                 static_cast<unsigned long long>(n), init_ms, setup_ms,
-                per_query_ms, wall_ms);
+                per_query_ms, wall_ms, t.hint_hit);
   } else {
     std::printf("DoublePIR latency @ N=%llu, Q=%llu:\n",
                 static_cast<unsigned long long>(n),
@@ -225,6 +244,11 @@ int main(int argc, char** argv) {
     std::printf("  wall_total   ~ %.3f ms  (Init + Setup + %llu queries)\n",
                 wall_ms,
                 static_cast<unsigned long long>(queries));
+    if (t.hint_hit >= 0) {
+      std::printf("  hint_hit     = %d  (%s)\n", t.hint_hit,
+                  t.hint_hit ? "warm-start, Setup skipped"
+                             : "cold-start, Setup ran");
+    }
   }
   // p50 / pmax suppression-warning silencer.
   (void)p50;
