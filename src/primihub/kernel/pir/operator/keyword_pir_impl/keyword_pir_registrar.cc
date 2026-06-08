@@ -84,6 +84,7 @@ PirCapabilities KeywordPirCaps() {
   // label width); leave 0 because hint_per_database = true makes that
   // signal lifecycle-managed rather than a flat number.
   caps.typical_hint_size_bytes = 0;
+  caps.is_real = true;  // real Microsoft APSI integration
   return caps;
 }
 

@@ -29,6 +29,14 @@ struct PirCapabilities {
   uint64_t typical_query_comm_bytes = 0;
   uint64_t typical_hint_size_bytes = 0;  // 0 = no hint
 
+  // True iff the OnExecute path is a full real implementation. Defaults
+  // to false so newly-registered algorithms are treated as skeletons
+  // until they explicitly opt in. The selector excludes is_real=false
+  // entries from recommendations unless Constraints.include_skeletons
+  // is set — same intent as the operator class's `kIsSkeleton` flag,
+  // exposed at the capability level where the selector can see it.
+  bool is_real = false;
+
   // Self-consistency check used by tests and by Registry on register.
   // Returns empty string when consistent, otherwise a human-readable error.
   std::string Check() const {
@@ -84,7 +92,8 @@ struct PirCapabilities {
     }
     os << "],";
     os << "\"typical_query_comm_bytes\":" << typical_query_comm_bytes << ",";
-    os << "\"typical_hint_size_bytes\":" << typical_hint_size_bytes;
+    os << "\"typical_hint_size_bytes\":" << typical_hint_size_bytes << ",";
+    os << "\"is_real\":" << (is_real ? "true" : "false");
     os << "}";
     return os.str();
   }

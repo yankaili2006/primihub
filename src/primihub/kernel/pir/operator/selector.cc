@@ -51,6 +51,10 @@ void Evaluate(const std::string& algo, const PirCapabilities& caps,
   m->expected_latency_us_at_db_size = 0;  // populated below if passes
 
   // Hard filters
+  if (!caps.is_real && !c.include_skeletons) {
+    m->failed_checks.push_back(
+        "skeleton — set include_skeletons=true to opt in");
+  }
   if (!caps.query_types.count(c.query_type)) {
     m->failed_checks.push_back("query_type unsupported");
   }

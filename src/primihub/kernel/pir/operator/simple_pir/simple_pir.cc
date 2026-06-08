@@ -242,6 +242,7 @@ PirCapabilities SimpleCaps() {
   caps.backends = {Backend::CPU};
   caps.typical_query_comm_bytes = 121 * 1024;  // ~121 KB (paper Table 2)
   caps.typical_hint_size_bytes = 121ULL * 1024 * 1024;  // ~121 MB at 1 GB
+  caps.is_real = true;  // task 7.2 wired full pipeline through OnExecute
   return caps;
 }
 

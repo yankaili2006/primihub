@@ -25,6 +25,13 @@ struct Constraints {
   LatencyBudget latency_budget = LatencyBudget::Any;
   ThreatModel min_threat_model = ThreatModel::SemiHonest;
   bool bandwidth_priority = false;
+  // When false (default), algorithms whose PirCapabilities.is_real is
+  // false are excluded from recommendations — they still appear in the
+  // RecommendWithRationale dry-run table with a "skeleton" fail reason
+  // so users can see what's coming, but Recommend() won't return them.
+  // Set to true to opt skeletons back in (useful for test stubs and
+  // dev-mode exploration).
+  bool include_skeletons = false;
 };
 
 // Per-algorithm match info for the dry-run / capabilities CLI.

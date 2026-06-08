@@ -127,6 +127,14 @@ TEST_F(DoublePirSkeletonTest, SelectorPicksDoublePirWhenAllConditionsMet) {
   c.allow_two_server = true;
   c.assume_non_colluding = true;
   c.client_can_cache_hint = true;
+  // DoublePIR OnExecute is still a skeleton (task 5.5 pending). The
+  // selector now hides skeletons from recommendations by default; opt
+  // them in for this test so we keep validating that the capability
+  // profile + per-flag gates would route to DoublePIR once the real
+  // impl lands. The two SelectorFilters* tests above keep working
+  // unchanged because they assert NOT passes — skeleton just adds an
+  // extra fail reason.
+  c.include_skeletons = true;
   auto matches = PirSelector{}.RecommendWithRationale(c);
   bool double_pir_passes = false;
   for (const auto& m : matches) {

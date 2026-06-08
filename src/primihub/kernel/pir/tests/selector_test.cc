@@ -49,6 +49,7 @@ PirCapabilities SpiralLike() {
   c.backends = {Backend::CPU, Backend::AVX2};
   c.typical_query_comm_bytes = 14336;
   c.typical_hint_size_bytes = 0;
+  c.is_real = true;  // test stubs simulate real algos for selector logic
   return c;
 }
 
@@ -65,6 +66,7 @@ PirCapabilities DoubleLike() {
   c.backends = {Backend::CPU, Backend::AVX2};
   c.typical_query_comm_bytes = 4096;
   c.typical_hint_size_bytes = 200000000ULL;
+  c.is_real = true;
   return c;
 }
 
@@ -81,6 +83,7 @@ PirCapabilities ApsiLike() {
   c.backends = {Backend::CPU};
   c.typical_query_comm_bytes = 1048576;
   c.typical_hint_size_bytes = 500000000ULL;
+  c.is_real = true;
   return c;
 }
 
@@ -231,6 +234,7 @@ TEST(PirSelectorTest, PerDatabaseHintFilteredWhenClientCannotCache) {
   caps.backends = {Backend::CPU};
   caps.typical_query_comm_bytes = 1024;
   caps.typical_hint_size_bytes = 16ULL * 1024 * 1024;
+  caps.is_real = true;
   RegisterFake("sel_test_hint_per_db", caps);
 
   Constraints c;
@@ -254,6 +258,67 @@ TEST(PirSelectorTest, PerDatabaseHintFilteredWhenClientCannotCache) {
     }
   }
   EXPECT_TRUE(found_failing);
+}
+
+// Skeleton-filter: a cap with is_real=false must be excluded from
+// Recommend() by default, but appear in RecommendWithRationale() with
+// a "skeleton" fail reason — and become a passing candidate when the
+// caller sets include_skeletons=true.
+TEST(PirSelectorTest, SkeletonExcludedByDefault) {
+  // Two fakes: one real, one skeleton, otherwise identical caps.
+  PirCapabilities real_caps = SpiralLike();  // is_real=true
+  PirCapabilities skel_caps = SpiralLike();
+  skel_caps.is_real = false;
+  RegisterFake("sel_test_skel_real", real_caps);
+  RegisterFake("sel_test_skel_stub", skel_caps);
+
+  Constraints c;
+  c.db_size = 1'000'000ULL;
+  c.query_type = QueryType::Index;
+  c.latency_budget = LatencyBudget::Any;
+
+  // Default: skeleton excluded from passing recommendations.
+  auto names = PirSelector{}.Recommend(c);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "sel_test_skel_real")
+              != names.end());
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "sel_test_skel_stub")
+              == names.end())
+      << "skeleton should NOT appear in default Recommend()";
+
+  // Dry-run table includes the skeleton with the activation hint reason.
+  auto matches = PirSelector{}.RecommendWithRationale(c);
+  bool found_skel_with_reason = false;
+  for (const auto& m : matches) {
+    if (m.algorithm == "sel_test_skel_stub") {
+      EXPECT_FALSE(m.passes);
+      for (const auto& f : m.failed_checks) {
+        if (f.find("skeleton") != std::string::npos) {
+          found_skel_with_reason = true;
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(found_skel_with_reason)
+      << "skeleton must surface with a 'skeleton — set include_skeletons'"
+         " message in the dry-run table";
+}
+
+TEST(PirSelectorTest, IncludeSkeletonsOptsIn) {
+  PirCapabilities skel_caps = SpiralLike();
+  skel_caps.is_real = false;
+  RegisterFake("sel_test_optin_skel", skel_caps);
+
+  Constraints c;
+  c.db_size = 1'000'000ULL;
+  c.query_type = QueryType::Index;
+  c.latency_budget = LatencyBudget::Any;
+  c.include_skeletons = true;
+
+  auto names = PirSelector{}.Recommend(c);
+  EXPECT_TRUE(std::find(names.begin(), names.end(), "sel_test_optin_skel")
+              != names.end())
+      << "include_skeletons=true should bring the skeleton back as a"
+         " passing candidate";
 }
 
 }  // namespace

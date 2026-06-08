@@ -92,6 +92,7 @@ PirCapabilities IdPirCaps() {
   caps.backends = {Backend::CPU};
   caps.typical_query_comm_bytes = 0;  // proportional to query size
   caps.typical_hint_size_bytes = 0;
+  caps.is_real = true;  // real SealPIR / passthrough impl
   return caps;
 }
 

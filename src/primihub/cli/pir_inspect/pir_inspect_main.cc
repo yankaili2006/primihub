@@ -129,6 +129,8 @@ int CmdAuto(const std::map<std::string, std::string>& flags) {
   c.min_threat_model = ParseThreatModel(get("min-threat-model", "semi-honest"));
   c.bandwidth_priority = get("bandwidth-priority", "0") == "1" ||
                          get("bandwidth-priority", "false") == "true";
+  c.include_skeletons = get("include-skeletons", "0") == "1" ||
+                        get("include-skeletons", "false") == "true";
 
   bool dry_run = flags.count("dry-run") &&
                  (flags.at("dry-run") == "1" || flags.at("dry-run") == "true" ||
@@ -185,6 +187,7 @@ void Usage() {
     "        latency-budget=<any|seconds|sub-second|ms>\n"
     "        min-threat-model=<semi-honest|semi-honest-non-colluding|malicious>\n"
     "        bandwidth-priority=<true|false>\n"
+    "        include-skeletons=<true|false>  include kIsSkeleton algos in recs\n"
     "        dry-run=<true|false>          show ranked table with rationale\n"
     "\n"
     "Examples:\n"

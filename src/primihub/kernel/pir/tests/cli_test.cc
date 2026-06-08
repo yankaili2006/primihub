@@ -56,6 +56,7 @@ void EnsureStubsRegistered() {
   two_server_ms.threat_model = ThreatModel::SemiHonestNonColluding;
   two_server_ms.recommended_max_db_size = 1ull << 30;
   two_server_ms.typical_query_comm_bytes = 256ull * 1024;
+  two_server_ms.is_real = true;  // stub simulates a real algo
   RegisterStub("clit_two_server_ms", two_server_ms);
 
   // A single-server, seconds-class option (SealPIR/Spiral profile).
@@ -68,6 +69,7 @@ void EnsureStubsRegistered() {
   single_seconds.threat_model = ThreatModel::SemiHonest;
   single_seconds.recommended_max_db_size = 1ull << 28;
   single_seconds.typical_query_comm_bytes = 32ull * 1024;
+  single_seconds.is_real = true;
   RegisterStub("clit_single_seconds", single_seconds);
 
   // A keyword-only option (APSI profile).
@@ -80,6 +82,7 @@ void EnsureStubsRegistered() {
   keyword_caps.threat_model = ThreatModel::SemiHonest;
   keyword_caps.recommended_max_db_size = 1ull << 28;
   keyword_caps.typical_query_comm_bytes = 16ull * 1024;
+  keyword_caps.is_real = true;
   RegisterStub("clit_keyword", keyword_caps);
 }
 
