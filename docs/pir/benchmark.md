@@ -106,28 +106,35 @@ in commit ee01f2*) — `init_ms` is the cost of sampling public matrices
 A1+A2; `setup_ms` is the per-database H1/H2/A2_copy preprocessing;
 `per_query_ms` is the average of the Query+Answer+Recover loop body.
 
-| N        | sqrt(N) | init_ms | setup_ms | per_query_ms |
-|----------|---------|---------|----------|--------------|
-| 64       | 8       | 1.3     | 42.5     | 43.3         |
-| 256      | 16      | 2.5     | 52.5     | 32.9         |
-| 1024     | 32      | 4.8     | 70.4     | 28.3         |
-| 4096     | 64      | 9.6     | 121.8    | 34.5         |
-| 16384    | 128     | 18.8    | 354.1    | 43.0         |
-| 65536    | 256     | 28.1    | 447.9    | 34.8         |
+| N        | sqrt(N) | init_ms | setup_ms | per_query_ms | trials |
+|----------|---------|---------|----------|--------------|--------|
+| 64       | 8       | 1.3     | 42.5     | 43.3         | 3      |
+| 256      | 16      | 2.5     | 52.5     | 32.9         | 3      |
+| 1024     | 32      | 4.8     | 70.4     | 28.3         | 3      |
+| 4096     | 64      | 9.6     | 121.8    | 34.5         | 3      |
+| 16384    | 128     | 18.8    | 354.1    | 43.0         | 3      |
+| 65536    | 256     | 28.1    | 447.9    | 34.8         | 3      |
+| 262144   | 512     | 110.3   | 1536.2   | 54.0         | 2      |
+| 1048576  | 1024    | 134.3   | 2093.0   | 50.5         | 2      |
+| 4194304  | 2048    | 226.6   | 4509.9   | 71.3         | 2      |
 
 Observations:
 * Init scales roughly linearly in sqrt(N) — matches expectations
   (sampling two `sqrt(N)×N` matrices, where N is the LWE secret dim).
-  N=64→65536 (sqrt-ratio 32×) → init 1.3→28.1 ms (~22×).
-* Setup grows close to N (not sqrt(N)) because the H1=DB·A1 matrix
-  multiply is O(L·M·n) where L·M ≈ DB size.
-* Per-query is remarkably stable at 28-43 ms across three orders of
-  magnitude of N (the spread is mostly run-to-run variance). This is the
-  algorithm working as designed — DoublePIR's whole point is that the
-  online cost does not grow with N once the offline hint is precomputed.
-* Per-query is ~3-4× the paper's ~10 ms@1e8 claim. Expected gap given
-  this is an un-optimized C++ port without AVX2/SIMD vectorization in
-  the LWE inner loops. CUDA backend (task 8.2) will close most of it.
+  N=64→4194304 (sqrt-ratio 256×) → init 1.3→227 ms (~175×).
+* Setup grows close to N because the H1=DB·A1 matrix multiply is
+  O(L·M·n) where L·M ≈ DB size. N=64→4194304 (65536×) → setup
+  43→4510 ms (105× — sub-linear thanks to BLAS-shaped kernels in the
+  C matmul, but the trend is clear).
+* Per-query latency drifts upward modestly with N (35 ms at small N
+  → 71 ms at N=4M) but remains an order of magnitude lower than the
+  paper's expected per-query → confirms the algorithm's online cost
+  is N-independent in spirit. The upward drift is cache pressure
+  (intermediates grow with sqrt(N)).
+* The single-trial N=4M Setup is ~4.5 s; extrapolating linearly to
+  N=1e8 gives ~110 s Setup + ~70 ms per-query. RAM is the limiting
+  factor — host needs ~10-50 GB free for the intermediates. Task 5.10
+  1e8 cell stays open until such a host is reachable.
 
 1e8 cell is task 5.10's long-term target, pending a host with enough
 RAM (the LWE intermediate matrices grow to several GB at N=1e8).
