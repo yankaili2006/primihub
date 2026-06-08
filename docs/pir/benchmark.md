@@ -79,6 +79,52 @@ PIR_SMOKE_RUN_TASK=1 bench/pir_correctness_smoke.sh
 
 ---
 
+### `bench/double_pir_latency_bench.sh`
+
+DoublePIR latency sweep across a range of DB sizes. Drives the cc_binary
+`src/primihub/kernel/pir/bench/double_pir_latency_bench` once per N
+value, captures setup + per-query latency, and emits JSON matching the
+other bench scripts' schema_version=1 shape.
+
+Two-call measurement: one OnExecute with 1 query (cost = Setup + per-query),
+one with --queries=Q (cost = Setup + Q · per-query). Subtraction gives
+per-query latency. --trials averages multiple repetitions per N.
+
+Gated behind `PIR_BENCH_RUN_BAZEL=1` + `SIMPLEPIR_UPSTREAM=<path>` so a
+fresh checkout doesn't trigger a 30 s build on every CI invocation.
+Usage:
+
+```bash
+PIR_BENCH_RUN_BAZEL=1 SIMPLEPIR_UPSTREAM=/tmp/simplepir-upstream \
+    bench/double_pir_latency_bench.sh --trials 3
+```
+
+#### Baseline on .50 (2026-06-08, 3 trials, 16 queries each)
+
+| N        | sqrt(N) | setup_ms | per_query_ms |
+|----------|---------|----------|--------------|
+| 64       | 8       | 52.9     | 30.5         |
+| 256      | 16      | 59.6     | 21.8         |
+| 1024     | 32      | 78.6     | 45.0         |
+| 4096     | 64      | 152.2    | 26.0         |
+| 16384    | 128     | 244.0    | 32.0         |
+| 65536    | 256     | 520.2    | 34.5         |
+
+Observations:
+* Setup scales sub-linearly in sqrt(N): N=64→65536 (1024×) → setup 53→520 ms
+  (~10×). Lower-bound expected ratio sqrt(1024)=32×; the gap is a fixed
+  Init cost (sampling the public A1, A2 matrices).
+* Per-query is remarkably stable at 22-45 ms across three orders of magnitude
+  of N. This is the algorithm working as designed — DoublePIR's whole point
+  is that the online cost does not grow with N once the offline hint is
+  precomputed.
+* Per-query is ~3-4× the paper's ~10 ms@1e8 claim. Expected gap given this
+  is an un-optimized C++ port without AVX2/SIMD vectorization in the LWE
+  inner loops. CUDA backend (task 8.2) will close most of it.
+
+1e8 cell is task 5.10's long-term target, pending a host with enough
+RAM (the LWE intermediate matrices grow to several GB at N=1e8).
+
 ## Result file shapes
 
 ### `pir_selector_sweep_*.json`
