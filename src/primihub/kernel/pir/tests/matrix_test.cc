@@ -615,21 +615,33 @@ TEST(MatrixTest, MulTransposedPackedRejectsNonHardcodedParams) {
   EXPECT_NE(err.find("basis=8"), std::string::npos) << err;
 }
 
-TEST(MatrixTest, MulTransposedPackedRejectsPackedColMismatch) {
+TEST(MatrixTest, MulTransposedPackedRejectsBadColLayout) {
+  // a is packed 4x2 → b must be unpacked 4x6 (cols = 2*3). 4x3
+  // (one packed col instead of three) trips the up-front guard.
   Matrix a(4, 2);
-  Matrix b(4, 3);
+  Matrix b(8, 3);
   Matrix out;
   std::string err;
   EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
-  EXPECT_NE(err.find("packed-cols mismatch"), std::string::npos) << err;
+  EXPECT_NE(err.find("b.cols must equal"), std::string::npos) << err;
+}
+
+TEST(MatrixTest, MulTransposedPackedRejectsBadBRowAlignment) {
+  // bRows must be a multiple of 8 (short-rows branch j+=8 unroll).
+  Matrix a(4, 2);
+  Matrix b(7, 6);  // 7 % 8 != 0
+  Matrix out;
+  std::string err;
+  EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
+  EXPECT_NE(err.find("multiple of 8"), std::string::npos) << err;
 }
 
 TEST(MatrixTest, MulTransposedPackedFailsLoudlyInStubMode) {
   if (kPirCoreKernelsVendored) {
-    GTEST_SKIP() << "vendored mode succeeds — see MulTransposedPackedSmokeAsymmetric";
+    GTEST_SKIP() << "vendored mode succeeds — see MulTransposedPackedSmokeProducesCorrectShape";
   }
-  Matrix a(8, 1);
-  Matrix b(8, 1);
+  Matrix a(4, 2);
+  Matrix b(8, 6);  // valid layout: bCols = aCols*3, bRows % 8 == 0
   Matrix out;
   std::string err;
   EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
@@ -640,19 +652,36 @@ TEST(MatrixTest, MulTransposedPackedSmokeProducesCorrectShape) {
   if (!kPirCoreKernelsVendored) {
     GTEST_SKIP() << "needs kernel bridge";
   }
-  // Output shape must be (this.rows) x (b.rows). Use enough rows so
-  // the kernel's j-loop (steps of 8 when aRows <= aCols, single-step
-  // otherwise) covers at least one full SIMD batch. aRows=8 is the
-  // minimum that exercises the "aRows > aCols" branch.
-  Matrix a(8, 1);   // packed 8x1
-  Matrix b(8, 1);   // packed 8x1 with the same cols=1
-  a.Set(0, 0, 1u);  // arbitrary non-zero payload
+  // Realistic DoublePIR shape: a is squished (aRows x aCols), b is
+  // unpacked (bRows x bCols) with bCols == aCols * 3. aRows > aCols
+  // exercises the "long rows" kernel branch. Output is aRows x bRows.
+  Matrix a(8, 2);
+  Matrix b(8, 6);
+  a.Set(0, 0, 1u);
   b.Set(0, 0, 1u);
   Matrix out;
   std::string err;
   ASSERT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::SUCCESS)
       << err;
   EXPECT_EQ(out.rows(), 8u);
+  EXPECT_EQ(out.cols(), 8u);
+}
+
+TEST(MatrixTest, MulTransposedPackedShortRowsBranchProducesCorrectShape) {
+  if (!kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs kernel bridge";
+  }
+  // aRows <= aCols exercises the "short rows" kernel branch which
+  // unrolls the j-loop by 8 — so bRows must be a multiple of 8.
+  Matrix a(2, 4);
+  Matrix b(8, 12);
+  a.Set(0, 0, 1u);
+  b.Set(0, 0, 1u);
+  Matrix out;
+  std::string err;
+  ASSERT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::SUCCESS)
+      << err;
+  EXPECT_EQ(out.rows(), 2u);
   EXPECT_EQ(out.cols(), 8u);
 }
 

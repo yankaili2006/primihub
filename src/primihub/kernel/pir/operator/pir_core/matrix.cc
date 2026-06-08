@@ -504,13 +504,34 @@ retcode Matrix::MulTransposedPacked(const Matrix& b, uint64_t basis,
     }
     return retcode::FAIL;
   }
-  if (cols_ != b.cols_) {
+  // Upstream kernel layout: `this` is squished (cols = packed cols);
+  // `b` is the un-squished operand whose b.cols equals this.cols *
+  // squishing (the kernel reads b at offset k*COMPRESSION+j*bCols
+  // for k in [0, this.cols) — needing b.cols >= this.cols * 3 to
+  // stay in-bounds). Match upstream exactly: require equality.
+  if (b.cols_ != cols_ * squishing) {
     if (err) {
       std::ostringstream oss;
-      oss << "Matrix::MulTransposedPacked: packed-cols mismatch — "
-          << "this=" << rows_ << "x" << cols_
+      oss << "Matrix::MulTransposedPacked: b.cols must equal "
+          << "this.cols * squishing — this=" << rows_ << "x" << cols_
           << ", b=" << b.rows_ << "x" << b.cols_
-          << " (kernel j-loop requires equal packed-column counts).";
+          << ", squishing=" << squishing
+          << " (kernel reads b at k*COMPRESSION+j*bCols up to "
+          << "k=this.cols-1).";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  // Short-rows branch (aRows <= aCols) steps j by 8 — bRows must
+  // be a multiple of 8. Required unconditionally so that accidental
+  // OOB writes from non-multiple-of-8 bRows do not silently corrupt
+  // out. DoublePIR Answer always passes N=1024 here.
+  if ((b.rows_ % 8) != 0) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulTransposedPacked: b.rows=" << b.rows_
+          << " must be a multiple of 8 (kernel short-rows branch "
+          << "unrolls the j-loop by 8).";
       *err = oss.str();
     }
     return retcode::FAIL;
