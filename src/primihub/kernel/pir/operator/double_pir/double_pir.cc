@@ -14,6 +14,7 @@
 
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_protocol.h"
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_runtime.h"
+#include "src/primihub/kernel/pir/operator/double_pir/hint_cache.h"
 #include "src/primihub/kernel/pir/operator/double_pir/hint_gen.h"
 #include "src/primihub/kernel/pir/operator/pir_core/database.h"
 #include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
@@ -149,19 +150,34 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   // Shift to centered [-p/2, p/2) representation (upstream MakeDB).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
-  // Init + Setup once for the whole batch via HintGen::Compute
-  // (task 5.6 chunk 1). HintGen returns the bundled offline state
-  // plus per-stage timings, decoupling the precompute from the
-  // per-query loop. A future chunk will swap HintGen::Compute for
-  // a cache-aware variant that skips Setup when a matching hint
-  // already exists.
+  // Init + Setup once for the whole batch via the cache-aware
+  // GetOrComputeHint wrapper (task 5.6 chunks 1+2). On cache hit
+  // (process-local LRU keyed by (l, m, p, logq, db fingerprint))
+  // the caller skips Setup entirely; we just need to re-apply the
+  // cheap (db.ScalarAdd(p/2); db.Squish(10, 3)) pair locally because
+  // the cache does NOT preserve squished-DB state. Total restore
+  // cost is O(L·M) vs O(L·M·n) for a fresh Setup.
   using clock = std::chrono::steady_clock;
   double_pir::DoublePirHint hint;
   double_pir::HintGenStats hint_stats;
-  rc = double_pir::HintGen::Compute(&db, params, &hint, &err, &hint_stats);
+  bool hint_hit = false;
+  rc = double_pir::GetOrComputeHint(&db, params, &hint, &err,
+                                     &hint_stats, &hint_hit);
   if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "DoublePirOperator: HintGen::Compute failed: " << err;
+    LOG(ERROR) << "DoublePirOperator: GetOrComputeHint failed: " << err;
     return retcode::FAIL;
+  }
+  if (hint_hit) {
+    // Cache hit: HintGen::Compute did NOT run, so the local db is
+    // still un-squished. Re-apply the cheap Squish pair so the
+    // squished_db has the same shape Answer expects.
+    db.mutable_data().ScalarAdd(static_cast<uint32_t>(params.p / 2));
+    std::string sq_err;
+    if (db.Squish(10, 3, &sq_err) != retcode::SUCCESS) {
+      LOG(ERROR) << "DoublePirOperator: cache-hit re-Squish failed: "
+                 << sq_err;
+      return retcode::FAIL;
+    }
   }
   const core::Matrix& A1 = hint.A1;
   const core::Matrix& A2 = hint.A2;
@@ -169,8 +185,6 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   const core::Matrix& A2_copy_transposed = hint.A2_copy_transposed;
   const core::Matrix& H2_msg = hint.H2_msg;
   const core::DBinfo info_after_setup = hint.info_after_setup;
-  // Reconstruct the "start of query loop" wall-clock anchor; init_ms
-  // / setup_ms are now sourced from hint_stats.
   const auto t_setup_end = clock::now();
 
   // Per-index Query / Answer / Recover loop. Noise RNG seeded once
@@ -242,6 +256,7 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   LOG(INFO) << "DoublePirOperator: timing"
             << " init_ms=" << init_ms
             << " setup_ms=" << setup_ms
+            << " hint_hit=" << (hint_hit ? 1 : 0)
             << " queries=" << idx_strs.size()
             << " query_total_ms=" << query_total_ms;
   return retcode::SUCCESS;

@@ -108,9 +108,15 @@ primihub::retcode ExecuteAndTime(DoublePirOperator* op,
   std::remove(tmpl);
   const std::string captured = ss.str();
 
-  std::regex re(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) queries=(\d+) query_total_ms=([\d.eE+-]+))");
+  // Match either the v1 timing line (no hint_hit field) or the v2
+  // line that includes hint_hit. The v2 form is emitted after the
+  // HintCache landing — we tolerate both to keep this binary
+  // compatible with older operator builds.
+  std::regex re_v2(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) hint_hit=\d+ queries=(\d+) query_total_ms=([\d.eE+-]+))");
+  std::regex re_v1(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) queries=(\d+) query_total_ms=([\d.eE+-]+))");
   std::smatch m;
-  if (std::regex_search(captured, m, re) && m.size() == 5) {
+  if ((std::regex_search(captured, m, re_v2) && m.size() == 5) ||
+      (std::regex_search(captured, m, re_v1) && m.size() == 5)) {
     timing->init_ms = std::stod(m[1]);
     timing->setup_ms = std::stod(m[2]);
     timing->queries = std::stoull(m[3]);

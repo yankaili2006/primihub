@@ -76,6 +76,20 @@ cc_test(
     size = "small",
 )
 
+# HintCache unit tests — fingerprint stability + LRU + GetOrComputeHint hit/miss.
+cc_test(
+    name = "hint_cache_test",
+    srcs = ["hint_cache_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/double_pir:hint_cache",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
 # HintGen unit tests — null guards + shape contract + per-stage timing.
 cc_test(
     name = "hint_gen_test",
