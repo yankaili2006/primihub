@@ -30,6 +30,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "src/primihub/kernel/pir/operator/double_pir/hint_gen.h"
 
@@ -97,6 +98,20 @@ class HintCache {
   retcode LoadFromFile(const std::string& path,
                        std::string* err = nullptr);
 
+  // Idempotent per-path lazy-load — task 5.6 chunk 5. Called by
+  // DoublePirOperator at the top of OnExecute when options_.hint_path
+  // is set. First call per (process, path) attempts LoadFromFile; the
+  // path is then marked "already attempted" regardless of outcome
+  // so we don't retry on every OnExecute (an absent or corrupt file
+  // would otherwise keep open/read-failing on every query).
+  //
+  // Errors are logged via glog WARNING but NOT propagated — production
+  // callers want the operator to keep working with an empty cache when
+  // the persisted file is missing or unreadable. Tests can opt out by
+  // calling Clear() (which also clears the "loaded paths" set) to
+  // re-arm the lazy load.
+  void MaybeLoadOnce(const std::string& path);
+
  private:
   HintCache() = default;
   HintCache(const HintCache&) = delete;
@@ -111,6 +126,10 @@ class HintCache {
       index_;
   uint64_t hits_ = 0;
   uint64_t misses_ = 0;
+
+  // Paths for which MaybeLoadOnce has already attempted a load. Reset
+  // by Clear() so tests can re-arm the lazy-load path.
+  std::unordered_set<std::string> loaded_paths_;
 };
 
 // Convenience wrapper: try cache, fall back to HintGen::Compute, then

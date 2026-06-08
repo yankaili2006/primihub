@@ -13,12 +13,18 @@
  */
 #include <gtest/gtest.h>
 #include <memory>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <unistd.h>
+#include <vector>
 #include <string>
 
 #include "src/primihub/kernel/pir/common.h"
 #include "src/primihub/kernel/pir/operator/base_pir.h"
 #include "src/primihub/kernel/pir/operator/capabilities.h"
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir.h"
+#include "src/primihub/kernel/pir/operator/double_pir/hint_cache.h"
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/kernel/pir/operator/selector.h"
@@ -191,6 +197,125 @@ TEST(DoublePirOperatorTest, EndToEndRetrievesCorrectEntries) {
   EXPECT_EQ(it->second[0], std::to_string((0u * 13 + 7) & 0xFF));
   EXPECT_EQ(it->second[1], std::to_string((27u * 13 + 7) & 0xFF));
   EXPECT_EQ(it->second[2], std::to_string((63u * 13 + 7) & 0xFF));
+}
+
+// --- task 5.6 chunk 5: operator-level HintCache persistence ----------
+
+namespace {
+
+// RAII tmpfile path used by the persistence integration tests.
+class TmpPath {
+ public:
+  TmpPath() {
+    char tmpl[] = "/tmp/double_pir_persist_XXXXXX";
+    int fd = ::mkstemp(tmpl);
+    if (fd >= 0) {
+      ::close(fd);
+      path_ = tmpl;
+      // Persistence test wants to control file lifetime — unlink the
+      // mkstemp result so the first SaveToFile gets a clean create.
+      ::unlink(path_.c_str());
+    }
+  }
+  ~TmpPath() {
+    if (!path_.empty()) ::unlink(path_.c_str());
+  }
+  const std::string& path() const { return path_; }
+
+ private:
+  std::string path_;
+};
+
+void RunOnceWithHintPath(const std::string& hint_path) {
+  std::vector<std::string> db;
+  db.reserve(64);
+  for (uint64_t i = 0; i < 64; ++i) {
+    db.push_back(std::to_string((i * 13 + 7) & 0xFF));
+  }
+  Options opt;
+  opt.self_party = "client";
+  opt.role = Role::CLIENT;
+  opt.hint_path = hint_path;
+  DoublePirOperator op(opt);
+  PirDataType input;
+  input["db_content"] = db;
+  input["query_indices"] = {"0", "27", "63"};
+  PirDataType result;
+  ASSERT_EQ(op.OnExecute(input, &result), retcode::SUCCESS);
+}
+
+}  // namespace
+
+TEST(DoublePirOperatorPersistTest, PersistsHintCacheAcrossInstances) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs the kernel bridge";
+  }
+  TmpPath tmp;
+  ASSERT_FALSE(tmp.path().empty());
+
+  // Cold cache, no file. First run: miss + save.
+  double_pir::HintCache::Instance().Clear();
+  const uint64_t hits0 = double_pir::HintCache::Instance().Hits();
+  const uint64_t misses0 = double_pir::HintCache::Instance().Misses();
+  RunOnceWithHintPath(tmp.path());
+  EXPECT_EQ(double_pir::HintCache::Instance().Hits(), hits0);
+  EXPECT_EQ(double_pir::HintCache::Instance().Misses(), misses0 + 1u);
+  // File should now exist with at least one entry.
+  std::ifstream check(tmp.path(), std::ios::binary);
+  ASSERT_TRUE(check.is_open()) << "SaveToFile did not create " << tmp.path();
+  check.close();
+
+  // Wipe singleton (Clear() also resets loaded_paths_).
+  double_pir::HintCache::Instance().Clear();
+  const uint64_t hits1 = double_pir::HintCache::Instance().Hits();
+  const uint64_t misses1 = double_pir::HintCache::Instance().Misses();
+
+  // Second run with same hint_path → MaybeLoadOnce loads, then TryGet
+  // hits (same db + params hash to the same fingerprint).
+  RunOnceWithHintPath(tmp.path());
+  EXPECT_EQ(double_pir::HintCache::Instance().Hits(), hits1 + 1u);
+  EXPECT_EQ(double_pir::HintCache::Instance().Misses(), misses1);
+}
+
+TEST(DoublePirOperatorPersistTest, MissingHintFileDegradesGracefully) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs the kernel bridge";
+  }
+  TmpPath tmp;
+  ASSERT_FALSE(tmp.path().empty());
+  // tmp.path() does NOT exist yet (TmpPath unlinked it on creation).
+  double_pir::HintCache::Instance().Clear();
+  RunOnceWithHintPath(tmp.path());
+  // Operator must succeed even though MaybeLoadOnce hit open() failure.
+  // SaveToFile after the miss creates the file.
+  std::ifstream check(tmp.path(), std::ios::binary);
+  EXPECT_TRUE(check.is_open());
+}
+
+TEST(DoublePirOperatorPersistTest, CorruptHintFileDegradesGracefully) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs the kernel bridge";
+  }
+  TmpPath tmp;
+  ASSERT_FALSE(tmp.path().empty());
+  // Pre-populate with garbage. MaybeLoadOnce will fail (bad magic) but
+  // operator must still finish; SaveToFile then overwrites with a valid
+  // cache file.
+  {
+    std::ofstream out(tmp.path(), std::ios::binary | std::ios::trunc);
+    const char garbage[] = "definitely not a PHHC cache file XXXXXX";
+    out.write(garbage, sizeof(garbage) - 1);
+  }
+  double_pir::HintCache::Instance().Clear();
+  RunOnceWithHintPath(tmp.path());
+
+  // After the second run with same path the corrupt file has been
+  // overwritten — a fresh load should succeed.
+  double_pir::HintCache::Instance().Clear();
+  std::string err;
+  EXPECT_EQ(double_pir::HintCache::Instance().LoadFromFile(tmp.path(), &err),
+            retcode::SUCCESS) << err;
+  EXPECT_GE(double_pir::HintCache::Instance().Size(), 1u);
 }
 
 }  // namespace primihub::pir

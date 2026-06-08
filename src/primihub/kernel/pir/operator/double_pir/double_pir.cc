@@ -150,6 +150,14 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   // Shift to centered [-p/2, p/2) representation (upstream MakeDB).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
+  // Lazy-load persisted cache from options_.hint_path on the very
+  // first OnExecute per (process, path) — task 5.6 chunk 5. Errors
+  // are advisory; operator continues with whatever cache state it
+  // already has.
+  if (!options_.hint_path.empty()) {
+    double_pir::HintCache::Instance().MaybeLoadOnce(options_.hint_path);
+  }
+
   // Init + Setup once for the whole batch via the cache-aware
   // GetOrComputeHint wrapper (task 5.6 chunks 1+2). On cache hit
   // (process-local LRU keyed by (l, m, p, logq, db fingerprint))
@@ -177,6 +185,21 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
       LOG(ERROR) << "DoublePirOperator: cache-hit re-Squish failed: "
                  << sq_err;
       return retcode::FAIL;
+    }
+  }
+  // Persist freshly-computed hints to disk so subsequent process
+  // restarts can short-circuit Setup — task 5.6 chunk 5. Errors are
+  // advisory; if persistence fails the query still completes.
+  if (!hint_hit && !options_.hint_path.empty()) {
+    std::string save_err;
+    if (double_pir::HintCache::Instance().SaveToFile(options_.hint_path,
+                                                      &save_err) !=
+        retcode::SUCCESS) {
+      LOG(WARNING) << "DoublePirOperator: HintCache::SaveToFile failed: "
+                   << save_err << " — query still proceeds";
+    } else {
+      LOG(INFO) << "DoublePirOperator: persisted hint cache to "
+                << options_.hint_path;
     }
   }
   const core::Matrix& A1 = hint.A1;

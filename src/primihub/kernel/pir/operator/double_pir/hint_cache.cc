@@ -157,6 +157,7 @@ void HintCache::Clear() {
   index_.clear();
   hits_ = 0;
   misses_ = 0;
+  loaded_paths_.clear();
 }
 
 void HintCache::SetCapacityForTest(std::size_t cap) {
@@ -354,6 +355,30 @@ retcode HintCache::LoadFromFile(const std::string& path, std::string* err) {
     Put(it->first, std::move(it->second));
   }
   return retcode::SUCCESS;
+}
+
+void HintCache::MaybeLoadOnce(const std::string& path) {
+  if (path.empty()) return;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (loaded_paths_.count(path) != 0) return;
+    // Mark BEFORE attempting load so a persistent error (missing file
+    // / read-only fs / corrupt blob) doesn't turn every OnExecute into
+    // a wasted open() syscall + glog warning.
+    loaded_paths_.insert(path);
+  }
+  std::string err;
+  // LoadFromFile takes the mutex itself, so we drop ours first.
+  auto rc = LoadFromFile(path, &err);
+  if (rc != retcode::SUCCESS) {
+    // Errors are advisory only — the operator must keep working with
+    // whatever cache state it already had.
+    LOG(WARNING) << "HintCache::MaybeLoadOnce: " << path << ": " << err
+                 << " — continuing with existing cache state";
+  } else {
+    LOG(INFO) << "HintCache::MaybeLoadOnce: loaded " << Size()
+              << " entries from " << path;
+  }
 }
 
 retcode GetOrComputeHint(core::Database* db,
