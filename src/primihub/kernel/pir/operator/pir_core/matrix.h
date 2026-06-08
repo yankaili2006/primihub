@@ -154,6 +154,18 @@ class Matrix {
   // Pure arithmetic — works in both stub and vendored modes.
   void Contract(uint64_t p, uint64_t delta);
 
+  // Concat — row-append. Mirrors upstream simplepir matrix.go Concat
+  // (which appends `other.Data` after `m.Data` when cols match). Pre:
+  //   * if this matrix is empty (rows == 0 && cols == 0), adopts
+  //     other's shape and data;
+  //   * otherwise cols_ must equal other.cols_ (LOG-FATAL otherwise).
+  // Post: rows_ becomes rows_ + other.rows_; cols_ unchanged; data_
+  // gets other.data_ appended. Used by DoublePIR Setup to pad the
+  // A2_copy matrix's rows up to a multiple of 3 before Transpose.
+  //
+  // Pure arithmetic — works in both stub and vendored modes.
+  void Concat(const Matrix& other);
+
   // Squish / Unsquish — pure-arithmetic in-memory compression used by
   // the SimplePIR Answer path (matMulVecPacked). Pack `delta` adjacent
   // Z_p columns into one Z_q column where each Z_p value lives in a

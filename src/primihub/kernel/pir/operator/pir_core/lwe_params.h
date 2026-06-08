@@ -54,6 +54,18 @@ struct LweParams {
   // plaintext slots. Fully determined by p and logq.
   uint64_t Delta() const;
 
+  // NumBasePDigits = ceil(logq / log2(p)). Number of base-p digits
+  // needed to represent a Z_(2^logq) element. Mirrors upstream
+  // simplepir params.go Params.delta() (lowercase — intentionally
+  // renamed in this port so it does not collide with Delta() above,
+  // which is q/p and serves a completely different purpose).
+  //
+  // Used by DoublePIR Setup as the second argument to Matrix::Expand
+  // to decompose each H1 cell into base-p digits before the second-
+  // level multiply against A2. LOG-FATALs when p == 0 (would call
+  // log2(0)) or p == 1 (log2(1) == 0 -> div-by-zero).
+  uint64_t NumBasePDigits() const;
+
   // Round(x) = ((x + Delta/2) / Delta) % p. Reduces an LWE-domain
   // value to the plaintext space.
   uint64_t Round(uint64_t x) const;

@@ -503,5 +503,49 @@ TEST(MatrixDeathTest, ContractFatalOnRowsNotDivisibleByDelta) {
   EXPECT_DEATH(m.Contract(4, 2), "Contract");
 }
 
+
+// ---- Concat (chunk 4a of DoublePIR port; task 5.5 dep) ----
+
+TEST(MatrixTest, ConcatAppendsRowsWhenColsMatch) {
+  Matrix top(2, 3);
+  top.Set(0, 0, 1); top.Set(0, 1, 2); top.Set(0, 2, 3);
+  top.Set(1, 0, 4); top.Set(1, 1, 5); top.Set(1, 2, 6);
+  Matrix bot(1, 3);
+  bot.Set(0, 0, 7); bot.Set(0, 1, 8); bot.Set(0, 2, 9);
+  top.Concat(bot);
+  EXPECT_EQ(top.rows(), 3u);
+  EXPECT_EQ(top.cols(), 3u);
+  EXPECT_EQ(top.Get(0, 0), 1u); EXPECT_EQ(top.Get(0, 2), 3u);
+  EXPECT_EQ(top.Get(1, 0), 4u); EXPECT_EQ(top.Get(1, 2), 6u);
+  EXPECT_EQ(top.Get(2, 0), 7u); EXPECT_EQ(top.Get(2, 2), 9u);
+}
+
+TEST(MatrixTest, ConcatAdoptsShapeWhenEmpty) {
+  Matrix empty;
+  Matrix src(2, 3);
+  src.Set(0, 0, 11); src.Set(1, 2, 22);
+  empty.Concat(src);
+  EXPECT_EQ(empty.rows(), 2u);
+  EXPECT_EQ(empty.cols(), 3u);
+  EXPECT_EQ(empty.Get(0, 0), 11u);
+  EXPECT_EQ(empty.Get(1, 2), 22u);
+}
+
+TEST(MatrixTest, ConcatEmptyAppendIsNoOp) {
+  Matrix m(2, 3);
+  m.Set(0, 0, 5);
+  Matrix empty_rows(0, 3);  // 0 rows, cols irrelevant for no-op path
+  m.Concat(empty_rows);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 3u);
+  EXPECT_EQ(m.Get(0, 0), 5u);
+}
+
+TEST(MatrixDeathTest, ConcatFatalOnColMismatch) {
+  Matrix a(2, 3);
+  Matrix b(1, 4);
+  EXPECT_DEATH(a.Concat(b), "Concat cols mismatch");
+}
+
 }  // namespace
 }  // namespace primihub::pir::core

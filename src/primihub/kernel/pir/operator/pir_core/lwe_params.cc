@@ -11,6 +11,7 @@
 #include <string>
 
 #include <glog/logging.h>
+#include <cmath>
 
 namespace primihub::pir::core {
 
@@ -33,6 +34,25 @@ const LweParamEntry kLweParamEntries[] = {
 
 const std::size_t kLweParamEntryCount =
     sizeof(kLweParamEntries) / sizeof(kLweParamEntries[0]);
+
+uint64_t LweParams::NumBasePDigits() const {
+  if (p == 0) {
+    LOG(FATAL) << "LweParams::NumBasePDigits called before Pick (p == 0)";
+  }
+  if (p == 1) {
+    LOG(FATAL) << "LweParams::NumBasePDigits invalid p == 1 (log2(1) == 0)";
+  }
+  if (logq == 0) {
+    LOG(FATAL) << "LweParams::NumBasePDigits invalid logq=" << logq;
+  }
+  // ceil(logq / log2(p)). Match upstream simplepir's float-based math
+  // so we agree on the digit count for non-power-of-2 p (929, 781,
+  // ... from the params CSV). std::log2 returns natural-rounded
+  // double; the std::ceil then rounds the quotient up.
+  double ratio = static_cast<double>(logq) /
+                 std::log2(static_cast<double>(p));
+  return static_cast<uint64_t>(std::ceil(ratio));
+}
 
 uint64_t LweParams::Delta() const {
   if (p == 0) {

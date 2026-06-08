@@ -232,6 +232,28 @@ void Matrix::Contract(uint64_t p, uint64_t delta) {
   rows_ = new_rows;
 }
 
+void Matrix::Concat(const Matrix& other) {
+  // Empty-target adopt path, mirrors upstream's first branch of
+  // Concat which treats a zero-shape matrix as "uninitialized".
+  if (rows_ == 0 && cols_ == 0) {
+    rows_ = other.rows_;
+    cols_ = other.cols_;
+    data_ = other.data_;
+    return;
+  }
+  if (other.rows_ == 0) {
+    // No-op: appending an empty row set leaves this unchanged.
+    return;
+  }
+  if (cols_ != other.cols_) {
+    LOG(FATAL) << "Matrix::Concat cols mismatch: this is " << rows_ << "x"
+               << cols_ << ", other is " << other.rows_ << "x"
+               << other.cols_;
+  }
+  data_.insert(data_.end(), other.data_.begin(), other.data_.end());
+  rows_ += other.rows_;
+}
+
 void Matrix::Squish(uint64_t basis, uint64_t delta) {
   if (delta == 0) {
     LOG(FATAL) << "Matrix::Squish delta == 0";

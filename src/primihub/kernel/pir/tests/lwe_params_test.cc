@@ -133,5 +133,51 @@ TEST(LweParamsTest, RoundCenterMapsToBoundary) {
   EXPECT_EQ(p.Round(d * 5 - d / 3), 5u % p.p);
 }
 
+
+// ---- NumBasePDigits (chunk 4a of DoublePIR port; task 5.5 dep) ----
+
+TEST(LweParamsTest, NumBasePDigitsPowerOfTwoP) {
+  // p = 4, logq = 32 -> ceil(32 / 2) = 16 digits.
+  LweParams params;
+  params.logq = 32;
+  params.p = 4;
+  EXPECT_EQ(params.NumBasePDigits(), 16u);
+}
+
+TEST(LweParamsTest, NumBasePDigitsArbitraryP) {
+  // p = 929 (from upstream params CSV log_n=10 log_m=13), logq = 32.
+  // log2(929) ~= 9.860; ceil(32 / 9.860) = ceil(3.245) = 4 digits.
+  LweParams params;
+  params.logq = 32;
+  params.p = 929;
+  EXPECT_EQ(params.NumBasePDigits(), 4u);
+
+  // p = 781 (log_n=10 log_m=14): log2(781) ~= 9.609; ceil(32 / 9.609) = 4.
+  params.p = 781;
+  EXPECT_EQ(params.NumBasePDigits(), 4u);
+}
+
+TEST(LweParamsTest, NumBasePDigitsLargePForcesOneDigit) {
+  // When p > 2^logq, ceil(32 / 33) = 1.
+  LweParams params;
+  params.logq = 32;
+  params.p = 1ULL << 33;
+  EXPECT_EQ(params.NumBasePDigits(), 1u);
+}
+
+TEST(LweParamsDeathTest, NumBasePDigitsFatalOnZeroP) {
+  LweParams params;
+  params.logq = 32;
+  params.p = 0;
+  EXPECT_DEATH(params.NumBasePDigits(), "NumBasePDigits");
+}
+
+TEST(LweParamsDeathTest, NumBasePDigitsFatalOnPOne) {
+  LweParams params;
+  params.logq = 32;
+  params.p = 1;
+  EXPECT_DEATH(params.NumBasePDigits(), "NumBasePDigits");
+}
+
 }  // namespace
 }  // namespace primihub::pir::core
