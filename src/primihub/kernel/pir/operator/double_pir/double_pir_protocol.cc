@@ -403,22 +403,186 @@ retcode DoublePirProtocol::Answer(
 }
 
 retcode DoublePirProtocol::Recover(
-    uint64_t /*index*/, const core::Matrix& /*A2*/,
-    const core::Matrix& /*query1*/,
-    const std::vector<core::Matrix>& /*queries2*/,
-    const core::Matrix& /*H2_msg*/, const core::Matrix& /*secret1*/,
-    const std::vector<core::Matrix>& /*secrets2*/,
-    const core::Matrix& /*answer1*/,
-    const std::vector<core::Matrix>& /*answers2*/,
-    const core::LweParams& /*params*/, const core::DBinfo& /*info*/,
-    uint64_t* /*recovered_out*/, std::string* err) {
-  if (err) {
-    *err =
-        "DoublePirProtocol::Recover: not yet implemented — chunk 6c "
-        "of openspec task 5.5 lands the val1/val2/val3 LWE-correction "
-        "chain + per-column SelectRows + Contract decode.";
+    uint64_t index, const core::Matrix& A2, const core::Matrix& query1,
+    const std::vector<core::Matrix>& queries2,
+    const core::Matrix& H2_msg, const core::Matrix& secret1,
+    const std::vector<core::Matrix>& secrets2,
+    const core::Matrix& answer1,
+    const std::vector<core::Matrix>& answers2,
+    const core::LweParams& params, const core::DBinfo& info,
+    uint64_t* recovered_out, std::string* err) {
+  auto fail = [&](const std::string& msg) {
+    if (err) *err = msg;
+    return retcode::FAIL;
+  };
+  if (recovered_out == nullptr) {
+    return fail("DoublePirProtocol::Recover: recovered_out must be non-null");
   }
-  return retcode::FAIL;
+  if (info.x == 0 || info.ne == 0 || info.ne % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: bad info — ne=" << info.ne
+        << " x=" << info.x << " (need ne, x non-zero and x | ne)";
+    return fail(oss.str());
+  }
+  const uint64_t per_col = info.ne / info.x;
+  if (queries2.size() != per_col) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: expected " << per_col
+        << " queries2, got " << queries2.size();
+    return fail(oss.str());
+  }
+  if (secrets2.size() != per_col) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: expected " << per_col
+        << " secrets2, got " << secrets2.size();
+    return fail(oss.str());
+  }
+  if (answers2.size() != 2 * per_col) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: expected " << (2 * per_col)
+        << " answers2 (interleaved a2/h2), got " << answers2.size();
+    return fail(oss.str());
+  }
+  if (A2.cols() != params.n || answer1.cols() != params.n) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: A2.cols=" << A2.cols()
+        << ", answer1.cols=" << answer1.cols()
+        << " — both must equal params.n=" << params.n
+        << " (upstream\'s \"should not happen\" panic).";
+    return fail(oss.str());
+  }
+  if (params.logq == 0 || params.logq > 32) {
+    return fail("DoublePirProtocol::Recover: params.logq must be in (0, 32]");
+  }
+
+  // Modular arithmetic constants. We do all per-cell math in uint64
+  // and mask with (2^logq - 1) (== 2^logq sentinel for logq < 64)
+  // to mirror upstream simplepir\'s "noised %% (1<<p.Logq)" pattern.
+  const uint64_t two_pow_logq =
+      (params.logq == 32) ? (uint64_t{1} << 32) : (uint64_t{1} << params.logq);
+  const uint64_t ratio = params.p / 2;
+  const uint64_t delta = params.NumBasePDigits();
+
+  // ---- val1 = - sum_{j in [0, M)} ratio * query1[j, 0]  (mod 2^logq)
+  // Upstream sums ratio*q1[j], reduces mod 2^logq, then negates.
+  uint64_t val1 = 0;
+  for (uint64_t j = 0; j < params.m; ++j) {
+    val1 += ratio * static_cast<uint64_t>(query1.Get(j, 0));
+  }
+  val1 %= two_pow_logq;
+  val1 = (two_pow_logq - val1) % two_pow_logq;
+
+  // ---- val2 = - sum_{j in [0, L/X)} ratio * queries2[0][j, 0]
+  // Upstream\'s Recover hardcodes query.Data[1] — the first of the
+  // queries2 stack — for the val2 derivation. Same here.
+  const uint64_t lx = params.l / info.x;
+  uint64_t val2 = 0;
+  for (uint64_t j = 0; j < lx; ++j) {
+    val2 += ratio * static_cast<uint64_t>(queries2[0].Get(j, 0));
+  }
+  val2 %= two_pow_logq;
+  val2 = (two_pow_logq - val2) % two_pow_logq;
+
+  // ---- h1 = answer1 (deep copy — Recover must stay side-effect free)
+  core::Matrix h1 = answer1;
+  if (h1.rows() % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Recover: h1.rows=" << h1.rows()
+        << " must be divisible by info.x=" << info.x;
+    return fail(oss.str());
+  }
+
+  // ---- Per output-column j1 of h1: val3 = - sum(ratio * A2[j2, j1])
+  //      then add val3 to every row of column j1 of h1. Upstream uses
+  //      Elem (uint32) arithmetic for the cell add — uint32 wrap is
+  //      the desired behavior, so cast to uint32 before adding.
+  for (uint64_t j1 = 0; j1 < params.n; ++j1) {
+    uint64_t val3 = 0;
+    for (uint64_t j2 = 0; j2 < A2.rows(); ++j2) {
+      val3 += ratio * static_cast<uint64_t>(A2.Get(j2, j1));
+    }
+    val3 %= two_pow_logq;
+    val3 = (two_pow_logq - val3) % two_pow_logq;
+    const uint32_t v = static_cast<uint32_t>(val3);
+    for (uint64_t k = 0; k < h1.rows(); ++k) {
+      h1.Set(k, j1, h1.Get(k, j1) + v);
+    }
+  }
+
+  // ---- LWE decode loop. Single-query → batch_index = 0 → offset = 0.
+  // For each ne_idx in [0, per_col), for each j in [0, info.x): peel
+  // N*delta-row slice of a2/H2 + delta-row slice of h2/h1, multiply
+  // by secret2, subtract, Round, Contract, then re-noise with secret1.
+  std::vector<uint64_t> vals;
+  vals.reserve(info.ne);
+  for (uint64_t ne_idx = 0; ne_idx < per_col; ++ne_idx) {
+    const core::Matrix& a2 = answers2[2 * ne_idx];
+    core::Matrix h2 = answers2[2 * ne_idx + 1];  // local copy: we ScalarAdd it.
+    const core::Matrix& secret2 = secrets2[ne_idx];
+
+    // Sanity check: a2 must have N*delta*X rows, h2 must have delta*X rows.
+    // Upstream just walks the offsets; we surface a clear failure if shapes
+    // mismatch so the integration test gives a useful error.
+    if (a2.rows() != params.n * delta * info.x) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Recover: answers2[" << (2 * ne_idx)
+          << "] (a2) has " << a2.rows()
+          << " rows, expected N*delta*X=" << (params.n * delta * info.x);
+      return fail(oss.str());
+    }
+    if (h2.rows() != delta * info.x) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Recover: answers2[" << (2 * ne_idx + 1)
+          << "] (h2) has " << h2.rows()
+          << " rows, expected delta*X=" << (delta * info.x);
+      return fail(oss.str());
+    }
+
+    h2.ScalarAdd(static_cast<uint32_t>(val2));
+
+    for (uint64_t j = 0; j < info.x; ++j) {
+      // state = a2[j * N*delta : (j+1)*N*delta, 0:1]   ; state += val2
+      core::Matrix state =
+          a2.SelectRows(j * params.n * delta, params.n * delta);
+      state.ScalarAdd(static_cast<uint32_t>(val2));
+      // state.Concat(h2[j*delta : (j+1)*delta, :])  → shape (N+1)*delta x 1
+      state.Concat(h2.SelectRows(j * delta, delta));
+
+      // hint = H2_msg[j*N*delta : (j+1)*N*delta, 0:N]
+      core::Matrix hint =
+          H2_msg.SelectRows(j * params.n * delta, params.n * delta);
+      hint.Concat(h1.SelectRows(j * delta, delta));
+      // hint shape: (N+1)*delta x N.
+
+      // interm = hint * secret2 ; state -= interm
+      core::Matrix interm;
+      std::string mul_err;
+      if (hint.Mul(secret2, &interm, &mul_err) != retcode::SUCCESS) {
+        return fail(
+            "DoublePirProtocol::Recover: hint * secret2 failed: " + mul_err);
+      }
+      state.MatrixSub(interm);
+      state.Round(params);
+      state.Contract(params.p, delta);
+      // state now has shape ((N+1)*delta / delta, 1) = (N+1, 1).
+
+      // noised = state[N, 0] + val1 - sum_{l in [0, N)} secret1[l] * state[l]
+      uint64_t noised = static_cast<uint64_t>(state.Get(params.n, 0)) + val1;
+      for (uint64_t l = 0; l < params.n; ++l) {
+        // Match upstream\'s uint32 multiplication semantics: do the
+        // multiply in uint32 (wrapping at 2^32), then cast to uint64
+        // for the subtract. Below works because logq = 32: uint32
+        // product equals uint64 product mod 2^32.
+        const uint32_t prod = secret1.Get(l, 0) * state.Get(l, 0);
+        noised -= static_cast<uint64_t>(prod);
+        noised %= two_pow_logq;
+      }
+      vals.push_back(params.Round(noised));
+    }
+  }
+
+  *recovered_out = core::ReconstructElem(vals, index, info);
+  return retcode::SUCCESS;
 }
 
 }  // namespace primihub::pir::double_pir

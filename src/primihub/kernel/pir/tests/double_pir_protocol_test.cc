@@ -110,19 +110,6 @@ TEST(DoublePirProtocolTest, InitProducesUniformlyDistinctMatrices) {
 // FAIL message must point at the openspec task so callers know where
 // to look. Lets us delete them in chunks 4..6 with a clear signal.
 
-TEST(DoublePirProtocolSkeletonTest, RecoverReturnsFailPointingAtChunk6c) {
-  core::Matrix A2, q1, H2, s1, a1;
-  std::vector<core::Matrix> q2s, s2s, a2s;
-  core::LweParams params;
-  core::DBinfo info;
-  uint64_t out = 0;
-  std::string err;
-  EXPECT_EQ(DoublePirProtocol::Recover(0, A2, q1, q2s, H2, s1, s2s, a1, a2s,
-                                        params, info, &out, &err),
-            retcode::FAIL);
-  EXPECT_NE(err.find("chunk 6c"), std::string::npos) << err;
-}
-
 
 // ---- Setup (chunk 4b of DoublePIR port) ----
 //
@@ -562,6 +549,198 @@ TEST_F(DoublePirAnswerFixture, AnswerProducesExpectedShapes) {
     if (nonzero_seen) break;
   }
   EXPECT_TRUE(nonzero_seen);
+}
+
+
+
+// ---- Recover (chunk 6c of DoublePIR port) ----
+
+TEST(DoublePirRecoverTest, RecoverRejectsNullRecoveredOut) {
+  core::Matrix A2, q1, H2, s1, a1;
+  std::vector<core::Matrix> q2s, s2s, a2s;
+  core::LweParams params;
+  core::DBinfo info;
+  std::string err;
+  EXPECT_EQ(DoublePirProtocol::Recover(0, A2, q1, q2s, H2, s1, s2s, a1, a2s,
+                                        params, info, nullptr, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("non-null"), std::string::npos) << err;
+}
+
+TEST(DoublePirRecoverTest, RecoverRejectsZeroInfoX) {
+  core::Matrix A2, q1, H2, s1, a1;
+  std::vector<core::Matrix> q2s, s2s, a2s;
+  core::LweParams params;
+  core::DBinfo info;  // ne == 0, x == 0
+  uint64_t out = 0;
+  std::string err;
+  EXPECT_EQ(DoublePirProtocol::Recover(0, A2, q1, q2s, H2, s1, s2s, a1, a2s,
+                                        params, info, &out, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("ne="), std::string::npos) << err;
+}
+
+TEST(DoublePirRecoverTest, RecoverRejectsWrongQueries2Count) {
+  core::Matrix A2, q1, H2, s1, a1;
+  std::vector<core::Matrix> q2s, s2s, a2s;
+  core::LweParams params;
+  params.n = 4;
+  params.logq = 32;
+  params.p = 4;
+  params.m = 8;
+  params.l = 8;
+  core::DBinfo info;
+  info.ne = 4;
+  info.x = 2;
+  info.p = params.p;
+  info.logq = params.logq;
+  // per_col = 2 expected, but queries2 empty.
+  uint64_t out = 0;
+  std::string err;
+  EXPECT_EQ(DoublePirProtocol::Recover(0, A2, q1, q2s, H2, s1, s2s, a1, a2s,
+                                        params, info, &out, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("queries2"), std::string::npos) << err;
+}
+
+TEST(DoublePirRecoverTest, RecoverFailsLoudlyInStubMode) {
+  if (core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "vendored mode succeeds end-to-end — see EndToEndRetrievesCorrectEntry";
+  }
+  core::LweParams params;
+  params.n = 4;
+  params.logq = 32;
+  params.p = 4;
+  params.m = 8;
+  params.l = 8;
+  core::DBinfo info;
+  info.ne = 2;
+  info.x = 2;
+  info.p = params.p;
+  info.logq = params.logq;
+  const uint64_t per_col = info.ne / info.x;
+  // Fake shapes that get past the per_col guard and arrive at the
+  // Mul kernel call.
+  core::Matrix A2(params.l / info.x, params.n);
+  core::Matrix q1(params.m, 1);
+  core::Matrix H2(params.n * info.x * params.NumBasePDigits(), params.n);
+  core::Matrix s1(params.n, 1);
+  core::Matrix a1(params.NumBasePDigits() * info.x, params.n);
+  std::vector<core::Matrix> q2s(per_col, core::Matrix(params.l / info.x, 1));
+  std::vector<core::Matrix> s2s(per_col, core::Matrix(params.n, 1));
+  std::vector<core::Matrix> a2s;
+  for (uint64_t i = 0; i < per_col; ++i) {
+    a2s.emplace_back(params.n * params.NumBasePDigits() * info.x, 1);
+    a2s.emplace_back(params.NumBasePDigits() * info.x, 1);
+  }
+  uint64_t out = 0;
+  std::string err;
+  EXPECT_EQ(DoublePirProtocol::Recover(0, A2, q1, q2s, H2, s1, s2s, a1, a2s,
+                                        params, info, &out, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("hint * secret2"), std::string::npos) << err;
+}
+
+
+// EndToEndRetrievesCorrectEntry — drives the full DoublePIR pipeline
+// (Init → Setup → Query → Answer → Recover) against a small but
+// realistic database. Mirrors SimplePirAnswerTest.EndToEndRetrievesCorrectEntry
+// (commit 96870375) — proves the LWE correction chain + Contract
+// decode + ReconstructElem all match upstream\'s math.
+//
+// Params come from the real LweParams table (log_m=13 row, p_double=929)
+// so the noise budget is genuine. ApproxSquareDB(64, 8) → l=8, m=8;
+// row_length=8, p=929 → ne=1, info.x=1 (each DB entry encodes one
+// Z_p value, recovered value = (Z_p value) %% 2^row_length). N=1024
+// keeps the kernel happy (matMulVecPacked steps by 8; 8 = l divides
+// neatly).
+TEST(DoublePirRecoverTest, EndToEndRetrievesCorrectEntry) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "end-to-end retrieval needs the kernel bridge";
+  }
+  std::string err;
+  core::LweParams params;
+  params.n = 1024;
+  params.logq = 32;
+  ASSERT_EQ(params.Pick(/*doublepir=*/true,
+                         /*samples=*/static_cast<uint64_t>(1) << 13, &err),
+            retcode::SUCCESS) << err;
+  uint64_t l = 0, m = 0;
+  ASSERT_EQ(core::ApproxSquareDatabaseDims(/*num=*/64, /*row_length=*/8,
+                                            params.p, &l, &m, &err),
+            retcode::SUCCESS) << err;
+  params.l = l;
+  params.m = m;
+
+  core::Database db;
+  ASSERT_EQ(db.SetupShape(/*num=*/64, /*row_length=*/8, params, &err),
+            retcode::SUCCESS) << err;
+
+  // For the picked row (p=929, log2(p) >= 8) SetupShape gives ne=1,
+  // packing=1, info.x=1 — the simplest DoublePIR layout (no batch).
+  ASSERT_EQ(db.info().ne, 1u);
+  ASSERT_EQ(db.info().x, 1u);
+  ASSERT_EQ(db.info().packing, 1u);
+
+  // Pin a target inside (l x m) so the index math is easy to follow.
+  const uint64_t target_index = 27;
+  ASSERT_LT(target_index, params.l * params.m);
+  const uint64_t target_row = target_index / params.m;
+  const uint64_t target_col = target_index % params.m;
+
+  // Fill with byte-sized values, then shift to centered [-p/2, p/2)
+  // representation (mirrors upstream MakeDB.Data.Sub(p/2)).
+  for (uint64_t i = 0; i < params.l; ++i) {
+    for (uint64_t j = 0; j < params.m; ++j) {
+      const uint32_t v = static_cast<uint32_t>((i * 13 + j * 7) & 0xFF);
+      db.mutable_data().Set(i, j, v);
+    }
+  }
+  db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
+  const uint64_t expected =
+      static_cast<uint64_t>((target_row * 13 + target_col * 7) & 0xFF);
+
+  // Init + Setup.
+  core::Matrix A1, A2;
+  ASSERT_EQ(DoublePirProtocol::Init(params, db.info(), &A1, &A2, &err),
+            retcode::SUCCESS) << err;
+  core::Matrix H1_squished, A2_copy_transposed, H2_msg;
+  ASSERT_EQ(DoublePirProtocol::Setup(&db, A1, A2, params, &H1_squished,
+                                      &A2_copy_transposed, &H2_msg, &err),
+            retcode::SUCCESS) << err;
+
+  // Setup mutated db.info() (basis=10 / squishing=3 / cols updated).
+  const core::DBinfo info_after_setup = db.info();
+
+  // Query.
+  std::mt19937_64 rng(/*seed=*/987654);
+  core::Matrix secret1, query1;
+  std::vector<core::Matrix> secrets2, queries2;
+  ASSERT_EQ(DoublePirProtocol::Query(target_index, A1, A2, params,
+                                      info_after_setup, &rng, &secret1,
+                                      &query1, &secrets2, &queries2, &err),
+            retcode::SUCCESS) << err;
+
+  // Answer.
+  core::Matrix answer1;
+  std::vector<core::Matrix> answers2;
+  ASSERT_EQ(DoublePirProtocol::Answer(db, H1_squished, A2_copy_transposed,
+                                       query1, queries2, params, &answer1,
+                                       &answers2, &err),
+            retcode::SUCCESS) << err;
+
+  // Recover.
+  uint64_t recovered = 0;
+  ASSERT_EQ(DoublePirProtocol::Recover(target_index, A2, query1, queries2,
+                                        H2_msg, secret1, secrets2, answer1,
+                                        answers2, params, info_after_setup,
+                                        &recovered, &err),
+            retcode::SUCCESS) << err;
+
+  EXPECT_EQ(recovered, expected)
+      << "DB entry at index=" << target_index << " (row=" << target_row
+      << ", col=" << target_col << ") expected " << expected
+      << " but recovered " << recovered;
 }
 
 }  // namespace
