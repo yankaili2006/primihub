@@ -50,23 +50,118 @@ retcode DoublePirProtocol::Init(const core::LweParams& params,
   return retcode::SUCCESS;
 }
 
-retcode DoublePirProtocol::Setup(core::Database* /*db*/,
-                                 const core::Matrix& /*A1*/,
-                                 const core::Matrix& /*A2*/,
-                                 const core::LweParams& /*params*/,
-                                 core::Matrix* /*H1_squished_out*/,
-                                 core::Matrix* /*A2_copy_transposed_out*/,
-                                 core::Matrix* /*H2_msg_out*/,
+retcode DoublePirProtocol::Setup(core::Database* db,
+                                 const core::Matrix& A1,
+                                 const core::Matrix& A2,
+                                 const core::LweParams& params,
+                                 core::Matrix* H1_squished_out,
+                                 core::Matrix* A2_copy_transposed_out,
+                                 core::Matrix* H2_msg_out,
                                  std::string* err) {
-  if (err) {
-    *err =
-        "DoublePirProtocol::Setup: not yet implemented — chunk 4 of "
-        "openspec/changes/primihub-pir-multi-algo task 5.5 will land "
-        "DB*A1, Transpose, Expand, ConcatCols, H1*A2, Squish, and "
-        "A2_copy row-padding (needs a Matrix::Concat primitive that "
-        "is not yet vendored).";
+  auto fail = [&](const std::string& msg) {
+    if (err) *err = msg;
+    return retcode::FAIL;
+  };
+  if (db == nullptr || H1_squished_out == nullptr ||
+      A2_copy_transposed_out == nullptr || H2_msg_out == nullptr) {
+    return fail(
+        "DoublePirProtocol::Setup: db / H1_squished_out / "
+        "A2_copy_transposed_out / H2_msg_out must all be non-null");
   }
-  return retcode::FAIL;
+  if (params.p == 0 || params.logq == 0 || params.l == 0 ||
+      params.m == 0 || params.n == 0) {
+    return fail(
+        "DoublePirProtocol::Setup: params must have p/logq/l/m/n "
+        "populated (call LweParams::Pick first)");
+  }
+  const core::DBinfo& info = db->info();
+  if (info.x == 0 || params.l % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Setup: info.x=" << info.x
+        << " must be nonzero and divide params.l=" << params.l;
+    return fail(oss.str());
+  }
+  if (A1.rows() != params.m || A1.cols() != params.n) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Setup: A1 shape mismatch — expected "
+        << params.m << "x" << params.n << ", got " << A1.rows() << "x"
+        << A1.cols();
+    return fail(oss.str());
+  }
+  if (A2.rows() != params.l / info.x || A2.cols() != params.n) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Setup: A2 shape mismatch — expected "
+        << (params.l / info.x) << "x" << params.n << ", got "
+        << A2.rows() << "x" << A2.cols();
+    return fail(oss.str());
+  }
+
+  // ---- H1 = DB.data * A1 ----  shape L x N.
+  core::Matrix H1;
+  std::string mul_err;
+  if (db->data().Mul(A1, &H1, &mul_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Setup: DB * A1 failed: " + mul_err);
+  }
+
+  // ---- H1.Transpose() ----  shape N x L.
+  core::Matrix H1_t;
+  std::string tr_err;
+  if (H1.Transpose(&H1_t, &tr_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Setup: Transpose(H1) failed: " + tr_err);
+  }
+  H1 = std::move(H1_t);
+
+  // ---- H1.Expand(params.p, params.NumBasePDigits()) ----  shape
+  //      (N * delta) x L, where delta = ceil(logq / log2(p)).
+  const uint64_t delta = params.NumBasePDigits();
+  H1.Expand(params.p, delta);
+
+  // ---- H1.ConcatCols(info.x) ----  shape (N * delta * X) x (L / X).
+  H1.ConcatCols(info.x);
+
+  // ---- H2 = H1 * A2 ----  shape (N * delta * X) x N.
+  std::string h2_err;
+  if (H1.Mul(A2, H2_msg_out, &h2_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Setup: H1 * A2 failed: " + h2_err);
+  }
+
+  // ---- Shift DB into [0, p] and Squish it (basis=10, squishing=3).
+  // Upstream's DB.Data.Add(p.P/2) + DB.Squish() pair.
+  db->mutable_data().ScalarAdd(static_cast<uint32_t>(params.p / 2));
+  std::string sq_err;
+  if (db->Squish(10, 3, &sq_err) != retcode::SUCCESS) {
+    return fail(
+        "DoublePirProtocol::Setup: db->Squish(10, 3) failed: " + sq_err);
+  }
+
+  // ---- Shift H1 into [0, p] and Squish it (same params).
+  // Upstream's H1.Add(p.P/2) + H1.Squish(10, 3). After this, H1's
+  // rows stay (N * delta * X); cols becomes ceil((L / X) / 3).
+  H1.ScalarAdd(static_cast<uint32_t>(params.p / 2));
+  H1.Squish(10, 3);
+  *H1_squished_out = std::move(H1);
+
+  // ---- A2_copy: deep copy, pad rows to a multiple of 3, transpose.
+  // Upstream:
+  //   A2_copy := A2.RowsDeepCopy(0, A2.Rows)  // full copy
+  //   if A2_copy.Rows % 3 != 0:
+  //       A2_copy.Concat(MatrixZeros(3 - (A2_copy.Rows % 3),
+  //                                   A2_copy.Cols))
+  //   A2_copy.Transpose()
+  core::Matrix A2_copy = A2;  // value-copy via std::vector copy
+  const uint64_t r = A2_copy.rows();
+  if (r % 3 != 0) {
+    const uint64_t pad = 3 - (r % 3);
+    A2_copy.Concat(core::Matrix(pad, A2_copy.cols()));
+  }
+  std::string a2_tr_err;
+  if (A2_copy.Transpose(A2_copy_transposed_out, &a2_tr_err) !=
+      retcode::SUCCESS) {
+    return fail(
+        "DoublePirProtocol::Setup: Transpose(A2_copy) failed: " + a2_tr_err);
+  }
+
+  return retcode::SUCCESS;
 }
 
 retcode DoublePirProtocol::Query(uint64_t /*index*/,
