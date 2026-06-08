@@ -33,8 +33,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
+#include <fstream>
 #include <random>
+#include <regex>
+#include <sstream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 #include <glog/logging.h>
@@ -56,6 +61,64 @@ double ms_since(const std::chrono::steady_clock::time_point& start) {
 }
 
 }  // namespace
+
+struct OpTiming {
+  double init_ms = 0.0;
+  double setup_ms = 0.0;
+  uint64_t queries = 0;
+  double query_total_ms = 0.0;
+  bool parsed = false;
+};
+
+// Drive op.OnExecute() with stderr captured to a tmpfile, then parse
+// the structured "DoublePirOperator: timing init_ms=… setup_ms=…
+// queries=… query_total_ms=…" LOG line. Falls back to total wall-time
+// only if the line is absent (operator running without timing patch).
+primihub::retcode ExecuteAndTime(DoublePirOperator* op,
+                                  const PirDataType& input,
+                                  PirDataType* result,
+                                  OpTiming* timing,
+                                  double* wall_ms) {
+  // Redirect stderr (where glog writes) to a tmpfile for the duration
+  // of OnExecute.
+  std::fflush(stderr);
+  char tmpl[] = "/tmp/double_pir_bench_stderr_XXXXXX";
+  int fd = mkstemp(tmpl);
+  if (fd < 0) {
+    return op->OnExecute(input, result);
+  }
+  const int saved_stderr = dup(fileno(stderr));
+  dup2(fd, fileno(stderr));
+
+  using clock = std::chrono::steady_clock;
+  const auto t0 = clock::now();
+  auto rc = op->OnExecute(input, result);
+  const auto t1 = clock::now();
+
+  std::fflush(stderr);
+  dup2(saved_stderr, fileno(stderr));
+  close(saved_stderr);
+  close(fd);
+
+  *wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+
+  std::ifstream f(tmpl);
+  std::stringstream ss;
+  ss << f.rdbuf();
+  std::remove(tmpl);
+  const std::string captured = ss.str();
+
+  std::regex re(R"(DoublePirOperator: timing init_ms=([\d.eE+-]+) setup_ms=([\d.eE+-]+) queries=(\d+) query_total_ms=([\d.eE+-]+))");
+  std::smatch m;
+  if (std::regex_search(captured, m, re) && m.size() == 5) {
+    timing->init_ms = std::stod(m[1]);
+    timing->setup_ms = std::stod(m[2]);
+    timing->queries = std::stoull(m[3]);
+    timing->query_total_ms = std::stod(m[4]);
+    timing->parsed = true;
+  }
+  return rc;
+}
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
@@ -105,72 +168,60 @@ int main(int argc, char** argv) {
   opt.role = Role::CLIENT;
   DoublePirOperator op(opt);
 
-  // First call with a 1-query input to measure Setup amortization.
-  PirDataType setup_in;
-  setup_in["db_content"] = db;
-  setup_in["query_indices"] = {idxs[0]};
-  PirDataType setup_out;
-  auto t0 = std::chrono::steady_clock::now();
-  auto rc1 = op.OnExecute(setup_in, &setup_out);
-  const double setup_plus_one_ms = ms_since(t0);
-  if (rc1 != retcode::SUCCESS) {
-    if (csv) std::printf("%llu,NA,NA,NA,setup_failed\n",
-                         static_cast<unsigned long long>(n));
-    else
-      std::fprintf(stderr, "FAILED setup: see logs above\n");
-    return 1;
-  }
-
-  // Second call with all queries — Setup repeats, but we subtract the
-  // single-query timing from the multi-query timing to approximate
-  // per-query latency. (DoublePirOperator does not currently expose a
-  // hint-cache; every OnExecute reruns Init+Setup. The math works
-  // because per-Setup costs are stable across calls with the same DB.)
-  PirDataType all_in;
-  all_in["db_content"] = db;
-  all_in["query_indices"] = idxs;
-  PirDataType all_out;
-  t0 = std::chrono::steady_clock::now();
-  auto rc2 = op.OnExecute(all_in, &all_out);
-  const double setup_plus_n_ms = ms_since(t0);
-  if (rc2 != retcode::SUCCESS) {
+  // Single OnExecute with all queries. Capture per-stage timing from
+  // the operator's structured LOG line (chrono-instrumented in
+  // double_pir.cc as of commit f08a45*). Falls back to wall-time-only
+  // if the LOG line is absent.
+  PirDataType in;
+  in["db_content"] = db;
+  in["query_indices"] = idxs;
+  PirDataType out;
+  OpTiming t;
+  double wall_ms = 0.0;
+  auto rc = ExecuteAndTime(&op, in, &out, &t, &wall_ms);
+  if (rc != retcode::SUCCESS) {
     if (csv) std::printf("%llu,NA,NA,NA,queries_failed\n",
                          static_cast<unsigned long long>(n));
-    else
-      std::fprintf(stderr, "FAILED multi-query: see logs above\n");
+    else std::fprintf(stderr, "FAILED execution: see logs above\n");
     return 1;
   }
 
-  // Approximations:
-  //   setup_ms  ~ setup_plus_one_ms - per_query_ms
-  //   per_query ~ (setup_plus_n_ms - setup_plus_one_ms) / (queries - 1)
-  double per_query_ms = 0.0;
-  if (queries > 1) {
-    per_query_ms = (setup_plus_n_ms - setup_plus_one_ms) /
-                   static_cast<double>(queries - 1);
+  double init_ms;
+  double setup_ms;
+  double per_query_ms;
+  if (t.parsed && t.queries > 0) {
+    init_ms = t.init_ms;
+    setup_ms = t.setup_ms;
+    per_query_ms = t.query_total_ms / static_cast<double>(t.queries);
   } else {
-    per_query_ms = setup_plus_one_ms;
+    // Fallback path — no per-stage detail available.
+    init_ms = 0.0;
+    setup_ms = wall_ms;  // worst case attribute everything to setup
+    per_query_ms = 0.0;
   }
-  const double setup_ms = setup_plus_one_ms - per_query_ms;
-  // We only have two data points so p50 and max collapse to per_query_ms.
-  // Future work: log per-query times inside OnExecute for true p50/max.
   const double p50 = per_query_ms;
   const double pmax = per_query_ms;
 
   if (csv) {
-    std::printf("%llu,%.3f,%.3f,%.3f,ok\n",
-                static_cast<unsigned long long>(n), setup_ms, p50, pmax);
+    // CSV schema (v2): n,init_ms,setup_ms,per_query_ms,wall_ms,status
+    std::printf("%llu,%.3f,%.3f,%.3f,%.3f,ok\n",
+                static_cast<unsigned long long>(n), init_ms, setup_ms,
+                per_query_ms, wall_ms);
   } else {
     std::printf("DoublePIR latency @ N=%llu, Q=%llu:\n",
                 static_cast<unsigned long long>(n),
                 static_cast<unsigned long long>(queries));
-    std::printf("  setup        ~ %.3f ms  (one-time per DB)\n", setup_ms);
+    std::printf("  init         ~ %.3f ms  (matrix sampling)\n",  init_ms);
+    std::printf("  setup        ~ %.3f ms  (one-time per DB)\n",  setup_ms);
     std::printf("  per_query    ~ %.3f ms  (avg over %llu queries)\n",
                 per_query_ms,
-                static_cast<unsigned long long>(queries - 1));
-    std::printf("  total        ~ %.3f ms  (1 setup + %llu queries)\n",
-                setup_plus_n_ms,
+                static_cast<unsigned long long>(queries));
+    std::printf("  wall_total   ~ %.3f ms  (Init + Setup + %llu queries)\n",
+                wall_ms,
                 static_cast<unsigned long long>(queries));
   }
+  // p50 / pmax suppression-warning silencer.
+  (void)p50;
+  (void)pmax;
   return 0;
 }

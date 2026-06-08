@@ -4,6 +4,7 @@
  */
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir.h"
 
+#include <chrono>
 #include <cstdint>
 #include <random>
 #include <string>
@@ -149,13 +150,18 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
 
   // Init + Setup once for the whole batch. Setup mutates db.info()
   // (basis/squishing) and produces H1_squished + A2_copy_transposed
-  // (server state) + H2_msg (per-database public hint).
+  // (server state) + H2_msg (per-database public hint). We chrono-
+  // instrument each stage so a single LOG(INFO) at the end can give
+  // observability into where time is spent without external profiling.
+  using clock = std::chrono::steady_clock;
+  const auto t_init_start = clock::now();
   core::Matrix A1, A2;
   rc = double_pir::DoublePirProtocol::Init(params, db.info(), &A1, &A2, &err);
   if (rc != retcode::SUCCESS) {
     LOG(ERROR) << "DoublePirOperator: Init failed: " << err;
     return retcode::FAIL;
   }
+  const auto t_init_end = clock::now();
   core::Matrix H1_squished, A2_copy_transposed, H2_msg;
   rc = double_pir::DoublePirProtocol::Setup(&db, A1, A2, params, &H1_squished,
                                              &A2_copy_transposed, &H2_msg,
@@ -164,6 +170,7 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
     LOG(ERROR) << "DoublePirOperator: Setup failed: " << err;
     return retcode::FAIL;
   }
+  const auto t_setup_end = clock::now();
   const core::DBinfo info_after_setup = db.info();
 
   // Per-index Query / Answer / Recover loop. Noise RNG seeded once
@@ -219,11 +226,24 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
     }
     recovered_strs.push_back(std::to_string(recovered));
   }
+  const auto t_end = clock::now();
   (*result)[kOutRecovered] = std::move(recovered_strs);
+  using ms_d = std::chrono::duration<double, std::milli>;
+  const double init_ms  = ms_d(t_init_end  - t_init_start).count();
+  const double setup_ms = ms_d(t_setup_end - t_init_end).count();
+  const double query_total_ms = ms_d(t_end - t_setup_end).count();
   LOG(INFO) << "DoublePirOperator: retrieved " << idx_strs.size()
             << " entries from " << n_entries << "-entry DB "
             << "(l=" << params.l << ", m=" << params.m
             << ", x=" << info_after_setup.x << ")";
+  // Structured timing line — parseable as `key=value` pairs. Used by
+  // bench/double_pir_latency_bench.sh in --detailed mode and useful
+  // for production observability without external profilers.
+  LOG(INFO) << "DoublePirOperator: timing"
+            << " init_ms=" << init_ms
+            << " setup_ms=" << setup_ms
+            << " queries=" << idx_strs.size()
+            << " query_total_ms=" << query_total_ms;
   return retcode::SUCCESS;
 }
 

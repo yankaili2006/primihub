@@ -97,28 +97,36 @@ cells_path="$TMP/cells.json"
 : > "$cells_path"
 first=1
 for N in $N_LIST; do
+  init_sum=0
   setup_sum=0
   perq_sum=0
+  wall_sum=0
   trial_count=0
   status=ok
   for ((t = 0; t < TRIALS; ++t)); do
-    line=$("$BENCH_BIN" --n "$N" --queries "$QUERIES" --csv 2>/dev/null || echo "$N,NA,NA,NA,binary_failed")
-    # Parse "n,setup_ms,p50,pmax,status"
-    IFS=, read -r got_n setup p50 _pmax tstatus <<<"$line"
+    line=$("$BENCH_BIN" --n "$N" --queries "$QUERIES" --csv 2>/dev/null || echo "$N,NA,NA,NA,NA,binary_failed")
+    # v2 CSV: n,init_ms,setup_ms,per_query_ms,wall_ms,status
+    IFS=, read -r got_n init setup perq wall tstatus <<<"$line"
     if [[ "$tstatus" != "ok" ]]; then
       status="$tstatus"
       break
     fi
+    init_sum=$(awk -v a="$init_sum"   -v b="$init"  'BEGIN { print a + b }')
     setup_sum=$(awk -v a="$setup_sum" -v b="$setup" 'BEGIN { print a + b }')
-    perq_sum=$(awk -v a="$perq_sum" -v b="$p50"   'BEGIN { print a + b }')
+    perq_sum=$(awk -v a="$perq_sum"   -v b="$perq"  'BEGIN { print a + b }')
+    wall_sum=$(awk -v a="$wall_sum"   -v b="$wall"  'BEGIN { print a + b }')
     trial_count=$((trial_count + 1))
   done
   if [[ "$status" == "ok" && $trial_count -gt 0 ]]; then
+    init_avg=$(awk  -v s="$init_sum"  -v t="$trial_count" 'BEGIN { printf "%.3f", s/t }')
     setup_avg=$(awk -v s="$setup_sum" -v t="$trial_count" 'BEGIN { printf "%.3f", s/t }')
-    perq_avg=$(awk -v s="$perq_sum"  -v t="$trial_count" 'BEGIN { printf "%.3f", s/t }')
+    perq_avg=$(awk  -v s="$perq_sum"  -v t="$trial_count" 'BEGIN { printf "%.3f", s/t }')
+    wall_avg=$(awk  -v s="$wall_sum"  -v t="$trial_count" 'BEGIN { printf "%.3f", s/t }')
   else
+    init_avg=null
     setup_avg=null
     perq_avg=null
+    wall_avg=null
   fi
   comma=""
   [[ $first -eq 0 ]] && comma=","
@@ -128,8 +136,10 @@ ${comma}{
   "n": $N,
   "queries": $QUERIES,
   "trials": $trial_count,
+  "init_ms": $init_avg,
   "setup_ms": $setup_avg,
   "per_query_ms": $perq_avg,
+  "wall_ms": $wall_avg,
   "status": "$status"
 }
 JSON
@@ -140,7 +150,7 @@ OUT_PATH="${OUT_PATH:-$OUT_DEFAULT}"
 mkdir -p "$(dirname "$OUT_PATH")"
 {
   printf '{\n'
-  printf '  "schema_version": 1,\n'
+  printf '  "schema_version": 2,\n'
   printf '  "captured_at": "%s",\n' "$CAPTURED_AT"
   printf '  "wrapper_commit": "%s",\n' "$WRAPPER_COMMIT"
   printf '  "host_uname": "%s",\n'    "$HOST_UNAME"

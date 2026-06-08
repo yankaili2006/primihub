@@ -99,28 +99,35 @@ PIR_BENCH_RUN_BAZEL=1 SIMPLEPIR_UPSTREAM=/tmp/simplepir-upstream \
     bench/double_pir_latency_bench.sh --trials 3
 ```
 
-#### Baseline on .50 (2026-06-08, 3 trials, 16 queries each)
+#### Baseline on .50 (2026-06-08, schema_version=2, 3 trials, 16 queries each)
 
-| N        | sqrt(N) | setup_ms | per_query_ms |
-|----------|---------|----------|--------------|
-| 64       | 8       | 52.9     | 30.5         |
-| 256      | 16      | 59.6     | 21.8         |
-| 1024     | 32      | 78.6     | 45.0         |
-| 4096     | 64      | 152.2    | 26.0         |
-| 16384    | 128     | 244.0    | 32.0         |
-| 65536    | 256     | 520.2    | 34.5         |
+Per-stage timings parsed from the operator's structured timing LOG (added
+in commit ee01f2*) — `init_ms` is the cost of sampling public matrices
+A1+A2; `setup_ms` is the per-database H1/H2/A2_copy preprocessing;
+`per_query_ms` is the average of the Query+Answer+Recover loop body.
+
+| N        | sqrt(N) | init_ms | setup_ms | per_query_ms |
+|----------|---------|---------|----------|--------------|
+| 64       | 8       | 1.3     | 42.5     | 43.3         |
+| 256      | 16      | 2.5     | 52.5     | 32.9         |
+| 1024     | 32      | 4.8     | 70.4     | 28.3         |
+| 4096     | 64      | 9.6     | 121.8    | 34.5         |
+| 16384    | 128     | 18.8    | 354.1    | 43.0         |
+| 65536    | 256     | 28.1    | 447.9    | 34.8         |
 
 Observations:
-* Setup scales sub-linearly in sqrt(N): N=64→65536 (1024×) → setup 53→520 ms
-  (~10×). Lower-bound expected ratio sqrt(1024)=32×; the gap is a fixed
-  Init cost (sampling the public A1, A2 matrices).
-* Per-query is remarkably stable at 22-45 ms across three orders of magnitude
-  of N. This is the algorithm working as designed — DoublePIR's whole point
-  is that the online cost does not grow with N once the offline hint is
-  precomputed.
-* Per-query is ~3-4× the paper's ~10 ms@1e8 claim. Expected gap given this
-  is an un-optimized C++ port without AVX2/SIMD vectorization in the LWE
-  inner loops. CUDA backend (task 8.2) will close most of it.
+* Init scales roughly linearly in sqrt(N) — matches expectations
+  (sampling two `sqrt(N)×N` matrices, where N is the LWE secret dim).
+  N=64→65536 (sqrt-ratio 32×) → init 1.3→28.1 ms (~22×).
+* Setup grows close to N (not sqrt(N)) because the H1=DB·A1 matrix
+  multiply is O(L·M·n) where L·M ≈ DB size.
+* Per-query is remarkably stable at 28-43 ms across three orders of
+  magnitude of N (the spread is mostly run-to-run variance). This is the
+  algorithm working as designed — DoublePIR's whole point is that the
+  online cost does not grow with N once the offline hint is precomputed.
+* Per-query is ~3-4× the paper's ~10 ms@1e8 claim. Expected gap given
+  this is an un-optimized C++ port without AVX2/SIMD vectorization in
+  the LWE inner loops. CUDA backend (task 8.2) will close most of it.
 
 1e8 cell is task 5.10's long-term target, pending a host with enough
 RAM (the LWE intermediate matrices grow to several GB at N=1e8).
