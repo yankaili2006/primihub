@@ -353,3 +353,19 @@ cc_test(
     ],
     size = "small",
 )
+
+# HintSerialize unit tests — round-trip, magic/version/reserved guards,
+# truncated and trailing-byte rejection. Task 5.6 chunk 3.
+cc_test(
+    name = "hint_serialize_test",
+    srcs = ["hint_serialize_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/double_pir:hint_serialize",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_gen",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

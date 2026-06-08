@@ -116,3 +116,17 @@ cc_library(
         "@com_github_glog_glog//:glog",
     ],
 )
+
+# HintSerialize — wire-format helpers for shipping a DoublePirHint
+# between processes or persisting it to disk. Task 5.6 chunk 3.
+cc_library(
+    name = "hint_serialize",
+    srcs = ["hint_serialize.cc"],
+    hdrs = ["hint_serialize.h"],
+    deps = [
+        ":hint_gen",
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_github_glog_glog//:glog",
+    ],
+)
