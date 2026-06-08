@@ -1,6 +1,6 @@
 # PIR Multi-Algorithm Guide
 
-> Status: **6 algorithms registered (1 real + 5 skeletons; 3 of those have C/C++ kernel link activated)** as of 2026-06-07.
+> Status: **6 algorithms registered (3 real + 3 skeletons; 3 of the skeletons have C/C++ kernel link activated)** as of 2026-06-08.
 > See [benchmark.md](benchmark.md) for the live capability matrix output and
 > [threat-model.md](threat-model.md) for per-algo security assumptions.
 
@@ -57,14 +57,20 @@ pir_inspect auto db-size=1e8 query-type=index latency-budget=ms \
 | `id_pir`     | 1         | none       | small          | seconds       | ✅ real      | SealPIR'18       |
 | `apsi`       | 1         | none       | medium         | seconds       | ✅ real (opt-in) | APSI USENIX'21 |
 | `spiral`     | 1         | none       | ~26 KB         | 2-3 s         | 🚧 skeleton | USENIX'22        |
-| `simple_pir` | 1         | client (per-DB) | ~121 KB    | sub-second    | 🚧 skeleton | USENIX'23        |
-| `double_pir` | 2 non-collude | client+server (per-DB) | ~4 KB | ~10 ms     | 🚧 skeleton | USENIX'23        |
+| `simple_pir` | 1         | client (per-DB) | ~121 KB    | sub-second    | ✅ real      | USENIX'23        |
+| `double_pir` | 2 non-collude | client+server (per-DB) | ~4 KB | ~10 ms     | ✅ real      | USENIX'23        |
 | `frodo_pir`  | 1         | client (per-DB) | ~64 KB     | ms class      | 🚧 skeleton | PETS'23          |
 | `ypir`       | 1         | client (per-DB) | minimal    | sub-second    | 🚧 skeleton | USENIX'24        |
 
 > 🚧 **skeleton** = registrar / capabilities / proto compat are in place,
 > selector ranks them correctly, OnExecute returns FAIL. Real cryptographic
-> kernel lands per algorithm in OpenSpec change tasks 4.4 / 5.5 / 7.x.
+> kernel lands per algorithm in OpenSpec change tasks 4.4 / 7.1 / 7.3.
+>
+> ✅ **real** algorithms: id_pir (SealPIR, since project inception), apsi
+> (opt-in via --define microsoft-apsi=true), simple_pir (task 7.2 landed
+> 2026-06-08 / commit 2d77509a), double_pir (task 5.5 landed 2026-06-08 /
+> commit 31e8fd43 — first single-process self-contained pipeline; the
+> production CLIENT/SERVER LinkContext split is task 5.6).
 
 ---
 

@@ -4,12 +4,14 @@ This document describes the benchmark scripts in `bench/`, captures the
 current state of measured-vs-claimed performance, and explains how to
 interpret the JSON outputs that the scripts emit.
 
-> **State of the world (2026-06-06):** 1 of 6 registered algorithms is
-> real (id_pir / SealPIR). The other 5 are skeletons whose OnExecute
-> returns FAIL by design. The bench scripts are structured to give
-> useful output *today* (selector regression) and pick up meaningful
-> per-algorithm numbers as the real crypto kernels land in
-> tasks 4.4 / 5.5 / 7.x.
+> **State of the world (2026-06-08):** 3 of 6 registered algorithms are
+> real: id_pir (SealPIR, since project inception), simple_pir (task 7.2,
+> commit 2d77509a), and double_pir (task 5.5, commit 31e8fd43). The
+> remaining 3 (spiral / frodo_pir / ypir) are skeletons whose OnExecute
+> returns FAIL by design — real crypto kernels land in tasks 4.4 / 7.1
+> / 7.3. The bench scripts are structured to give useful output *today*
+> (selector regression + correctness smoke for the real ones) and pick
+> up per-algorithm latency numbers as the remaining ports land.
 
 ---
 
@@ -142,8 +144,8 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `id_pir`     | 1e6   | 1-3 s           | TBD          | TBD          | TBD        |
 | `apsi`       | 1e6   | sub-second      | TBD          | TBD          | TBD        |
 | `spiral`     | 1e8   | 2-3 s           | TBD          | TBD          | (skeleton) |
-| `double_pir` | 1e8   | ~10 ms          | TBD          | TBD          | (skeleton) |
-| `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (skeleton) |
+| `double_pir` | 1e8   | ~10 ms          | TBD          | TBD          | (real, bench task 5.10 pending) |
+| `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, bench TBD)              |
 | `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | (skeleton) |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 

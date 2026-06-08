@@ -78,7 +78,7 @@ weaker than the user's `min_threat_model` constraint.
 - **Operational notes:** No client-side hint required — same trust
   envelope as SealPIR but ~10× faster on the same hardware.
 
-### `simple_pir` — SimplePIR (USENIX'23) 🚧 skeleton
+### `simple_pir` — SimplePIR (USENIX'23) ✅ real
 
 - **Assumption (planned):** Single server, semi-honest. Plain LWE.
 - **Known attacks:** None practical.
@@ -95,7 +95,7 @@ weaker than the user's `min_threat_model` constraint.
 - **Operational notes:** Industrial maintenance by Brave; slightly
   larger hint than SimplePIR but easier parameter justification.
 
-### `double_pir` — DoublePIR (USENIX'23) 🚧 skeleton
+### `double_pir` — DoublePIR (USENIX'23) ✅ real
 
 - **Assumption (planned):** **TWO servers, semi-honest, non-colluding.**
   This is the strongest operational assumption in the framework.
