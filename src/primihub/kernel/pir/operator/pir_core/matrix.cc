@@ -166,6 +166,72 @@ void Matrix::ConcatCols(uint64_t n) {
   cols_ = new_cols;
 }
 
+void Matrix::Expand(uint64_t p, uint64_t delta) {
+  if (p == 0) {
+    LOG(FATAL) << "Matrix::Expand p == 0";
+  }
+  if (p == 1) {
+    LOG(FATAL) << "Matrix::Expand p == 1 — every digit is 0";
+  }
+  if (delta == 0) {
+    LOG(FATAL) << "Matrix::Expand delta == 0";
+  }
+  uint64_t new_rows = rows_ * delta;
+  std::vector<uint32_t> out(new_rows * cols_, 0);
+  uint32_t shift = static_cast<uint32_t>(p / 2);
+  for (uint64_t i = 0; i < rows_; ++i) {
+    for (uint64_t j = 0; j < cols_; ++j) {
+      uint64_t val = data_[i * cols_ + j];
+      for (uint64_t f = 0; f < delta; ++f) {
+        uint32_t digit = static_cast<uint32_t>(val % p);
+        // Centered representation: subtract p/2. Underflow on uint32
+        // is intentional and matches upstream simplepir's centered
+        // shift (Database::ScalarSub uses the same wrap-around).
+        out[(i * delta + f) * cols_ + j] = digit - shift;
+        val /= p;
+      }
+    }
+  }
+  data_ = std::move(out);
+  rows_ = new_rows;
+}
+
+void Matrix::Contract(uint64_t p, uint64_t delta) {
+  if (p == 0) {
+    LOG(FATAL) << "Matrix::Contract p == 0";
+  }
+  if (delta == 0) {
+    LOG(FATAL) << "Matrix::Contract delta == 0";
+  }
+  if (rows_ % delta != 0) {
+    LOG(FATAL) << "Matrix::Contract delta=" << delta
+               << " does not divide rows_=" << rows_;
+  }
+  uint64_t new_rows = rows_ / delta;
+  std::vector<uint32_t> out(new_rows * cols_, 0);
+  uint32_t shift = static_cast<uint32_t>(p / 2);
+  for (uint64_t i = 0; i < new_rows; ++i) {
+    for (uint64_t j = 0; j < cols_; ++j) {
+      uint64_t acc = 0;
+      uint64_t coeff = 1;
+      for (uint64_t f = 0; f < delta; ++f) {
+        uint32_t digit = data_[(i * delta + f) * cols_ + j];
+        // Upstream verbatim: (uint64(digit) + p/2) % p. The uint64
+        // widening before adding p/2 is exactly what upstream does;
+        // it makes the underflow wrap from Expand visible as a large
+        // uint64 (see the class-level docstring on round-trip
+        // semantics).
+        uint64_t recentered = (static_cast<uint64_t>(digit) + shift) % p;
+        acc += coeff * recentered;
+        coeff *= p;
+      }
+      out[i * cols_ + j] = static_cast<uint32_t>(acc);
+    }
+  }
+  data_ = std::move(out);
+  rows_ = new_rows;
+}
+
 void Matrix::Squish(uint64_t basis, uint64_t delta) {
   if (delta == 0) {
     LOG(FATAL) << "Matrix::Squish delta == 0";

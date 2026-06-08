@@ -377,5 +377,131 @@ TEST(MatrixDeathTest, ConcatColsZeroFatal) {
   EXPECT_DEATH(m.ConcatCols(0), "ConcatCols");
 }
 
+
+// ---- Expand / Contract (chunk 2 of DoublePIR port; task 5.5 dep) ----
+//
+// These tests pin each method to upstream simplepir's matrix.go
+// verbatim. Round-trip (Contract(Expand(x)) == x) is intentionally NOT
+// tested — see the Contract docstring: the uint32 underflow Expand
+// uses to encode negative digits introduces a per-digit offset of
+// (2^32 mod p) when Contract reads it back, so the round-trip is
+// exact only for p that divides 2^32. DoublePIR uses arbitrary p
+// (e.g. 929, 781) and handles this by applying Contract within an
+// LWE protocol context where the offset cancels.
+
+TEST(MatrixTest, ExpandWritesBasePDigitsCenteredByPOver2) {
+  // p = 4, delta = 2. p/2 = 2. Each input cell becomes 2 rows.
+  // Input 1x2:
+  //   row 0: 7 5
+  // 7 in base 4 = (3, 1)  ->  centered: (3-2, 1-2) = (1, -1) =
+  //                                                    (1, 0xFFFFFFFF)
+  // 5 in base 4 = (1, 1)  ->  centered: (1-2, 1-2) = (-1, -1) =
+  //                                                    (0xFFFFFFFF, 0xFFFFFFFF)
+  Matrix m(1, 2);
+  m.Set(0, 0, 7);
+  m.Set(0, 1, 5);
+  m.Expand(4, 2);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 2u);
+  EXPECT_EQ(m.Get(0, 0), 1u);
+  EXPECT_EQ(m.Get(1, 0), 0xFFFFFFFFu);
+  EXPECT_EQ(m.Get(0, 1), 0xFFFFFFFFu);
+  EXPECT_EQ(m.Get(1, 1), 0xFFFFFFFFu);
+}
+
+TEST(MatrixTest, ExpandGrowsRowsByDeltaWithColsUnchanged) {
+  Matrix m(5, 3);
+  m.Expand(7, 4);
+  EXPECT_EQ(m.rows(), 20u);
+  EXPECT_EQ(m.cols(), 3u);
+}
+
+TEST(MatrixTest, ContractMatchesUpstreamReconstructFromBaseP) {
+  // Hand-build the expanded form (the per-digit centered layout
+  // Expand would have produced) and verify Contract reconstructs the
+  // expected values. p = 5, delta = 3, p/2 = 2.
+  // Target output values: 17 and 11.
+  //   17 = 2 + 3*5 + 0*25 -> digits (2, 3, 0) -> centered (0, 1, -2) =
+  //                              (0, 1, 0xFFFFFFFE)
+  //   11 = 1 + 2*5 + 0*25 -> digits (1, 2, 0) -> centered (-1, 0, -2) =
+  //                              (0xFFFFFFFF, 0, 0xFFFFFFFE)
+  // Contract reads each digit back: (uint64(stored) + 2) % 5
+  //   col 0:
+  //     row 0 stored 0          -> (0+2)%5 = 2
+  //     row 1 stored 1          -> (1+2)%5 = 3
+  //     row 2 stored 0xFFFFFFFE -> (0xFFFFFFFE+2)%5 = 0x100000000 % 5
+  //   col 1:
+  //     row 0 stored 0xFFFFFFFF -> (0xFFFFFFFF+2)%5 = 0x100000001 % 5
+  //     row 1 stored 0          -> (0+2)%5 = 2
+  //     row 2 stored 0xFFFFFFFE -> 0x100000000 % 5
+  // 0x100000000 = 4294967296. 4294967296 % 5 = 1 (since 2^32 mod 5 = 1).
+  // 0x100000001 % 5 = 2.
+  // col 0: vals = [2, 3, 1]; sum = 2 + 3*5 + 1*25 = 2 + 15 + 25 = 42.
+  // col 1: vals = [2, 2, 1]; sum = 2 + 2*5 + 1*25 = 2 + 10 + 25 = 37.
+  // (Round-trip "value 17" -> 42 illustrates the offset effect — the
+  // test asserts the algorithm, not the round-trip.)
+  Matrix m(3, 2);
+  m.Set(0, 0, 0);             m.Set(0, 1, 0xFFFFFFFFu);
+  m.Set(1, 0, 1);             m.Set(1, 1, 0);
+  m.Set(2, 0, 0xFFFFFFFEu);   m.Set(2, 1, 0xFFFFFFFEu);
+  m.Contract(5, 3);
+  EXPECT_EQ(m.rows(), 1u);
+  EXPECT_EQ(m.cols(), 2u);
+  EXPECT_EQ(m.Get(0, 0), 42u);
+  EXPECT_EQ(m.Get(0, 1), 37u);
+}
+
+TEST(MatrixTest, ContractRoundTripsExactlyWhenPIsPowerOfTwo) {
+  // The one regime where Expand+Contract IS a clean inverse — when p
+  // divides 2^32 evenly, the per-digit wrap-around offset is 0.
+  // p = 4 (2^32 mod 4 == 0), delta = 3, p^delta = 64. Values 0..15
+  // are well within bounds and round-trip exactly.
+  Matrix m(2, 4);
+  uint32_t v = 0;
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 4; ++j) {
+      m.Set(i, j, v++);
+    }
+  }
+  Matrix original(2, 4);
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 4; ++j) {
+      original.Set(i, j, m.Get(i, j));
+    }
+  }
+  m.Expand(4, 3);
+  EXPECT_EQ(m.rows(), 6u);
+  EXPECT_EQ(m.cols(), 4u);
+  m.Contract(4, 3);
+  EXPECT_EQ(m.rows(), 2u);
+  EXPECT_EQ(m.cols(), 4u);
+  for (uint64_t i = 0; i < 2; ++i) {
+    for (uint64_t j = 0; j < 4; ++j) {
+      EXPECT_EQ(m.Get(i, j), original.Get(i, j))
+          << "p=4 round-trip mismatch at (" << i << ", " << j << ")";
+    }
+  }
+}
+
+TEST(MatrixDeathTest, ExpandFatalOnZeroP) {
+  Matrix m(2, 2);
+  EXPECT_DEATH(m.Expand(0, 2), "Expand");
+}
+
+TEST(MatrixDeathTest, ExpandFatalOnPOne) {
+  Matrix m(2, 2);
+  EXPECT_DEATH(m.Expand(1, 2), "Expand");
+}
+
+TEST(MatrixDeathTest, ExpandFatalOnZeroDelta) {
+  Matrix m(2, 2);
+  EXPECT_DEATH(m.Expand(4, 0), "Expand");
+}
+
+TEST(MatrixDeathTest, ContractFatalOnRowsNotDivisibleByDelta) {
+  Matrix m(5, 2);
+  EXPECT_DEATH(m.Contract(4, 2), "Contract");
+}
+
 }  // namespace
 }  // namespace primihub::pir::core

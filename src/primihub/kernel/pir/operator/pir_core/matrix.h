@@ -114,6 +114,46 @@ class Matrix {
   // FATALs (would divide by zero).
   void ConcatCols(uint64_t n);
 
+  // Expand(p, delta) — base-p digit decomposition into delta digits
+  // per element, growing rows by a factor of delta with cols
+  // unchanged. Input m x k -> output (m * delta) x k with the
+  // permutation
+  //     new[i * delta + f, j] = (old[i, j] / p^f) % p  -  p / 2
+  // The trailing "-p/2" matches upstream simplepir's centered
+  // representation (relies on uint32 underflow wrap-around — the same
+  // pattern Database::ScalarSub uses for the centered-DB shift).
+  //
+  // Used by DoublePIR Setup to expand each H1 cell into its base-p
+  // digits before the second-level multiply against A2, and by the
+  // TransposeAndExpandAndConcatColsAndSquish fused upstream helper
+  // (which we will assemble out of these primitives rather than
+  // porting the C kernel directly).
+  //
+  // p == 0 LOG-FATALs (would divide by zero). p == 1 LOG-FATALs
+  // (every digit would be 0). delta == 0 LOG-FATALs (would produce a
+  // zero-row matrix and lose all data). Pure arithmetic — works in
+  // both stub and vendored modes.
+  void Expand(uint64_t p, uint64_t delta);
+
+  // Contract(p, delta) — base-p digit re-aggregation, the upstream
+  // simplepir matrix.go Contract verbatim. Pre: rows % delta == 0
+  // (LOG-FATAL otherwise). Input (n * delta) x k -> output n x k with
+  //     new[i, j] = Sum_{f=0..delta-1} p^f * ((old[i*delta+f, j] + p/2) % p)
+  // The (+p/2) % p re-centers the digit before reconstruction.
+  //
+  // NOT a clean inverse of Expand for arbitrary p: the uint32
+  // underflow Expand uses to encode negative digits gets re-read as
+  // a large uint64 here, introducing a per-digit offset of
+  // (2^32 mod p) in the recentered value. Round-trip is exact only
+  // when p divides 2^32 (i.e., p is a power of 2). DoublePIR uses
+  // arbitrary p (e.g. 929, 781) and handles this by applying
+  // Contract within an LWE protocol context where the offset cancels
+  // — NOT as a plaintext decoder. Tests assert the upstream
+  // algorithm verbatim rather than round-trip identity.
+  //
+  // Pure arithmetic — works in both stub and vendored modes.
+  void Contract(uint64_t p, uint64_t delta);
+
   // Squish / Unsquish — pure-arithmetic in-memory compression used by
   // the SimplePIR Answer path (matMulVecPacked). Pack `delta` adjacent
   // Z_p columns into one Z_q column where each Z_p value lives in a
