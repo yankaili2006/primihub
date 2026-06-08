@@ -311,3 +311,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "double_pir_protocol_test",
+    srcs = ["double_pir_protocol_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_protocol",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

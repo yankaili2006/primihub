@@ -56,3 +56,24 @@ cc_library(
         "//conditions:default": [],
     }),
 )
+
+# Algorithm-level static functions (Init / Setup / Query / Answer /
+# Recover) for DoublePIR. Built separately from double_pir_operator
+# so the operator keeps its current scaffolding flow while the
+# protocol port lands in chunks 3..6 of openspec task 5.5. Setup,
+# Query, Answer, Recover need Matrix kernel calls so the cc_library
+# deps include pir_core::matrix which has its own enable_pir_core_real
+# activation. Query also pulls pir_core::gaussian for the LWE noise.
+cc_library(
+    name = "double_pir_protocol",
+    srcs = ["double_pir_protocol.cc"],
+    hdrs = ["double_pir_protocol.h"],
+    deps = [
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:gaussian",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_github_glog_glog//:glog",
+    ],
+)
