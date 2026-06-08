@@ -297,24 +297,114 @@ retcode DoublePirProtocol::Query(
 }
 
 retcode DoublePirProtocol::Answer(
-    const core::Database& /*squished_db*/,
-    const core::Matrix& /*H1_squished*/,
-    const core::Matrix& /*A2_copy_transposed*/,
-    const core::Matrix& /*query1*/,
-    const std::vector<core::Matrix>& /*queries2*/,
-    core::Matrix* /*answer1_out*/,
-    std::vector<core::Matrix>* /*answers2_out*/, std::string* err) {
-  if (err) {
-    *err =
-        "DoublePirProtocol::Answer: not yet implemented — chunk 6 of "
-        "openspec task 5.5 will land squished_DB * query1 plus the "
-        "per-column queries2 reduction.";
+    const core::Database& squished_db, const core::Matrix& H1_squished,
+    const core::Matrix& A2_copy_transposed, const core::Matrix& query1,
+    const std::vector<core::Matrix>& queries2,
+    const core::LweParams& params, core::Matrix* answer1_out,
+    std::vector<core::Matrix>* answers2_out, std::string* err) {
+  auto fail = [&](const std::string& msg) {
+    if (err) *err = msg;
+    return retcode::FAIL;
+  };
+  if (answer1_out == nullptr || answers2_out == nullptr) {
+    return fail(
+        "DoublePirProtocol::Answer: answer1_out / answers2_out must be "
+        "non-null");
   }
-  return retcode::FAIL;
+  const core::DBinfo& info = squished_db.info();
+  if (info.basis != 10 || info.squishing != 3) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Answer: squished_db must have basis=10 "
+           "squishing=3 (got basis="
+        << info.basis << " squishing=" << info.squishing
+        << ") — call Setup first";
+    return fail(oss.str());
+  }
+  if (info.x == 0 || info.ne % info.x != 0) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Answer: bad info — x=" << info.x
+        << " ne=" << info.ne << " (need x != 0 and x | ne)";
+    return fail(oss.str());
+  }
+  const uint64_t per_col = info.ne / info.x;
+  if (queries2.size() != per_col) {
+    std::ostringstream oss;
+    oss << "DoublePirProtocol::Answer: expected " << per_col
+        << " queries2 (= info.ne / info.x), got " << queries2.size();
+    return fail(oss.str());
+  }
+  if (params.p == 0 || params.logq == 0) {
+    return fail("DoublePirProtocol::Answer: params.p/logq must be populated");
+  }
+
+  // ---- a1 = squished_db * query1 ----  shape (L, 1).
+  // Upstream: a := MatrixMulVecPacked(DB.Data, q1, basis, squishing)
+  core::Matrix a1;
+  std::string mvp_err;
+  if (squished_db.data().MulVecPacked(query1, info.basis, info.squishing,
+                                       &a1, &mvp_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Answer: squished_db * query1 failed: " +
+                mvp_err);
+  }
+
+  // ---- TransposeAndExpandAndConcatColsAndSquish(p.P, p.delta(), info.X, 10, 3)
+  // Composition: Transpose + Expand + ScalarAdd(p/2) + ConcatCols + Squish.
+  // The ScalarAdd(p/2) un-does Matrix::Expand's centering subtraction
+  // so the squished bit pattern matches upstream's un-centered fused op.
+  core::Matrix a1_t;
+  std::string tr_err;
+  if (a1.Transpose(&a1_t, &tr_err) != retcode::SUCCESS) {
+    return fail("DoublePirProtocol::Answer: Transpose(a1) failed: " + tr_err);
+  }
+  const uint64_t delta = params.NumBasePDigits();
+  a1_t.Expand(params.p, delta);
+  a1_t.ScalarAdd(static_cast<uint32_t>(params.p / 2));
+  a1_t.ConcatCols(info.x);
+  a1_t.Squish(10, 3);
+  // a1_t now has shape (n * delta * x, ceil((l / x) / 3)).
+
+  // ---- h1 = MulTransposedPacked(a1_t, A2_copy_transposed, 10, 3) ----
+  std::string mtp_err;
+  if (a1_t.MulTransposedPacked(A2_copy_transposed, 10, 3, answer1_out,
+                                &mtp_err) != retcode::SUCCESS) {
+    return fail(
+        "DoublePirProtocol::Answer: MulTransposedPacked(a1, A2T) failed: " +
+        mtp_err);
+  }
+
+  // ---- Per-query2 LWE: for j in [0, info.ne / info.x):
+  //        a2 = H1_squished.MulVecPacked(q2)
+  //        h2 = a1_t.MulVecPacked(q2)
+  //      answers2_out is the interleaved list [a2_0, h2_0, a2_1, ...].
+  answers2_out->clear();
+  answers2_out->reserve(2 * per_col);
+  for (uint64_t j = 0; j < per_col; ++j) {
+    const core::Matrix& q2 = queries2[j];
+    core::Matrix a2;
+    core::Matrix h2;
+    std::string a2_err;
+    if (H1_squished.MulVecPacked(q2, 10, 3, &a2, &a2_err) != retcode::SUCCESS) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Answer: H1_squished * queries2[" << j
+          << "] failed: " << a2_err;
+      return fail(oss.str());
+    }
+    std::string h2_err;
+    if (a1_t.MulVecPacked(q2, 10, 3, &h2, &h2_err) != retcode::SUCCESS) {
+      std::ostringstream oss;
+      oss << "DoublePirProtocol::Answer: a1_t * queries2[" << j
+          << "] failed: " << h2_err;
+      return fail(oss.str());
+    }
+    answers2_out->push_back(std::move(a2));
+    answers2_out->push_back(std::move(h2));
+  }
+  return retcode::SUCCESS;
 }
 
 retcode DoublePirProtocol::Recover(
-    uint64_t /*index*/, const core::Matrix& /*query1*/,
+    uint64_t /*index*/, const core::Matrix& /*A2*/,
+    const core::Matrix& /*query1*/,
     const std::vector<core::Matrix>& /*queries2*/,
     const core::Matrix& /*H2_msg*/, const core::Matrix& /*secret1*/,
     const std::vector<core::Matrix>& /*secrets2*/,
@@ -324,9 +414,9 @@ retcode DoublePirProtocol::Recover(
     uint64_t* /*recovered_out*/, std::string* err) {
   if (err) {
     *err =
-        "DoublePirProtocol::Recover: not yet implemented — chunk 6 of "
-        "openspec task 5.5 will land the two-stage decode (Contract "
-        "undoes the Expand from Setup, then reconstruct the cell).";
+        "DoublePirProtocol::Recover: not yet implemented — chunk 6c "
+        "of openspec task 5.5 lands the val1/val2/val3 LWE-correction "
+        "chain + per-column SelectRows + Contract decode.";
   }
   return retcode::FAIL;
 }

@@ -626,14 +626,33 @@ TEST(MatrixTest, MulTransposedPackedRejectsBadColLayout) {
   EXPECT_NE(err.find("b.cols must equal"), std::string::npos) << err;
 }
 
-TEST(MatrixTest, MulTransposedPackedRejectsBadBRowAlignment) {
-  // bRows must be a multiple of 8 (short-rows branch j+=8 unroll).
-  Matrix a(4, 2);
-  Matrix b(7, 6);  // 7 % 8 != 0
+TEST(MatrixTest, MulTransposedPackedRejectsBadBRowAlignmentInShortRowsBranch) {
+  // bRows must be a multiple of 8 ONLY when aRows <= aCols (kernel
+  // short-rows branch j+=8 unroll). aRows=2, aCols=4 → short-rows;
+  // bRows=7 trips the guard.
+  Matrix a(2, 4);
+  Matrix b(7, 12);
   Matrix out;
   std::string err;
   EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
   EXPECT_NE(err.find("multiple of 8"), std::string::npos) << err;
+}
+
+TEST(MatrixTest, MulTransposedPackedAllowsAnyBRowsInLongRowsBranch) {
+  // Long-rows branch (aRows > aCols) steps j by 1 — bRows=4 must be
+  // accepted. We're testing input validation only, so stub mode is
+  // fine.
+  Matrix a(4, 2);
+  Matrix b(4, 6);
+  Matrix out;
+  std::string err;
+  if (kPirCoreKernelsVendored) {
+    EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::SUCCESS)
+        << err;
+  } else {
+    EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
+    EXPECT_NE(err.find("not vendored"), std::string::npos) << err;
+  }
 }
 
 TEST(MatrixTest, MulTransposedPackedFailsLoudlyInStubMode) {

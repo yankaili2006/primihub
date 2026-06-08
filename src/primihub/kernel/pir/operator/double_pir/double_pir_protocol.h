@@ -150,16 +150,68 @@ class DoublePirProtocol {
                        std::vector<core::Matrix>* queries2_out,
                        std::string* err);
 
+  // Server-side per-database compute. Mirrors upstream
+  // simplepir/double_pir.go Answer single-query path:
+  //
+  //   a1 = MulVecPacked(squished_db.Data, query1, basis, squishing)
+  //   a1.TransposeAndExpandAndConcatColsAndSquish(p.P, p.delta(),
+  //                                                info.X, 10, 3)
+  //     // a1 starts as (L, 1); after the fused op it has shape
+  //     // (delta * info.X, ceil((L/info.X)/3)).
+  //   h1 = MulTransposedPacked(a1, A2_copy_transposed, 10, 3)
+  //     // h1 shape: (a1.rows, A2_copy_transposed.rows) =
+  //     //           (delta * info.X, N).
+  //   answer1_out = h1
+  //   for each q2 in queries2:
+  //       a2 = MulVecPacked(H1_squished, q2, 10, 3)
+  //       h2 = MulVecPacked(a1, q2, 10, 3)
+  //       answers2_out.push_back(a2)
+  //       answers2_out.push_back(h2)
+  //
+  // The fused upstream TransposeAndExpandAndConcatColsAndSquish is
+  // composed in this port as Transpose + Expand(p, delta) +
+  // ScalarAdd(p/2) + ConcatCols(info.x) + Squish(10, 3). The
+  // ScalarAdd(p/2) un-does the centering subtraction baked into our
+  // Matrix::Expand so the resulting bit pattern matches upstream's
+  // un-centered fused operation.
+  //
+  // Pre: squished_db.info().basis == 10 && squished_db.info().squishing == 3
+  //      (set up by Setup); queries2.size() == info.ne / info.x.
+  //
+  // Activation: vendored mode required (calls MulVecPacked and
+  // MulTransposedPacked kernel bridges). Stub mode forwards
+  // retcode::FAIL with the kernel-bridge's activation-flag hint.
+  //
+  // Output:
+  //   answer1_out -> single matrix (the h1 hint).
+  //   answers2_out -> 2 * queries2.size() matrices interleaved as
+  //                    [a2_0, h2_0, a2_1, h2_1, ...].
   static retcode Answer(const core::Database& squished_db,
                         const core::Matrix& H1_squished,
                         const core::Matrix& A2_copy_transposed,
                         const core::Matrix& query1,
                         const std::vector<core::Matrix>& queries2,
+                        const core::LweParams& params,
                         core::Matrix* answer1_out,
                         std::vector<core::Matrix>* answers2_out,
                         std::string* err);
 
+  // Client-side decode. Mirrors upstream simplepir/double_pir.go
+  // Recover. Walks the val1/val2/val3 LWE-correction triples,
+  // peels per-column slices of H2 / answer1 / answer2 / h2 with
+  // Matrix::SelectRows, runs the LWE multiply-then-round chain
+  // (Mul + Sub + Round + Contract), then dequantises the recovered
+  // p-ary digit list through core::ReconstructElem.
+  //
+  // Pre: query1 / secrets2 / answers2 produced by Query+Answer for
+  // the same `index`. info.ne, info.x, info.cols, info.row_length
+  // must all be populated (set by Database::SetupShape).
+  //
+  // Activation: vendored mode required (Matrix::Mul kernel bridge
+  // is hit on the per-column LWE re-encrypt step). Stub mode
+  // forwards FAIL with the kernel-bridge's activation-flag hint.
   static retcode Recover(uint64_t index,
+                         const core::Matrix& A2,
                          const core::Matrix& query1,
                          const std::vector<core::Matrix>& queries2,
                          const core::Matrix& H2_msg,

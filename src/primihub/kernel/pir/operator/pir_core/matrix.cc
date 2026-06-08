@@ -523,15 +523,17 @@ retcode Matrix::MulTransposedPacked(const Matrix& b, uint64_t basis,
     return retcode::FAIL;
   }
   // Short-rows branch (aRows <= aCols) steps j by 8 — bRows must
-  // be a multiple of 8. Required unconditionally so that accidental
-  // OOB writes from non-multiple-of-8 bRows do not silently corrupt
-  // out. DoublePIR Answer always passes N=1024 here.
-  if ((b.rows_ % 8) != 0) {
+  // be a multiple of 8 in that branch. Long-rows branch (aRows >
+  // aCols) steps j by 1 and tolerates any bRows. Match upstream by
+  // gating the alignment check on the branch the kernel will take.
+  if (rows_ <= cols_ && (b.rows_ % 8) != 0) {
     if (err) {
       std::ostringstream oss;
       oss << "Matrix::MulTransposedPacked: b.rows=" << b.rows_
-          << " must be a multiple of 8 (kernel short-rows branch "
-          << "unrolls the j-loop by 8).";
+          << " must be a multiple of 8 when this.rows <= this.cols "
+          << "(kernel short-rows branch unrolls the j-loop by 8). "
+          << "this=" << rows_ << "x" << cols_ << ", b=" << b.rows_
+          << "x" << b.cols_ << ".";
       *err = oss.str();
     }
     return retcode::FAIL;
