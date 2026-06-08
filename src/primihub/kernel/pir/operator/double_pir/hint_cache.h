@@ -70,6 +70,33 @@ class HintCache {
   // Test-only: bound capacity (lets unit tests force eviction).
   void SetCapacityForTest(std::size_t cap);
 
+  // On-disk persistence — task 5.6 chunk 4. Lets the cache survive a
+  // process restart so production callers don't repeat the cold-start
+  // hint computation. File format (little-endian throughout):
+  //
+  //   magic     : "PHHC"   4 bytes  ("PrimiHub Hint Cache")
+  //   version   : u16      2 bytes  (current = 1)
+  //   reserved  : u16      2 bytes  (must be 0)
+  //   count     : u64      8 bytes  (number of entries)
+  //   for each entry, in MRU-first order:
+  //     fp       : u64                 fingerprint
+  //     blob_len : u64                 SerializeHint output length
+  //     blob     : blob_len bytes      SerializeHint output (PHHB)
+  //
+  // SaveToFile writes atomically via `<path>.tmp` + rename, so a
+  // partial write never corrupts the destination. Returns FAIL on
+  // open/write/rename failure; *err is populated.
+  retcode SaveToFile(const std::string& path,
+                     std::string* err = nullptr) const;
+
+  // Replaces the current cache contents with the entries in `path`.
+  // Validates magic / version / framing; refuses to mutate the cache
+  // on any framing error (cache state preserved on FAIL). Entries are
+  // re-inserted via Put() so LRU ordering matches the file's
+  // MRU-first sequence.
+  retcode LoadFromFile(const std::string& path,
+                       std::string* err = nullptr);
+
  private:
   HintCache() = default;
   HintCache(const HintCache&) = delete;

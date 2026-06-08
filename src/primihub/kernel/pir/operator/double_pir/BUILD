@@ -110,6 +110,7 @@ cc_library(
     hdrs = ["hint_cache.h"],
     deps = [
         ":hint_gen",
+        ":hint_serialize",
         "//src/primihub/common:common_defination",
         "//src/primihub/kernel/pir/operator/pir_core:database",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
