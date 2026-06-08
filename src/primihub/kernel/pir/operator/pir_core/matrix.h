@@ -45,6 +45,8 @@
 
 namespace primihub::pir::core {
 
+class LweParams;
+
 // True iff this build links against @simplepir//:simplepir_c_kernels.
 // When false, kernel-calling methods (Mul / MulVec / Transpose) return
 // retcode::FAIL.
@@ -216,6 +218,42 @@ class Matrix {
   // pointers, which is harder to bound-check in C++; allocating a new
   // out is slightly more memory but lets the caller decide lifetime.
   retcode Transpose(Matrix* out, std::string* err) const;
+
+  // SelectRows — deep-copy slice. Returns a new Matrix containing
+  // rows [offset, offset + num_rows) of `*this`. Pre: offset +
+  // num_rows <= rows_ (LOG-FATAL otherwise). num_rows == 0 returns
+  // an empty matrix. Mirrors upstream simplepir matrix.go
+  // RowsDeepCopy verbatim — used by DoublePIR Answer to feed the
+  // squished-DB row-batch into MulVecPacked, and by Recover to
+  // peel off per-column chunks of H2 / answer1 / answer2 / h1.
+  //
+  // Pure arithmetic — works in both stub and vendored modes.
+  Matrix SelectRows(uint64_t offset, uint64_t num_rows) const;
+
+  // Round(params) — in-place rounding of every cell via
+  // LweParams::Round. Mirrors upstream simplepir matrix.go
+  // Matrix.Round, used by DoublePIR Recover to coarsen LWE
+  // ciphertexts back to Z_p before Contract. Pure arithmetic —
+  // works in both stub and vendored modes.
+  void Round(const LweParams& params);
+
+  // MulTransposedPacked — kernel bridge for the DoublePIR Answer's
+  // server-side per-column compute. Both `*this` and `b` are
+  // Squish-ed matrices (basis = 10, squishing = 3). Output is
+  // (this.rows) x (b.rows) in the unpacked representation —
+  // matMulTransposedPacked computes the transposed product across
+  // packed Z_q slots.
+  //
+  // The C kernel hardcodes basis=10 / squishing=3 like MulVecPacked;
+  // anything else returns FAIL up-front. Pre: this.cols == b.cols
+  // (matching packed-column count — the kernel reads `aCols` and
+  // `bCols` independently but the j-loop relies on b being packed
+  // with the same compression layout as this).
+  //
+  // Stub mode returns FAIL with the activation-flag hint.
+  retcode MulTransposedPacked(const Matrix& b, uint64_t basis,
+                              uint64_t squishing, Matrix* out,
+                              std::string* err) const;
 
  private:
   uint64_t rows_ = 0;

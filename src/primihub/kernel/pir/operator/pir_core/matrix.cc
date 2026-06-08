@@ -7,6 +7,9 @@
  */
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 
+#include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
+
+#include <algorithm>
 #include <cstdint>
 #include <random>
 #include <sstream>
@@ -23,6 +26,9 @@ void matMulVec(Elem* out, const Elem* a, const Elem* b,
                size_t aRows, size_t aCols);
 void matMulVecPacked(Elem* out, const Elem* a, const Elem* b,
                      size_t aRows, size_t aCols);
+void matMulTransposedPacked(Elem* out, const Elem* a, const Elem* b,
+                            size_t aRows, size_t aCols,
+                            size_t bRows, size_t bCols);
 void transpose(Elem* out, const Elem* in, size_t rows, size_t cols);
 }  // extern "C"
 #endif  // PIR_PIR_CORE_REAL
@@ -451,6 +457,78 @@ retcode Matrix::Transpose(Matrix* out, std::string* err) const {
   *out = Matrix(cols_, rows_);
   transpose(out->mutable_data(), data_.data(),
             static_cast<size_t>(rows_), static_cast<size_t>(cols_));
+  return retcode::SUCCESS;
+#endif
+}
+
+
+Matrix Matrix::SelectRows(uint64_t offset, uint64_t num_rows) const {
+  if (offset + num_rows > rows_) {
+    LOG(FATAL) << "Matrix::SelectRows offset=" << offset << " num_rows="
+               << num_rows << " > rows_=" << rows_;
+  }
+  Matrix out(num_rows, cols_);
+  if (num_rows == 0) {
+    return out;
+  }
+  std::copy(data_.begin() + offset * cols_,
+            data_.begin() + (offset + num_rows) * cols_,
+            out.data_.begin());
+  return out;
+}
+
+void Matrix::Round(const LweParams& params) {
+  // LweParams::Round handles the per-cell math (Delta + p semantics).
+  // Iterating element-by-element mirrors upstream simplepir matrix.go
+  // Matrix.Round.
+  for (uint64_t i = 0; i < size(); ++i) {
+    data_[i] = static_cast<uint32_t>(
+        params.Round(static_cast<uint64_t>(data_[i])));
+  }
+}
+
+retcode Matrix::MulTransposedPacked(const Matrix& b, uint64_t basis,
+                                     uint64_t squishing, Matrix* out,
+                                     std::string* err) const {
+  if (out == nullptr) {
+    if (err) *err = "Matrix::MulTransposedPacked: out is null";
+    return retcode::FAIL;
+  }
+  if (basis != 10 || squishing != 3) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulTransposedPacked: basis=" << basis
+          << " squishing=" << squishing
+          << " — kernel hardcodes basis=10 squishing=3.";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+  if (cols_ != b.cols_) {
+    if (err) {
+      std::ostringstream oss;
+      oss << "Matrix::MulTransposedPacked: packed-cols mismatch — "
+          << "this=" << rows_ << "x" << cols_
+          << ", b=" << b.rows_ << "x" << b.cols_
+          << " (kernel j-loop requires equal packed-column counts).";
+      *err = oss.str();
+    }
+    return retcode::FAIL;
+  }
+#ifndef PIR_PIR_CORE_REAL
+  WriteNotVendoredError(err);
+  return retcode::FAIL;
+#else
+  // Output shape: (this.rows) x (b.rows). Both operands packed.
+  Matrix temp(rows_, b.rows_);
+  // The C kernel reads aRows, aCols, bRows, bCols and writes
+  // out[bRows*i + j]. Output is aRows-by-bRows in row-major.
+  matMulTransposedPacked(temp.mutable_data(), data_.data(), b.data(),
+                          static_cast<size_t>(rows_),
+                          static_cast<size_t>(cols_),
+                          static_cast<size_t>(b.rows_),
+                          static_cast<size_t>(b.cols_));
+  *out = std::move(temp);
   return retcode::SUCCESS;
 #endif
 }

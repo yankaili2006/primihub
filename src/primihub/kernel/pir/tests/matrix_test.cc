@@ -16,6 +16,8 @@
 
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 
+#include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
+
 namespace primihub::pir::core {
 namespace {
 
@@ -545,6 +547,113 @@ TEST(MatrixDeathTest, ConcatFatalOnColMismatch) {
   Matrix a(2, 3);
   Matrix b(1, 4);
   EXPECT_DEATH(a.Concat(b), "Concat cols mismatch");
+}
+
+
+// ---- SelectRows / Round / MulTransposedPacked (chunk 6a) ----
+
+TEST(MatrixTest, SelectRowsReturnsDeepCopyOfSlice) {
+  Matrix m(4, 3);
+  uint32_t v = 1;
+  for (uint64_t i = 0; i < 4; ++i) {
+    for (uint64_t j = 0; j < 3; ++j) {
+      m.Set(i, j, v++);
+    }
+  }
+  Matrix slice = m.SelectRows(1, 2);
+  EXPECT_EQ(slice.rows(), 2u);
+  EXPECT_EQ(slice.cols(), 3u);
+  EXPECT_EQ(slice.Get(0, 0), 4u);  // original row 1
+  EXPECT_EQ(slice.Get(0, 2), 6u);
+  EXPECT_EQ(slice.Get(1, 0), 7u);  // original row 2
+  EXPECT_EQ(slice.Get(1, 2), 9u);
+  // Deep copy: mutating the slice must not touch the original.
+  slice.Set(0, 0, 9999u);
+  EXPECT_EQ(m.Get(1, 0), 4u);
+}
+
+TEST(MatrixTest, SelectRowsZeroCountReturnsEmpty) {
+  Matrix m(3, 2);
+  Matrix slice = m.SelectRows(1, 0);
+  EXPECT_EQ(slice.rows(), 0u);
+  EXPECT_EQ(slice.cols(), 2u);
+}
+
+TEST(MatrixDeathTest, SelectRowsFatalOnOutOfBounds) {
+  Matrix m(3, 2);
+  EXPECT_DEATH(m.SelectRows(2, 2), "SelectRows");
+}
+
+TEST(MatrixTest, RoundAppliesLweParamsRoundToEachCell) {
+  // Pick params with a tight Round behaviour: p = 4, logq = 32 makes
+  // Delta = 2^30. LweParams::Round(x) = ((x + Delta/2) / Delta) % p.
+  // Sample input cell values that map to known Round outputs.
+  LweParams params;
+  params.logq = 32;
+  params.p = 4;
+  const uint32_t delta = static_cast<uint32_t>(params.Delta());
+  Matrix m(2, 2);
+  m.Set(0, 0, 0u);                 // Round(0) = 0
+  m.Set(0, 1, delta);              // Round(Delta) = 1
+  m.Set(1, 0, 2u * delta);         // Round(2*Delta) = 2
+  m.Set(1, 1, 3u * delta);         // Round(3*Delta) = 3
+  m.Round(params);
+  EXPECT_EQ(m.Get(0, 0), 0u);
+  EXPECT_EQ(m.Get(0, 1), 1u);
+  EXPECT_EQ(m.Get(1, 0), 2u);
+  EXPECT_EQ(m.Get(1, 1), 3u);
+}
+
+TEST(MatrixTest, MulTransposedPackedRejectsNonHardcodedParams) {
+  // Stub-or-vendored: input-validation happens before the kernel
+  // dispatch, so the EXPECT_EQ holds in both modes.
+  Matrix a(4, 2);
+  Matrix b(4, 2);
+  Matrix out;
+  std::string err;
+  EXPECT_EQ(a.MulTransposedPacked(b, 8, 3, &out, &err), retcode::FAIL);
+  EXPECT_NE(err.find("basis=8"), std::string::npos) << err;
+}
+
+TEST(MatrixTest, MulTransposedPackedRejectsPackedColMismatch) {
+  Matrix a(4, 2);
+  Matrix b(4, 3);
+  Matrix out;
+  std::string err;
+  EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
+  EXPECT_NE(err.find("packed-cols mismatch"), std::string::npos) << err;
+}
+
+TEST(MatrixTest, MulTransposedPackedFailsLoudlyInStubMode) {
+  if (kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "vendored mode succeeds — see MulTransposedPackedSmokeAsymmetric";
+  }
+  Matrix a(8, 1);
+  Matrix b(8, 1);
+  Matrix out;
+  std::string err;
+  EXPECT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::FAIL);
+  EXPECT_NE(err.find("not vendored"), std::string::npos) << err;
+}
+
+TEST(MatrixTest, MulTransposedPackedSmokeProducesCorrectShape) {
+  if (!kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "needs kernel bridge";
+  }
+  // Output shape must be (this.rows) x (b.rows). Use enough rows so
+  // the kernel's j-loop (steps of 8 when aRows <= aCols, single-step
+  // otherwise) covers at least one full SIMD batch. aRows=8 is the
+  // minimum that exercises the "aRows > aCols" branch.
+  Matrix a(8, 1);   // packed 8x1
+  Matrix b(8, 1);   // packed 8x1 with the same cols=1
+  a.Set(0, 0, 1u);  // arbitrary non-zero payload
+  b.Set(0, 0, 1u);
+  Matrix out;
+  std::string err;
+  ASSERT_EQ(a.MulTransposedPacked(b, 10, 3, &out, &err), retcode::SUCCESS)
+      << err;
+  EXPECT_EQ(out.rows(), 8u);
+  EXPECT_EQ(out.cols(), 8u);
 }
 
 }  // namespace

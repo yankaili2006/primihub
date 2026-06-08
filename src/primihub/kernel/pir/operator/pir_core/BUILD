@@ -64,6 +64,7 @@ cc_library(
     deps = [
         "//src/primihub/common:common_defination",
         "@com_github_glog_glog//:glog",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
     ] + select({
         ":enable_real": ["@simplepir//:simplepir_c_kernels"],
         "//conditions:default": [],
