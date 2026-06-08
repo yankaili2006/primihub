@@ -14,7 +14,13 @@
 #                -> Recover pipeline end-to-end at N=64/l=8/m=8). Gated
 #                behind PIR_SMOKE_RUN_BAZEL=1 + SIMPLEPIR_UPSTREAM env
 #                var; otherwise reports SKIP with the activation hint.
-#   spiral, double_pir, frodo_pir, ypir, tiptoe_pir
+#   double_pir — real DoublePIR implementation (USENIX'23). Smoke invokes
+#                double_pir_test via bazel (DoublePirOperator EndToEnd
+#                runs Init -> Setup -> Query -> Answer -> Recover end-to-
+#                end at N=64). Same activation flags as simple_pir; both
+#                share the @simplepir upstream (it ships SimplePIR +
+#                DoublePIR together).
+#   spiral, frodo_pir, ypir, tiptoe_pir
 #              — registered as SKELETONS. Their OnExecute returns FAIL by
 #                design; smoke records SKIP-stub with the reason.
 #
@@ -91,7 +97,7 @@ declare -A IS_SKELETON=(
   [id_pir]=0
   [apsi]=0
   [spiral]=1
-  [double_pir]=1
+  [double_pir]=0
   [simple_pir]=0
   [frodo_pir]=1
   [ypir]=1
@@ -111,7 +117,11 @@ run_real_smoke() {
   # full Init -> ... -> Recover pipeline in-process. Gated behind a
   # separate env var so the default `bench/pir_correctness_smoke.sh`
   # invocation stays fast; CI gates can opt in via PIR_SMOKE_RUN_BAZEL=1.
-  if [[ "$algo" == "simple_pir" ]]; then
+  # simple_pir + double_pir share the same @simplepir upstream + the
+  # same bazel smoke pattern: build with --define=enable_pir_core_real=1
+  # + --override_repository=simplepir=<path>, then run the operator test
+  # that exercises the full Init→…→Recover pipeline.
+  if [[ "$algo" == "simple_pir" || "$algo" == "double_pir" ]]; then
     if [[ -z "${PIR_SMOKE_RUN_BAZEL:-}" ]]; then
       echo "SKIP(set PIR_SMOKE_RUN_BAZEL=1 + SIMPLEPIR_UPSTREAM=<path> to run bazel smoke)"
       return
@@ -121,7 +131,6 @@ run_real_smoke() {
       echo "SKIP(SIMPLEPIR_UPSTREAM=$upstream is not a directory)"
       return
     fi
-    # Find the bazel WORKSPACE root by walking up from the script.
     local root="$SCRIPT_DIR"
     while [[ "$root" != "/" && ! -f "$root/WORKSPACE" && ! -f "$root/WORKSPACE.bazel" ]]; do
       root="$(dirname "$root")"
@@ -134,13 +143,21 @@ run_real_smoke() {
       echo "SKIP(bazel not on PATH)"
       return
     fi
+    local target define_flag
+    if [[ "$algo" == "simple_pir" ]]; then
+      target="//src/primihub/kernel/pir/tests:simple_pir_operator_test"
+      define_flag="--define=enable_simple_pir_real=1"
+    else
+      target="//src/primihub/kernel/pir/tests:double_pir_test"
+      define_flag="--define=enable_double_pir_real=1"
+    fi
     local log
     log="$(mktemp)"
     if (cd "$root" && bazel test --config=linux_x86_64 \
             --define=enable_pir_core_real=1 \
-            --define=enable_simple_pir_real=1 \
+            "$define_flag" \
             --override_repository=simplepir="$upstream" \
-            //src/primihub/kernel/pir/tests:simple_pir_operator_test \
+            "$target" \
             --test_output=summary) > "$log" 2>&1; then
       rm -f "$log"
       echo "PASS"
