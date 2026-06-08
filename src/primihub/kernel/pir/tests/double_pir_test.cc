@@ -19,6 +19,7 @@
 #include "src/primihub/kernel/pir/operator/base_pir.h"
 #include "src/primihub/kernel/pir/operator/capabilities.h"
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir.h"
+#include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/kernel/pir/operator/selector.h"
 
@@ -64,18 +65,6 @@ TEST_F(DoublePirSkeletonTest, FactoryReturnsNonNull) {
   opt.role = Role::CLIENT;
   auto op = PirRegistry::Instance().Create("double_pir", opt);
   ASSERT_NE(op, nullptr);
-}
-
-TEST_F(DoublePirSkeletonTest, OnExecuteFailsLoudlyUntilImplemented) {
-  EXPECT_TRUE(DoublePirOperator::kIsSkeleton);
-  Options opt;
-  opt.self_party = "client";
-  opt.role = Role::CLIENT;
-  DoublePirOperator op(opt);
-  PirDataType input;
-  PirDataType result;
-  EXPECT_EQ(op.OnExecute(input, &result), retcode::FAIL);
-  EXPECT_TRUE(result.empty());
 }
 
 // The single most important behavioural test for DoublePIR — it MUST be
@@ -127,14 +116,6 @@ TEST_F(DoublePirSkeletonTest, SelectorPicksDoublePirWhenAllConditionsMet) {
   c.allow_two_server = true;
   c.assume_non_colluding = true;
   c.client_can_cache_hint = true;
-  // DoublePIR OnExecute is still a skeleton (task 5.5 pending). The
-  // selector now hides skeletons from recommendations by default; opt
-  // them in for this test so we keep validating that the capability
-  // profile + per-flag gates would route to DoublePIR once the real
-  // impl lands. The two SelectorFilters* tests above keep working
-  // unchanged because they assert NOT passes — skeleton just adds an
-  // extra fail reason.
-  c.include_skeletons = true;
   auto matches = PirSelector{}.RecommendWithRationale(c);
   bool double_pir_passes = false;
   for (const auto& m : matches) {
@@ -147,6 +128,69 @@ TEST_F(DoublePirSkeletonTest, SelectorPicksDoublePirWhenAllConditionsMet) {
       << "DoublePIR did not pass selector despite all conditions met "
          "(db_size=1e8, Ms budget, two-server allowed, non-colluding "
          "assumed) — selector or capability profile regressed";
+}
+
+
+// ---- Operator integration tests (chunk 7 of openspec task 5.5) ----
+//
+// kIsSkeleton flipped to false in chunk 7. DoublePirOperator now
+// drives the full Init/Setup/Query/Answer/Recover pipeline on the
+// caller-supplied PirDataType input.
+
+TEST(DoublePirOperatorTest, NotSkeletonAfterChunk7) {
+  EXPECT_FALSE(DoublePirOperator::kIsSkeleton);
+}
+
+TEST(DoublePirOperatorTest, FailsOnMissingDb) {
+  Options opt;
+  opt.self_party = "client";
+  opt.role = Role::CLIENT;
+  DoublePirOperator op(opt);
+  PirDataType input;
+  input["query_indices"] = {"0"};
+  PirDataType result;
+  EXPECT_EQ(op.OnExecute(input, &result), retcode::FAIL);
+}
+
+TEST(DoublePirOperatorTest, FailsOnMissingIndices) {
+  Options opt;
+  opt.self_party = "client";
+  opt.role = Role::CLIENT;
+  DoublePirOperator op(opt);
+  PirDataType input;
+  input["db_content"] = {"1", "2", "3"};
+  PirDataType result;
+  EXPECT_EQ(op.OnExecute(input, &result), retcode::FAIL);
+}
+
+TEST(DoublePirOperatorTest, EndToEndRetrievesCorrectEntries) {
+  if (!core::kPirCoreKernelsVendored) {
+    GTEST_SKIP() << "end-to-end retrieval needs the kernel bridge";
+  }
+  // 64-entry DB. l=8, m=8 — l divisible by 8 (kRowAlignment) and
+  // info.x=1 from SetupShape with p_double=929, row_length=8 →
+  // params.l % info.x == 0.
+  std::vector<std::string> db;
+  db.reserve(64);
+  for (uint64_t i = 0; i < 64; ++i) {
+    db.push_back(std::to_string((i * 13 + 7) & 0xFF));
+  }
+  Options opt;
+  opt.self_party = "client";
+  opt.role = Role::CLIENT;
+  DoublePirOperator op(opt);
+  PirDataType input;
+  input["db_content"] = db;
+  input["query_indices"] = {"0", "27", "63"};
+
+  PirDataType result;
+  ASSERT_EQ(op.OnExecute(input, &result), retcode::SUCCESS);
+  auto it = result.find("recovered");
+  ASSERT_NE(it, result.end());
+  ASSERT_EQ(it->second.size(), 3u);
+  EXPECT_EQ(it->second[0], std::to_string((0u * 13 + 7) & 0xFF));
+  EXPECT_EQ(it->second[1], std::to_string((27u * 13 + 7) & 0xFF));
+  EXPECT_EQ(it->second[2], std::to_string((63u * 13 + 7) & 0xFF));
 }
 
 }  // namespace primihub::pir

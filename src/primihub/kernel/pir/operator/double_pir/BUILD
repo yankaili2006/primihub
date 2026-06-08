@@ -50,6 +50,10 @@ cc_library(
         "//src/primihub/kernel/pir/operator:capabilities",
         "//src/primihub/kernel/pir/operator:multi_peer_pir",
         "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_protocol",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "@com_github_glog_glog//:glog",
     ] + select({
         ":enable_real": ["@simplepir//:simplepir_c_kernels"],

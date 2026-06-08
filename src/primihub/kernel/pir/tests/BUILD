@@ -86,6 +86,7 @@ cc_test(
         "//src/primihub/kernel/pir/operator:registry",
         "//src/primihub/kernel/pir/operator:selector",
         "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "@com_google_googletest//:gtest_main",
     ],
     size = "small",

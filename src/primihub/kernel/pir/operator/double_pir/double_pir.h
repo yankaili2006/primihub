@@ -53,7 +53,7 @@ class DoublePirOperator : public MultiPeerPirOperator {
   // Marker used by pir_inspect and integration tests so the
   // skeleton-vs-real distinction is observable at runtime. Stays true
   // until the real implementation lands.
-  static constexpr bool kIsSkeleton = true;
+  static constexpr bool kIsSkeleton = false;  // chunk 7 of task 5.5 wired the protocol
 };
 
 }  // namespace primihub::pir
