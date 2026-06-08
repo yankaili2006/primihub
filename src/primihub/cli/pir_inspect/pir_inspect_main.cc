@@ -23,6 +23,11 @@
 #include "src/primihub/kernel/pir/operator/capabilities.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/kernel/pir/operator/selector.h"
+#include "src/primihub/kernel/pir/operator/double_pir/hint_serialize.h"
+
+#include <cerrno>
+#include <fstream>
+#include <sstream>
 
 using primihub::pir::AlgoMatch;
 using primihub::pir::Backend;
@@ -194,7 +199,164 @@ void Usage() {
     "  pir_inspect list\n"
     "  pir_inspect caps id_pir\n"
     "  pir_inspect auto db-size=1e8 query-type=index allow-two-server=true \\\n"
-    "                   assume-non-colluding=true latency-budget=ms\n";
+    "                   assume-non-colluding=true latency-budget=ms\n"
+    "\n"
+    "  pir_inspect cache <path> [--emit-csv]\n"
+    "      Dump on-disk HintCache (PHHC) summary or CSV (task 5.6 chunk 4+5).\n";
+}
+
+}  // namespace
+
+// --- pir_inspect cache <path> -------------------------------------------
+//
+// Reads a PHHC HintCache file (written by HintCache::SaveToFile, task 5.6
+// chunks 4+5) and prints a human-readable summary. Useful for verifying
+// what's been persisted before restarting a production node, and for
+// debugging "why didn't my hint hit the cache" investigations.
+//
+// Output:
+//   - default: a multi-line per-entry summary (fingerprint hex, blob
+//     bytes, matrix shapes, total cell count, DBinfo highlights)
+//   - --emit-csv: one CSV row per entry — for shell pipelines / monitoring
+
+namespace {
+
+constexpr char kCacheMagicCli[4] = {'P', 'H', 'H', 'C'};
+constexpr uint16_t kCacheVersionCli = 1;
+
+inline bool ReadU16LE(const std::string& s, size_t* off, uint16_t* out) {
+  if (*off + 2 > s.size()) return false;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(s.data() + *off);
+  *out = static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+  *off += 2;
+  return true;
+}
+
+inline bool ReadU64LE(const std::string& s, size_t* off, uint64_t* out) {
+  if (*off + 8 > s.size()) return false;
+  const uint8_t* p = reinterpret_cast<const uint8_t*>(s.data() + *off);
+  *out = 0;
+  for (int i = 0; i < 8; ++i) {
+    *out |= static_cast<uint64_t>(p[i]) << (i * 8);
+  }
+  *off += 8;
+  return true;
+}
+
+int CmdCache(const std::string& path, bool emit_csv) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in.is_open()) {
+    std::cerr << "pir_inspect cache: cannot open " << path << ": "
+              << std::strerror(errno) << "\n";
+    return 1;
+  }
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  const std::string data = ss.str();
+
+  size_t off = 0;
+  if (data.size() < 4 ||
+      std::memcmp(data.data(), kCacheMagicCli, 4) != 0) {
+    std::cerr << "pir_inspect cache: " << path
+              << " is not a PHHC HintCache file (bad magic)\n";
+    return 1;
+  }
+  off += 4;
+  uint16_t version = 0, reserved = 0;
+  if (!ReadU16LE(data, &off, &version) ||
+      !ReadU16LE(data, &off, &reserved)) {
+    std::cerr << "pir_inspect cache: " << path << " truncated header\n";
+    return 1;
+  }
+  if (version != kCacheVersionCli) {
+    std::cerr << "pir_inspect cache: " << path
+              << " has unsupported version " << version
+              << " (this build understands " << kCacheVersionCli << ")\n";
+    return 1;
+  }
+  uint64_t count = 0;
+  if (!ReadU64LE(data, &off, &count)) {
+    std::cerr << "pir_inspect cache: " << path
+              << " truncated entry count\n";
+    return 1;
+  }
+
+  if (emit_csv) {
+    std::cout
+        << "entry_idx,fp_hex,blob_bytes,"
+        << "A1_rows,A1_cols,A2_rows,A2_cols,"
+        << "H1sq_rows,H1sq_cols,A2copyT_rows,A2copyT_cols,"
+        << "H2msg_rows,H2msg_cols,total_cells,"
+        << "info_num,info_p,info_logq\n";
+  } else {
+    std::cout << "PHHC HintCache @ " << path << "\n"
+              << "  version : " << version << "\n"
+              << "  entries : " << count << "\n"
+              << "  bytes   : " << data.size() << "\n\n";
+  }
+
+  for (uint64_t i = 0; i < count; ++i) {
+    uint64_t fp = 0, blob_len = 0;
+    if (!ReadU64LE(data, &off, &fp) || !ReadU64LE(data, &off, &blob_len)) {
+      std::cerr << "pir_inspect cache: truncated entry header at index "
+                << i << "\n";
+      return 1;
+    }
+    if (off + blob_len > data.size()) {
+      std::cerr << "pir_inspect cache: truncated entry body at index "
+                << i << "\n";
+      return 1;
+    }
+    const std::string blob = data.substr(off, blob_len);
+    off += blob_len;
+    primihub::pir::double_pir::DoublePirHint hint;
+    std::string blob_err;
+    if (primihub::pir::double_pir::DeserializeHint(blob, &hint, &blob_err) !=
+        primihub::retcode::SUCCESS) {
+      std::cerr << "pir_inspect cache: entry " << i
+                << " DeserializeHint failed: " << blob_err << "\n";
+      return 1;
+    }
+    const uint64_t total_cells =
+        hint.A1.size() + hint.A2.size() + hint.H1_squished.size() +
+        hint.A2_copy_transposed.size() + hint.H2_msg.size();
+    if (emit_csv) {
+      std::cout << i << ",0x" << std::hex << fp << std::dec << ","
+                << blob_len << ","
+                << hint.A1.rows() << "," << hint.A1.cols() << ","
+                << hint.A2.rows() << "," << hint.A2.cols() << ","
+                << hint.H1_squished.rows() << "," << hint.H1_squished.cols()
+                << ","
+                << hint.A2_copy_transposed.rows() << ","
+                << hint.A2_copy_transposed.cols() << ","
+                << hint.H2_msg.rows() << "," << hint.H2_msg.cols() << ","
+                << total_cells << ","
+                << hint.info_after_setup.num << ","
+                << hint.info_after_setup.p << ","
+                << hint.info_after_setup.logq << "\n";
+    } else {
+      std::cout << "entry[" << i << "] fp=0x" << std::hex << fp << std::dec
+                << " blob=" << blob_len << " B"
+                << " | A1=" << hint.A1.rows() << "x" << hint.A1.cols()
+                << " A2=" << hint.A2.rows() << "x" << hint.A2.cols()
+                << " H1sq=" << hint.H1_squished.rows() << "x"
+                << hint.H1_squished.cols()
+                << " A2copyT=" << hint.A2_copy_transposed.rows() << "x"
+                << hint.A2_copy_transposed.cols()
+                << " H2msg=" << hint.H2_msg.rows() << "x"
+                << hint.H2_msg.cols()
+                << " | cells=" << total_cells
+                << " info{num=" << hint.info_after_setup.num
+                << " p=" << hint.info_after_setup.p
+                << " logq=" << hint.info_after_setup.logq << "}\n";
+    }
+  }
+  if (off != data.size()) {
+    std::cerr << "pir_inspect cache: " << (data.size() - off)
+              << " trailing bytes after last entry\n";
+    return 1;
+  }
+  return 0;
 }
 
 }  // namespace
@@ -231,6 +393,18 @@ int main(int argc, char** argv) {
       }
     }
     return CmdAuto(flags);
+  }
+  if (sub == "cache") {
+    if (argc < 3) {
+      std::cerr << "usage: pir_inspect cache <path> [--emit-csv]\n";
+      return 2;
+    }
+    bool emit_csv = false;
+    for (int i = 3; i < argc; ++i) {
+      const std::string a = argv[i];
+      if (a == "--emit-csv") emit_csv = true;
+    }
+    return CmdCache(argv[2], emit_csv);
   }
   if (sub == "--help" || sub == "-h" || sub == "help") {
     Usage();
