@@ -401,3 +401,19 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "double_pir_hint_link_test",
+    srcs = ["double_pir_hint_link_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_gen",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_link",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_serialize",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/util/network:communication_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

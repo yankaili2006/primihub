@@ -131,3 +131,21 @@ cc_library(
         "@com_github_glog_glog//:glog",
     ],
 )
+
+# HintLink — LinkContext-aware transport helpers for shipping a
+# DoublePirHint between non-colluding peers. Task 5.6 chunk 6. Pairs
+# with HintSerialize (wire format) and MultiPeerPirOperator's
+# Send/Recv helpers (transport plumbing); operator-level wiring
+# arrives in a follow-up chunk.
+cc_library(
+    name = "hint_link",
+    srcs = ["hint_link.cc"],
+    hdrs = ["hint_link.h"],
+    deps = [
+        ":hint_gen",
+        ":hint_serialize",
+        "//src/primihub/common:common_defination",
+        "//src/primihub/util/network:communication_lib",
+        "@com_github_glog_glog//:glog",
+    ],
+)
