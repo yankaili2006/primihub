@@ -115,6 +115,81 @@ to a registry name (`ID_PIR → "id_pir"`, `KEY_PIR → "apsi"`). This means
 
 ---
 
+## Hint persistence (`hint_path`)
+
+Both **DoublePIR** and **SimplePIR** now persist hints across process
+restarts when `hint_path` is set. The wire-level mechanics are the
+same for both algorithms; only the wire magic differs (PHHC for
+DoublePIR, PSHC for SimplePIR).
+
+What happens during `OnExecute`:
+
+1. **First call per (process, path)** — `HintCache::MaybeLoadOnce(path)`
+   attempts to load any persisted cache file. Missing/corrupt files
+   surface as a `WARNING` in the node log; the operator continues
+   with whatever cache state it already had.
+2. **Cache miss + successful compute** — `HintCache::SaveToFile(path)`
+   persists the new hint, atomically via `<path>.tmp` + rename. Save
+   failures (disk full, permission errors) are also advisory.
+3. **Cache hit** — skips the O(L·M·n) Setup multiply entirely;
+   caller re-applies the cheap `ScalarAdd(p/2) + Squish(10, 3)`
+   locally to restore the squished-DB shape Answer expects.
+
+Errors from persistence never fail the query. On-call sees
+`WARNING`s; the actual PIR work always completes if the operator
+can compute the hint itself.
+
+### When to set `hint_path`
+
+- Production deployments that restart frequently (rolling upgrades,
+  k8s pod reschedules, OOM kills) — cold-start latency drops to
+  warm-start levels after the first miss.
+- Single-shot queries can leave `hint_path` empty; the in-process
+  LRU still amortizes across multiple OnExecute calls within the
+  same process.
+- Hint files are bound to a specific `(l, m, p, logq, FNV-1a(DB))`
+  fingerprint. Changing the DB invalidates the cache silently —
+  the next call hashes to a different fingerprint and misses, then
+  overwrites the file with the fresh hint.
+
+### Ops verification
+
+```bash
+pir_inspect cache /var/cache/primihub/double_pir_hints.bin
+# PHHC HintCache (DoublePIR) @ /var/cache/primihub/double_pir_hints.bin
+#   version : 1
+#   entries : 4
+# entry[0] fp=0x… blob=… B | A1=… A2=… H1sq=… A2copyT=… H2msg=… | cells=… info{…}
+
+# Same CLI auto-detects PSHC (SimplePIR) files.
+pir_inspect cache /var/cache/primihub/simple_pir_hints.bin
+```
+
+### Measured speedup
+
+See `docs/pir/benchmark.md` for the full cold-vs-warm tables. Headline
+numbers on .50 (queries=4):
+
+| algorithm  | N=4096 wall speedup | N=4M wall speedup |
+|------------|---------------------|-------------------|
+| DoublePIR  | 3.4×                | (memory-limited)  |
+| SimplePIR  | 2.7×                | 3.7×              |
+
+Reproduce via `bench/double_pir_persistence_bench.sh` and
+`bench/simple_pir_persistence_bench.sh`.
+
+### What's *not* yet wired
+
+- **FrodoPIR / YPIR / Tiptoe** are still skeletons; their operators
+  don't yet consume `hint_path` because they don't yet have real
+  Setup paths. When they land they'll pick up the same pattern.
+- **Cross-machine hint distribution** (one server precomputes, many
+  clients download) is the "out-of-band cron-style refresh" story
+  documented in `docs/pir/hint-lifecycle.md` — orthogonal to the
+  per-process persistence covered here.
+
+---
+
 ## When the selector says "no algorithm satisfies constraints"
 
 The selector returns an empty winner list when no registered algorithm
