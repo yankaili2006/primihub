@@ -28,10 +28,10 @@ that both servers ship to the client during the offline phase.
 
 ---
 
-## Implementation status (DoublePIR, task 5.6 chunks 1-5)
+## Implementation status (DoublePIR, task 5.6 chunks 1-7 — FULLY DONE)
 
-The single-process side of hint lifecycle is implemented and merged on
-the `pir-multi-algo` branch:
+The single-process **and** two-peer sides of hint lifecycle are
+implemented and merged on the `pir-multi-algo` branch:
 
 | Chunk | Commit     | What landed                                                                 |
 |-------|------------|-----------------------------------------------------------------------------|
@@ -40,13 +40,18 @@ the `pir-multi-algo` branch:
 | 3     | `3595f95f` | Wire format `SerializeHint` / `DeserializeHint` (PHHB magic + u16 version + 10·u64 DBinfo + 5 matrices). 168 B fixed overhead. Guards against bad magic / unsupported version / dim overflow / truncation / trailing bytes. |
 | 4     | `5e9630ee` | `HintCache::SaveToFile` / `LoadFromFile` wrap PHHB blobs in a PHHC outer envelope. Atomic write via `<path>.tmp` + rename. Load stages framing checks then `Clear()` + `Put()` so malformed files never clobber existing state. |
 | 5     | `59333cad` | `DoublePirOperator::OnExecute` auto-loads from `options_.hint_path` (populated by `pir_task.cc` from the `hint_path` param) via idempotent `MaybeLoadOnce`, auto-saves after a successful cache miss. Errors are LOG(WARNING) only — queries never fail because persistence misbehaved. |
+| 6     | `c370ca66` | `hint_link.{h,cc}` — LinkContext-aware transport. `BroadcastHint(link, peers, hint, key)` serializes via SerializeHint then Sends identical bytes to every peer; `ReceiveHint(link, peer, hint_out, key)` is the inverse. Wire key defaults to `"double_pir.hint.v1"`. Pure functions over an injected `LinkContext*`; do not touch HintCache themselves. |
+| 7     | `a0a25bc6` | `DoublePirOperator::OnExecute` role-aware wiring. New `Options.hint_role` string field (populated by `pir_task.cc` from `param_map["hint_role"]`); `""` (default) → single-process, `"primary"` → local compute + `BroadcastHint` to `peer_nodes` (broadcast failure advisory), `"secondary"` → `ReceiveHint` from `peer_nodes[0]` replaces `HintGen`, `Put()` installs into `HintCache`. Saves O(L·M·n) Setup on every secondary — same magnitude as a chunks-1-5 cache hit. |
 
 What this means for callers: set `hint_path` in the task's
 `param_map` and the operator transparently persists hints across
-process restarts. No out-of-band CLI invocation needed for the
-common case; the "out-of-band cron-style refresh" pattern below
-still applies for **cross-machine** hint distribution where a single
-server precomputes hints and ships them to many clients.
+process restarts. Set `hint_role` to `"primary"` / `"secondary"` to
+distribute the hint over the wire between non-colluding peers (see
+`docs/pir/multi-algo-guide.md` for the `hint_role` cheat sheet).
+Both keys compose: a primary commonly sets both; a secondary only
+needs `hint_role`. The "out-of-band cron-style refresh" pattern
+below still applies for **cross-machine** hint distribution where
+a single server precomputes hints and ships them to many clients.
 
 ### Measured speedup (DoublePIR, .50, queries=4)
 
@@ -68,16 +73,26 @@ warm-start wall speedup.
 PHHC file and prints per-entry summaries — useful for verifying
 what's been persisted before restarting a production node.
 
+### SimplePIR parity (task 7.2 chunks 1-5)
+
+SimplePIR mirrors chunks 1-5 of DoublePIR — same `HintGen` / LRU
+`HintCache` / `PSHB` wire format / `PSHC` on-disk envelope / operator
+auto-load+save pattern. Commits `aa9381a6` (HintGen + LRU),
+`72425c8b` (wire + on-disk + operator wiring), `77b749a9` (latency
+bench). Measured speedup `bench/simple_pir_persistence_bench.sh`:
+2.3× at N=64, 2.7× at N=4096, 3.7× at N=4M.
+
+SimplePIR does **not** get chunks 6+7 because it is single-server by
+construction (min_servers=1); the two-peer hint distribution doesn't
+apply.
+
 ### Remaining work
 
-- **5.6 LinkContext peer-split** — two non-colluding servers each
-  compute their slice of the hint locally and ship via
-  `MultiPeerPirOperator::SendToAllPeers` using the PHHB wire format.
-  Blocked on the production CLIENT/SERVER LinkContext design.
-- **Other algorithms** — only DoublePIR's hint lifecycle is wired
-  through chunks 1-5 so far. SimplePIR/FrodoPIR/YPIR will pick up
-  the same `Options.hint_path` + `MaybeLoadOnce` pattern when their
-  Setup paths are de-inlined to match.
+- **Other algorithms** — FrodoPIR/YPIR/Tiptoe are still skeletons.
+  Each will pick up the same `Options.hint_path` + `MaybeLoadOnce`
+  pattern when their Setup paths are de-inlined to match. FrodoPIR
+  and YPIR are single-server (no chunks 6+7 needed); Tiptoe layers
+  on SimplePIR so it inherits SimplePIR's single-process pattern.
 
 ---
 
@@ -121,6 +136,12 @@ specific scheme. primihub's distribution model:
 - **Push to client** — for clients that connect intermittently, the
   server pushes the hint over the existing gRPC channel during the
   PIR task setup phase, before the first query.
+- **In-band peer-to-peer** *(DoublePIR only, chunks 6+7)* — for the
+  two-non-colluding-server deployment, one server (`hint_role="primary"`)
+  computes the hint and `BroadcastHint`s it over the existing
+  `LinkContext` to the other (`hint_role="secondary"`) under the wire
+  key `"double_pir.hint.v1"`. No external storage hop. See
+  `docs/pir/multi-algo-guide.md` for the `hint_role` cheat sheet.
 
 The hint file MUST be served over an integrity-protected channel (TLS +
 checksum verification). A malicious upstream that swaps a hint can

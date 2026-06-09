@@ -183,10 +183,92 @@ Reproduce via `bench/double_pir_persistence_bench.sh` and
 - **FrodoPIR / YPIR / Tiptoe** are still skeletons; their operators
   don't yet consume `hint_path` because they don't yet have real
   Setup paths. When they land they'll pick up the same pattern.
-- **Cross-machine hint distribution** (one server precomputes, many
-  clients download) is the "out-of-band cron-style refresh" story
-  documented in `docs/pir/hint-lifecycle.md` — orthogonal to the
-  per-process persistence covered here.
+
+---
+
+## Two-peer hint distribution (`hint_role`) — DoublePIR only
+
+DoublePIR's threat model assumes two **non-colluding** servers. Both
+hold the database; both can independently derive the same hint locally
+(generation is deterministic given the DB). Running `HintGen` on both
+servers wastes O(L·M·n) Setup work that only one server actually
+needs to perform.
+
+`Options.hint_role` (populated from `param_map["hint_role"]`) lets one
+peer act as the **primary** (computes the hint, broadcasts it) and the
+other as the **secondary** (receives the hint over `LinkContext` in
+lieu of `HintGen`).
+
+| `hint_role` value | Behaviour                                                                                 |
+|-------------------|-------------------------------------------------------------------------------------------|
+| (empty, default)  | Single-process — operator runs the full protocol locally, no wire I/O regardless of `peer_nodes`. |
+| `"primary"`       | Local `GetOrComputeHint` then `BroadcastHint` to every node in `peer_nodes`. Broadcast failure is `LOG(WARNING)` only — the primary's own query still completes. |
+| `"secondary"`     | `ReceiveHint` from `peer_nodes[0]` (the primary) replaces `HintGen`. Result is `Put()` into the local `HintCache` so a same-process re-run hits the LRU. Local DB still goes through the cheap `ScalarAdd(p/2) + Squish(10, 3)` pair so the squished-DB shape matches what Answer expects. |
+
+Wire payload is the same PHHB blob used by `hint_path` persistence —
+serialization is shared between disk and network. Key on the wire is
+`"double_pir.hint.v1"`; override via the `key` argument to
+`BroadcastHint` / `ReceiveHint` if you need to namespace multiple
+concurrent hints in flight.
+
+### Task config example (`param_map`)
+
+Primary peer's task config:
+
+```json
+{
+  "algorithm":   { "type": "STRING", "value": "double_pir" },
+  "hint_role":   { "type": "STRING", "value": "primary" },
+  "hint_path":   { "type": "STRING", "value": "/var/cache/primihub/dp_hint.bin" }
+}
+```
+
+Secondary peer's task config:
+
+```json
+{
+  "algorithm":   { "type": "STRING", "value": "double_pir" },
+  "hint_role":   { "type": "STRING", "value": "secondary" }
+}
+```
+
+Both peers also need `peer_nodes` populated by the scheduler — the
+secondary expects `peer_nodes[0]` to be the primary, the primary
+expects `peer_nodes` to enumerate all secondaries to broadcast to.
+
+`hint_path` and `hint_role` compose: a primary may also persist its
+hint to disk for cold-restart speedup, and a secondary may also keep
+the received hint in its on-disk cache. Most production deployments
+set both on the primary and only `hint_role="secondary"` on the
+secondary.
+
+### Failure modes
+
+| Symptom                                                          | Cause                                                                  | Fix                                                                                |
+|------------------------------------------------------------------|------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| Operator returns FAIL with `hint_role="primary" with non-empty peer_nodes requires Options.link_ctx_ref` | Caller set `peer_nodes` but never plumbed `link_ctx_ref`. | Make sure the scheduler injects `Options.link_ctx_ref` before constructing the operator. |
+| `LOG(WARNING): BroadcastHint: Send to peer index N failed`       | Network partition or secondary not listening on the wire key.          | Operator continues without breaking the primary's own query. Investigate the peer.        |
+| Operator returns FAIL with `ReceiveHint: Recv from peer id=... failed` | Secondary started before primary's broadcast arrived, OR primary failed to broadcast. | Retry the task. If the primary repeatedly fails the broadcast (check `WARNING` logs there) treat it as a primary-side outage. |
+| Operator returns FAIL with `hint_role="secondary" requires peer_nodes[0]` | Secondary task config forgot to declare the primary in `peer_nodes`. | Add the primary's `Node` to `peer_nodes` in the secondary's config.                  |
+
+### When to use which mode
+
+- **Single-shot demos / local development** — leave `hint_role`
+  empty. Single-process is fine and the test surface is smallest.
+- **Pre-production / multi-node smoke** — both servers run with
+  `hint_role` set. Verifies the wire path end-to-end.
+- **Production deployment** — primary holds the authoritative hint
+  (often also persisted via `hint_path`); secondaries pick up the
+  hint over the wire on each task. Saves O(L·M·n) Setup per secondary
+  per cold cache.
+
+### Cross-machine hint distribution
+
+Beyond the per-task `hint_role` split above, the "one server
+precomputes, many clients download" pattern is the out-of-band
+cron-style refresh story documented in
+`docs/pir/hint-lifecycle.md` — orthogonal to the per-process
+persistence and per-task wire transport covered here.
 
 ---
 
