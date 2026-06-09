@@ -152,6 +152,14 @@ retcode SimplePirOperator::OnExecute(const PirDataType& input,
   // EndToEndRetrievesCorrectEntry comments for the derivation).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
+  // Lazy-load persisted cache from options_.hint_path on the very
+  // first OnExecute per (process, path) — SimplePIR sibling of
+  // DoublePIR task 5.6 chunk 5. Errors are advisory; operator
+  // continues with whatever cache state it already has.
+  if (!options_.hint_path.empty()) {
+    simple_pir::SimpleHintCache::Instance().MaybeLoadOnce(options_.hint_path);
+  }
+
   // Run Init + Setup + Squish once for the whole batch via the
   // cache-aware GetOrComputeHint wrapper (SimplePIR sibling of
   // DoublePIR task 5.6 chunks 1+2). On cache hit, caller re-runs
@@ -179,6 +187,20 @@ retcode SimplePirOperator::OnExecute(const PirDataType& input,
       LOG(ERROR) << "SimplePirOperator: cache-hit re-Squish failed: "
                  << sq_err;
       return retcode::FAIL;
+    }
+  }
+  // Persist freshly-computed hints to disk so process restarts can
+  // short-circuit Setup — SimplePIR sibling of DoublePIR task 5.6
+  // chunk 5. Errors are advisory; the query still completes.
+  if (!hint_hit && !options_.hint_path.empty()) {
+    std::string save_err;
+    if (simple_pir::SimpleHintCache::Instance().SaveToFile(
+            options_.hint_path, &save_err) != retcode::SUCCESS) {
+      LOG(WARNING) << "SimplePirOperator: SimpleHintCache::SaveToFile "
+                   << "failed: " << save_err << " — query still proceeds";
+    } else {
+      LOG(INFO) << "SimplePirOperator: persisted hint cache to "
+                << options_.hint_path;
     }
   }
   const core::Matrix& A = hint.A;

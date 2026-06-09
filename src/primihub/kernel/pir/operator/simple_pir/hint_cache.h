@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "src/primihub/kernel/pir/operator/simple_pir/hint_gen.h"
 
@@ -46,6 +47,27 @@ class SimpleHintCache {
   void Clear();
   void SetCapacityForTest(std::size_t cap);
 
+  // On-disk persistence (SimplePIR sibling of DoublePIR 5.6 chunk 4).
+  // File format: PSHC magic + u16 version=1 + u16 reserved + u64 count
+  // + per-entry [u64 fp + u64 blob_len + PSHB blob]. Atomic write
+  // via <path>.tmp + rename.
+  retcode SaveToFile(const std::string& path,
+                     std::string* err = nullptr) const;
+
+  // Replaces cache contents with file's entries on full framing
+  // success; cache state preserved on FAIL.
+  retcode LoadFromFile(const std::string& path,
+                       std::string* err = nullptr);
+
+  // Idempotent per-path lazy load — SimplePIR sibling of DoublePIR
+  // 5.6 chunk 5's MaybeLoadOnce. Called by SimplePirOperator at the
+  // top of OnExecute when options_.hint_path is set. First call per
+  // (process, path) attempts LoadFromFile and marks the path as
+  // attempted regardless of outcome, so missing/corrupt files don't
+  // cost a wasted open() per query. Errors logged via WARNING but
+  // never propagated.
+  void MaybeLoadOnce(const std::string& path);
+
  private:
   SimpleHintCache() = default;
   SimpleHintCache(const SimpleHintCache&) = delete;
@@ -59,6 +81,10 @@ class SimpleHintCache {
       index_;
   uint64_t hits_ = 0;
   uint64_t misses_ = 0;
+
+  // Paths for which MaybeLoadOnce has already attempted a load.
+  // Reset by Clear() so tests can re-arm the lazy-load path.
+  std::unordered_set<std::string> loaded_paths_;
 };
 
 // Convenience wrapper. On cache hit, the caller MUST re-run the cheap

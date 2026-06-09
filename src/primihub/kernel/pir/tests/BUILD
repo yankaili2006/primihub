@@ -385,3 +385,19 @@ cc_test(
     ],
     size = "small",
 )
+
+# SimplePIR serialize + persistence + operator-integration tests
+# (chunks 3+4+5 sibling of DoublePIR's coverage).
+cc_test(
+    name = "simple_pir_serialize_persist_test",
+    srcs = ["simple_pir_serialize_persist_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "//src/primihub/kernel/pir/operator/simple_pir:hint_cache",
+        "//src/primihub/kernel/pir/operator/simple_pir:hint_serialize",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

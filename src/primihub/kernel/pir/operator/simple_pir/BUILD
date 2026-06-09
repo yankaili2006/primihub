@@ -96,9 +96,24 @@ cc_library(
     hdrs = ["hint_cache.h"],
     deps = [
         ":hint_gen",
+        ":hint_serialize",
         "//src/primihub/common:common_defination",
         "//src/primihub/kernel/pir/operator/pir_core:database",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+# SimpleHintSerialize — PSHB wire-format helpers (SimplePIR sibling
+# of double_pir:hint_serialize). 2 matrices vs DoublePIR's 5.
+cc_library(
+    name = "hint_serialize",
+    srcs = ["hint_serialize.cc"],
+    hdrs = ["hint_serialize.h"],
+    deps = [
+        ":hint_gen",
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "@com_github_glog_glog//:glog",
     ],
 )
