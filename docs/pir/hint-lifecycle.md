@@ -28,6 +28,59 @@ that both servers ship to the client during the offline phase.
 
 ---
 
+## Implementation status (DoublePIR, task 5.6 chunks 1-5)
+
+The single-process side of hint lifecycle is implemented and merged on
+the `pir-multi-algo` branch:
+
+| Chunk | Commit     | What landed                                                                 |
+|-------|------------|-----------------------------------------------------------------------------|
+| 1     | `7303a83e` | `HintGen::Compute` lifts Init+Setup out of `OnExecute` into a reusable static function; bundles A1/A2/H1_squished/A2_copy_transposed/H2_msg/info_after_setup into `DoublePirHint`. |
+| 2     | `7b017575` | Process-local LRU `HintCache` (cap=16) keyed by `(l, m, p, logq, FNV-1a(DB))`. Hit skips O(L·M·n) Setup; caller re-runs cheap O(L·M) `ScalarAdd(p/2) + Squish(10,3)` to restore squished-DB shape. |
+| 3     | `3595f95f` | Wire format `SerializeHint` / `DeserializeHint` (PHHB magic + u16 version + 10·u64 DBinfo + 5 matrices). 168 B fixed overhead. Guards against bad magic / unsupported version / dim overflow / truncation / trailing bytes. |
+| 4     | `5e9630ee` | `HintCache::SaveToFile` / `LoadFromFile` wrap PHHB blobs in a PHHC outer envelope. Atomic write via `<path>.tmp` + rename. Load stages framing checks then `Clear()` + `Put()` so malformed files never clobber existing state. |
+| 5     | `59333cad` | `DoublePirOperator::OnExecute` auto-loads from `options_.hint_path` (populated by `pir_task.cc` from the `hint_path` param) via idempotent `MaybeLoadOnce`, auto-saves after a successful cache miss. Errors are LOG(WARNING) only — queries never fail because persistence misbehaved. |
+
+What this means for callers: set `hint_path` in the task's
+`param_map` and the operator transparently persists hints across
+process restarts. No out-of-band CLI invocation needed for the
+common case; the "out-of-band cron-style refresh" pattern below
+still applies for **cross-machine** hint distribution where a single
+server precomputes hints and ships them to many clients.
+
+### Measured speedup (DoublePIR, .50, queries=4)
+
+| N    | cold setup_ms | warm setup_ms | wall speedup |
+|------|---------------|---------------|--------------|
+| 64   | 43            | 0             | 1.6×         |
+| 256  | 60            | 0             | 1.7×         |
+| 1024 | 97            | 0             | 1.8×         |
+| 4096 | 224           | 0             | 3.4×         |
+
+Reproduce via `bench/double_pir_persistence_bench.sh`. Speedup grows
+with N because cold Setup is O(L·M·n); warm Setup is fixed at 0.
+At 1e8 the paper's ~110 s Setup vs ~70 ms per-query yields >1000×
+warm-start wall speedup.
+
+### Ops verification
+
+`pir_inspect cache <path> [--emit-csv]` (commit `a41d3d1e`) reads a
+PHHC file and prints per-entry summaries — useful for verifying
+what's been persisted before restarting a production node.
+
+### Remaining work
+
+- **5.6 LinkContext peer-split** — two non-colluding servers each
+  compute their slice of the hint locally and ship via
+  `MultiPeerPirOperator::SendToAllPeers` using the PHHB wire format.
+  Blocked on the production CLIENT/SERVER LinkContext design.
+- **Other algorithms** — only DoublePIR's hint lifecycle is wired
+  through chunks 1-5 so far. SimplePIR/FrodoPIR/YPIR will pick up
+  the same `Options.hint_path` + `MaybeLoadOnce` pattern when their
+  Setup paths are de-inlined to match.
+
+---
+
 ## Three lifecycle phases
 
 ```text
@@ -174,6 +227,8 @@ Mitigations:
 | "hint stale" at query time       | DB version drifted                 | Re-download hint, retry query           |
 | Query returns garbage            | Hint integrity broken silently     | Always verify `hint_sha256` on download |
 | Hint download times out          | Large blob, narrow channel         | Switch to CDN-fronted OSS or co-located storage |
+| `HintCache::MaybeLoadOnce` WARNING in node log | Persisted PHHC file missing / corrupt / on read-only fs | Advisory only — operator continues with an empty cache and saves a fresh PHHC after the first miss. Inspect with `pir_inspect cache <path>` to confirm format. |
+| `HintCache::SaveToFile` WARNING after query | Disk full / read-only fs / permission error on `<hint_path>.tmp` | Advisory only — query still returns the answer. Check disk + perms; the next OnExecute will retry the save. |
 
 ---
 
@@ -200,5 +255,12 @@ keeping the previous hint version reachable for a transition window.
   hint-requiring algorithm in the first place
 - [threat-model.md](threat-model.md) — hint integrity threat surface
 - `src/primihub/kernel/pir/operator/base_pir.h` — `Options.hint_path`
+- `src/primihub/kernel/pir/operator/double_pir/hint_cache.{h,cc}` —
+  process-local LRU + `MaybeLoadOnce` / `SaveToFile` / `LoadFromFile`
+- `src/primihub/kernel/pir/operator/double_pir/hint_serialize.{h,cc}` —
+  PHHB wire format
+- `src/primihub/cli/pir_inspect/pir_inspect_main.cc` — `cache`
+  subcommand for ops verification
+- `bench/double_pir_persistence_bench.sh` — cold-vs-warm latency bench
 - OpenSpec change `primihub-pir-multi-algo`, tasks 5.6 (`hint_gen`)
   and 7.x (per-algo hint formats)
