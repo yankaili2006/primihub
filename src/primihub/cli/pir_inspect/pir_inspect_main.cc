@@ -24,6 +24,7 @@
 #include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/kernel/pir/operator/selector.h"
 #include "src/primihub/kernel/pir/operator/double_pir/hint_serialize.h"
+#include "src/primihub/kernel/pir/operator/simple_pir/hint_serialize.h"
 
 #include <cerrno>
 #include <fstream>
@@ -202,7 +203,8 @@ void Usage() {
     "                   assume-non-colluding=true latency-budget=ms\n"
     "\n"
     "  pir_inspect cache <path> [--emit-csv]\n"
-    "      Dump on-disk HintCache (PHHC) summary or CSV (task 5.6 chunk 4+5).\n";
+    "      Dump on-disk HintCache summary or CSV. Auto-detects PHHC\n"
+    "      (DoublePIR) vs PSHC (SimplePIR) via the file's magic.\n";
 }
 
 }  // namespace
@@ -221,7 +223,13 @@ void Usage() {
 
 namespace {
 
-constexpr char kCacheMagicCli[4] = {'P', 'H', 'H', 'C'};
+// Two cache file magics — distinct so SimplePIR and DoublePIR caches
+// can co-exist in the same directory and pir_inspect dispatches at
+// parse time. CLI keeps its own copy of the constants so it doesn't
+// need to drag the storage-layer kCacheMagic out of an anonymous
+// namespace.
+constexpr char kDoublePirCacheMagic[4] = {'P', 'H', 'H', 'C'};
+constexpr char kSimplePirCacheMagic[4] = {'P', 'S', 'H', 'C'};
 constexpr uint16_t kCacheVersionCli = 1;
 
 inline bool ReadU16LE(const std::string& s, size_t* off, uint16_t* out) {
@@ -243,7 +251,15 @@ inline bool ReadU64LE(const std::string& s, size_t* off, uint64_t* out) {
   return true;
 }
 
-int CmdCache(const std::string& path, bool emit_csv) {
+// Reads the file, validates magic + version + count, and returns the
+// remainder of the buffer in *out_payload starting just after the
+// count u64. Algorithm-specific helpers then walk that payload.
+//
+// Returns 0 on success, sets *algo to either "double_pir" or
+// "simple_pir". Returns 1 on parse failure with stderr populated.
+int ReadCacheHeader(const std::string& path, std::string* data_out,
+                    std::string* algo, uint16_t* version_out,
+                    uint64_t* count_out, size_t* payload_off_out) {
   std::ifstream in(path, std::ios::binary);
   if (!in.is_open()) {
     std::cerr << "pir_inspect cache: cannot open " << path << ": "
@@ -252,16 +268,23 @@ int CmdCache(const std::string& path, bool emit_csv) {
   }
   std::ostringstream ss;
   ss << in.rdbuf();
-  const std::string data = ss.str();
+  *data_out = ss.str();
+  const std::string& data = *data_out;
 
-  size_t off = 0;
-  if (data.size() < 4 ||
-      std::memcmp(data.data(), kCacheMagicCli, 4) != 0) {
-    std::cerr << "pir_inspect cache: " << path
-              << " is not a PHHC HintCache file (bad magic)\n";
+  if (data.size() < 4) {
+    std::cerr << "pir_inspect cache: " << path << " shorter than magic\n";
     return 1;
   }
-  off += 4;
+  if (std::memcmp(data.data(), kDoublePirCacheMagic, 4) == 0) {
+    *algo = "double_pir";
+  } else if (std::memcmp(data.data(), kSimplePirCacheMagic, 4) == 0) {
+    *algo = "simple_pir";
+  } else {
+    std::cerr << "pir_inspect cache: " << path
+              << " is not a HintCache file (magic is not PHHC or PSHC)\n";
+    return 1;
+  }
+  size_t off = 4;
   uint16_t version = 0, reserved = 0;
   if (!ReadU16LE(data, &off, &version) ||
       !ReadU16LE(data, &off, &reserved)) {
@@ -280,21 +303,28 @@ int CmdCache(const std::string& path, bool emit_csv) {
               << " truncated entry count\n";
     return 1;
   }
+  *version_out = version;
+  *count_out = count;
+  *payload_off_out = off;
+  return 0;
+}
 
+int CmdCacheDouble(const std::string& path, const std::string& data,
+                   uint16_t version, uint64_t count, size_t off,
+                   bool emit_csv) {
   if (emit_csv) {
     std::cout
-        << "entry_idx,fp_hex,blob_bytes,"
+        << "algorithm,entry_idx,fp_hex,blob_bytes,"
         << "A1_rows,A1_cols,A2_rows,A2_cols,"
         << "H1sq_rows,H1sq_cols,A2copyT_rows,A2copyT_cols,"
         << "H2msg_rows,H2msg_cols,total_cells,"
         << "info_num,info_p,info_logq\n";
   } else {
-    std::cout << "PHHC HintCache @ " << path << "\n"
+    std::cout << "PHHC HintCache (DoublePIR) @ " << path << "\n"
               << "  version : " << version << "\n"
               << "  entries : " << count << "\n"
               << "  bytes   : " << data.size() << "\n\n";
   }
-
   for (uint64_t i = 0; i < count; ++i) {
     uint64_t fp = 0, blob_len = 0;
     if (!ReadU64LE(data, &off, &fp) || !ReadU64LE(data, &off, &blob_len)) {
@@ -321,8 +351,8 @@ int CmdCache(const std::string& path, bool emit_csv) {
         hint.A1.size() + hint.A2.size() + hint.H1_squished.size() +
         hint.A2_copy_transposed.size() + hint.H2_msg.size();
     if (emit_csv) {
-      std::cout << i << ",0x" << std::hex << fp << std::dec << ","
-                << blob_len << ","
+      std::cout << "double_pir," << i << ",0x" << std::hex << fp
+                << std::dec << "," << blob_len << ","
                 << hint.A1.rows() << "," << hint.A1.cols() << ","
                 << hint.A2.rows() << "," << hint.A2.cols() << ","
                 << hint.H1_squished.rows() << "," << hint.H1_squished.cols()
@@ -357,6 +387,94 @@ int CmdCache(const std::string& path, bool emit_csv) {
     return 1;
   }
   return 0;
+}
+
+int CmdCacheSimple(const std::string& path, const std::string& data,
+                   uint16_t version, uint64_t count, size_t off,
+                   bool emit_csv) {
+  if (emit_csv) {
+    std::cout
+        << "algorithm,entry_idx,fp_hex,blob_bytes,"
+        << "A_rows,A_cols,H_rows,H_cols,total_cells,"
+        << "info_num,info_p,info_logq\n";
+  } else {
+    std::cout << "PSHC HintCache (SimplePIR) @ " << path << "\n"
+              << "  version : " << version << "\n"
+              << "  entries : " << count << "\n"
+              << "  bytes   : " << data.size() << "\n\n";
+  }
+  for (uint64_t i = 0; i < count; ++i) {
+    uint64_t fp = 0, blob_len = 0;
+    if (!ReadU64LE(data, &off, &fp) || !ReadU64LE(data, &off, &blob_len)) {
+      std::cerr << "pir_inspect cache: truncated entry header at index "
+                << i << "\n";
+      return 1;
+    }
+    if (off + blob_len > data.size()) {
+      std::cerr << "pir_inspect cache: truncated entry body at index "
+                << i << "\n";
+      return 1;
+    }
+    const std::string blob = data.substr(off, blob_len);
+    off += blob_len;
+    primihub::pir::simple_pir::SimplePirHint hint;
+    std::string blob_err;
+    if (primihub::pir::simple_pir::DeserializeHint(blob, &hint, &blob_err) !=
+        primihub::retcode::SUCCESS) {
+      std::cerr << "pir_inspect cache: entry " << i
+                << " DeserializeHint failed: " << blob_err << "\n";
+      return 1;
+    }
+    const uint64_t total_cells = hint.A.size() + hint.H.size();
+    if (emit_csv) {
+      std::cout << "simple_pir," << i << ",0x" << std::hex << fp
+                << std::dec << "," << blob_len << ","
+                << hint.A.rows() << "," << hint.A.cols() << ","
+                << hint.H.rows() << "," << hint.H.cols() << ","
+                << total_cells << ","
+                << hint.info_after_squish.num << ","
+                << hint.info_after_squish.p << ","
+                << hint.info_after_squish.logq << "\n";
+    } else {
+      std::cout << "entry[" << i << "] fp=0x" << std::hex << fp << std::dec
+                << " blob=" << blob_len << " B"
+                << " | A=" << hint.A.rows() << "x" << hint.A.cols()
+                << " H=" << hint.H.rows() << "x" << hint.H.cols()
+                << " | cells=" << total_cells
+                << " info{num=" << hint.info_after_squish.num
+                << " p=" << hint.info_after_squish.p
+                << " logq=" << hint.info_after_squish.logq << "}\n";
+    }
+  }
+  if (off != data.size()) {
+    std::cerr << "pir_inspect cache: " << (data.size() - off)
+              << " trailing bytes after last entry\n";
+    return 1;
+  }
+  return 0;
+}
+
+// Dispatcher — sniffs the file's 4-byte magic and routes to the
+// algorithm-specific cache reader. Returns 0 on success / 1 on any
+// parse failure (stderr already populated by the helpers).
+int CmdCache(const std::string& path, bool emit_csv) {
+  std::string data;
+  std::string algo;
+  uint16_t version = 0;
+  uint64_t count = 0;
+  size_t payload_off = 0;
+  int rc = ReadCacheHeader(path, &data, &algo, &version, &count,
+                            &payload_off);
+  if (rc != 0) return rc;
+  if (algo == "double_pir") {
+    return CmdCacheDouble(path, data, version, count, payload_off, emit_csv);
+  }
+  if (algo == "simple_pir") {
+    return CmdCacheSimple(path, data, version, count, payload_off, emit_csv);
+  }
+  // ReadCacheHeader guards this — defensive fallthrough.
+  std::cerr << "pir_inspect cache: unknown algorithm '" << algo << "'\n";
+  return 1;
 }
 
 }  // namespace
