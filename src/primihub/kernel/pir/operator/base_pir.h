@@ -50,6 +50,16 @@ struct Options {
   bool assume_non_colluding{false};
   std::string hint_path;
 
+  // Per-algorithm hint role. Currently only DoublePIR consumes this.
+  // Empty string (default) → single-process: operator computes the
+  // hint locally and runs the full protocol in-process. "primary" →
+  // operator computes the hint then BroadcastHints it to every peer
+  // in peer_nodes. "secondary" → operator ReceiveHints from
+  // peer_nodes[0] instead of running HintGen::Compute, then installs
+  // the result into HintCache and proceeds. See
+  // src/primihub/kernel/pir/operator/double_pir/hint_link.h.
+  std::string hint_role;
+
   // Backward-compatible setter: legacy code wrote `options.peer_node = X`.
   // Existing call sites should be migrated to peer_nodes; this helper keeps
   // single-peer callers working without source changes when accessed via

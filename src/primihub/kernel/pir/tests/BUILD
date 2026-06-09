@@ -417,3 +417,24 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "double_pir_role_test",
+    srcs = ["double_pir_role_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator:base_pir_operator",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_cache",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_gen",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_link",
+        "//src/primihub/kernel/pir/operator/double_pir:hint_serialize",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/util/network:communication_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

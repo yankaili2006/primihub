@@ -255,6 +255,11 @@ retcode PirTask::ParseAlgorithmSelection(const rpc::Task& task_config) {
     const auto& h = hint_it->second.value_string();
     options_.hint_path.assign(h.begin(), h.end());
   }
+  auto hr_it = param_map.find("hint_role");
+  if (hr_it != param_map.end()) {
+    const auto& h = hr_it->second.value_string();
+    options_.hint_role.assign(h.begin(), h.end());
+  }
   // latency_budget is a selector-side hint only; operators do not consume
   // it directly, so we deliberately don't echo it into Options here.
   return retcode::SUCCESS;

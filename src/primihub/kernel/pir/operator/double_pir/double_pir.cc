@@ -16,6 +16,7 @@
 #include "src/primihub/kernel/pir/operator/double_pir/double_pir_runtime.h"
 #include "src/primihub/kernel/pir/operator/double_pir/hint_cache.h"
 #include "src/primihub/kernel/pir/operator/double_pir/hint_gen.h"
+#include "src/primihub/kernel/pir/operator/double_pir/hint_link.h"
 #include "src/primihub/kernel/pir/operator/pir_core/database.h"
 #include "src/primihub/kernel/pir/operator/pir_core/lwe_params.h"
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
@@ -150,56 +151,130 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   // Shift to centered [-p/2, p/2) representation (upstream MakeDB).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
-  // Lazy-load persisted cache from options_.hint_path on the very
-  // first OnExecute per (process, path) — task 5.6 chunk 5. Errors
-  // are advisory; operator continues with whatever cache state it
-  // already has.
-  if (!options_.hint_path.empty()) {
-    double_pir::HintCache::Instance().MaybeLoadOnce(options_.hint_path);
-  }
-
-  // Init + Setup once for the whole batch via the cache-aware
-  // GetOrComputeHint wrapper (task 5.6 chunks 1+2). On cache hit
-  // (process-local LRU keyed by (l, m, p, logq, db fingerprint))
-  // the caller skips Setup entirely; we just need to re-apply the
-  // cheap (db.ScalarAdd(p/2); db.Squish(10, 3)) pair locally because
-  // the cache does NOT preserve squished-DB state. Total restore
-  // cost is O(L·M) vs O(L·M·n) for a fresh Setup.
   using clock = std::chrono::steady_clock;
+  using ms_d = std::chrono::duration<double, std::milli>;
+
+  // Role-aware hint acquisition — task 5.6 chunk 6 wiring.
+  //   * hint_role == "secondary": skip HintGen entirely; ReceiveHint
+  //     from peer_nodes[0] (the primary), install into HintCache so a
+  //     same-process subsequent run hits the LRU, and apply the cheap
+  //     Squish pair locally (mirrors the cache-hit path).
+  //   * hint_role == "primary": compute locally (full HintCache LRU +
+  //     options_.hint_path persistence path), then BroadcastHint to
+  //     every node in peer_nodes (advisory — query still completes if
+  //     broadcast fails).
+  //   * hint_role empty (default): single-process behaviour — compute
+  //     locally + persistence, no wire I/O.
+  const bool is_secondary = options_.hint_role == "secondary";
+  const bool is_primary = options_.hint_role == "primary";
   double_pir::DoublePirHint hint;
   double_pir::HintGenStats hint_stats;
   bool hint_hit = false;
-  rc = double_pir::GetOrComputeHint(&db, params, &hint, &err,
-                                     &hint_stats, &hint_hit);
-  if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "DoublePirOperator: GetOrComputeHint failed: " << err;
-    return retcode::FAIL;
-  }
-  if (hint_hit) {
-    // Cache hit: HintGen::Compute did NOT run, so the local db is
-    // still un-squished. Re-apply the cheap Squish pair so the
-    // squished_db has the same shape Answer expects.
+  double hint_recv_ms = 0.0;
+
+  if (is_secondary) {
+    if (options_.peer_nodes.empty()) {
+      LOG(ERROR) << "DoublePirOperator: hint_role=\"secondary\" requires "
+                 << "peer_nodes[0] (the primary peer); got empty.";
+      return retcode::FAIL;
+    }
+    if (GetLinkContext() == nullptr) {
+      LOG(ERROR) << "DoublePirOperator: hint_role=\"secondary\" requires "
+                 << "Options.link_ctx_ref to be set.";
+      return retcode::FAIL;
+    }
+    const auto t_recv_start = clock::now();
+    std::string recv_err;
+    rc = double_pir::ReceiveHint(GetLinkContext(), options_.peer_nodes[0],
+                                  &hint, double_pir::kDefaultHintWireKey,
+                                  &recv_err);
+    if (rc != retcode::SUCCESS) {
+      LOG(ERROR) << "DoublePirOperator: ReceiveHint failed: " << recv_err;
+      return retcode::FAIL;
+    }
+    hint_recv_ms = ms_d(clock::now() - t_recv_start).count();
+    // Install into HintCache so a same-process re-run hits the LRU.
+    // Fingerprint is a function of the DB bytes the secondary already
+    // holds; the cache surface is identical to GetOrComputeHint's.
+    const uint64_t fp = double_pir::FingerprintDb(db, params);
+    double_pir::HintCache::Instance().Put(fp, hint);
+    // Apply the cheap Squish pair locally so squished_db has the shape
+    // Answer expects (identical math to the cache-hit branch below).
     db.mutable_data().ScalarAdd(static_cast<uint32_t>(params.p / 2));
     std::string sq_err;
     if (db.Squish(10, 3, &sq_err) != retcode::SUCCESS) {
-      LOG(ERROR) << "DoublePirOperator: cache-hit re-Squish failed: "
+      LOG(ERROR) << "DoublePirOperator: secondary-mode Squish failed: "
                  << sq_err;
       return retcode::FAIL;
     }
-  }
-  // Persist freshly-computed hints to disk so subsequent process
-  // restarts can short-circuit Setup — task 5.6 chunk 5. Errors are
-  // advisory; if persistence fails the query still completes.
-  if (!hint_hit && !options_.hint_path.empty()) {
-    std::string save_err;
-    if (double_pir::HintCache::Instance().SaveToFile(options_.hint_path,
-                                                      &save_err) !=
-        retcode::SUCCESS) {
-      LOG(WARNING) << "DoublePirOperator: HintCache::SaveToFile failed: "
-                   << save_err << " — query still proceeds";
-    } else {
-      LOG(INFO) << "DoublePirOperator: persisted hint cache to "
-                << options_.hint_path;
+  } else {
+    // Lazy-load persisted cache from options_.hint_path on the very
+    // first OnExecute per (process, path) — task 5.6 chunk 5. Errors
+    // are advisory; operator continues with whatever cache state it
+    // already has.
+    if (!options_.hint_path.empty()) {
+      double_pir::HintCache::Instance().MaybeLoadOnce(options_.hint_path);
+    }
+    // Init + Setup once for the whole batch via the cache-aware
+    // GetOrComputeHint wrapper (task 5.6 chunks 1+2). On cache hit
+    // (process-local LRU keyed by (l, m, p, logq, db fingerprint))
+    // the caller skips Setup entirely; we just need to re-apply the
+    // cheap (db.ScalarAdd(p/2); db.Squish(10, 3)) pair locally because
+    // the cache does NOT preserve squished-DB state. Total restore
+    // cost is O(L·M) vs O(L·M·n) for a fresh Setup.
+    rc = double_pir::GetOrComputeHint(&db, params, &hint, &err,
+                                       &hint_stats, &hint_hit);
+    if (rc != retcode::SUCCESS) {
+      LOG(ERROR) << "DoublePirOperator: GetOrComputeHint failed: " << err;
+      return retcode::FAIL;
+    }
+    if (hint_hit) {
+      // Cache hit: HintGen::Compute did NOT run, so the local db is
+      // still un-squished. Re-apply the cheap Squish pair so the
+      // squished_db has the same shape Answer expects.
+      db.mutable_data().ScalarAdd(static_cast<uint32_t>(params.p / 2));
+      std::string sq_err;
+      if (db.Squish(10, 3, &sq_err) != retcode::SUCCESS) {
+        LOG(ERROR) << "DoublePirOperator: cache-hit re-Squish failed: "
+                   << sq_err;
+        return retcode::FAIL;
+      }
+    }
+    // Persist freshly-computed hints to disk so subsequent process
+    // restarts can short-circuit Setup — task 5.6 chunk 5. Errors are
+    // advisory; if persistence fails the query still completes.
+    if (!hint_hit && !options_.hint_path.empty()) {
+      std::string save_err;
+      if (double_pir::HintCache::Instance().SaveToFile(options_.hint_path,
+                                                        &save_err) !=
+          retcode::SUCCESS) {
+        LOG(WARNING) << "DoublePirOperator: HintCache::SaveToFile failed: "
+                     << save_err << " — query still proceeds";
+      } else {
+        LOG(INFO) << "DoublePirOperator: persisted hint cache to "
+                  << options_.hint_path;
+      }
+    }
+    // Primary: broadcast freshly-computed hint to non-colluding peers
+    // so they can skip the O(L·M·n) Setup themselves. Cache hits
+    // re-broadcast too — keeps the protocol contract simple (every
+    // primary-role OnExecute call publishes its hint). Broadcast
+    // failure is advisory: the query itself does not depend on peers
+    // being reachable.
+    if (is_primary && !options_.peer_nodes.empty()) {
+      if (GetLinkContext() == nullptr) {
+        LOG(ERROR) << "DoublePirOperator: hint_role=\"primary\" with "
+                   << "non-empty peer_nodes requires Options.link_ctx_ref.";
+        return retcode::FAIL;
+      }
+      std::string bc_err;
+      auto bc_rc = double_pir::BroadcastHint(
+          GetLinkContext(), options_.peer_nodes, hint,
+          double_pir::kDefaultHintWireKey, &bc_err);
+      if (bc_rc != retcode::SUCCESS) {
+        LOG(WARNING) << "DoublePirOperator: BroadcastHint failed: " << bc_err
+                     << " — query still proceeds";
+      }
     }
   }
   const core::Matrix& A1 = hint.A1;
@@ -265,7 +340,6 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
   }
   const auto t_end = clock::now();
   (*result)[kOutRecovered] = std::move(recovered_strs);
-  using ms_d = std::chrono::duration<double, std::milli>;
   const double init_ms  = hint_stats.init_ms;
   const double setup_ms = hint_stats.setup_ms;
   const double query_total_ms = ms_d(t_end - t_setup_end).count();
@@ -273,15 +347,24 @@ retcode DoublePirOperator::OnExecute(const PirDataType& input,
             << " entries from " << n_entries << "-entry DB "
             << "(l=" << params.l << ", m=" << params.m
             << ", x=" << info_after_setup.x << ")";
-  // Structured timing line — parseable as `key=value` pairs. Used by
-  // bench/double_pir_latency_bench.sh in --detailed mode and useful
-  // for production observability without external profilers.
+  // Structured timing line — parseable as `key=value` pairs. The
+  // first five key=value pairs (init_ms / setup_ms / hint_hit /
+  // queries / query_total_ms) form a stable schema that
+  // bench/double_pir_latency_bench.sh's regex anchors on. Newer tags
+  // (hint_role, hint_recv_ms) trail at the end so adding them never
+  // breaks an existing parser. Secondary-mode timings have init_ms /
+  // setup_ms == 0 by construction (no HintGen call); use hint_recv_ms
+  // to attribute that path's wall time.
+  const std::string role_tag =
+      options_.hint_role.empty() ? "(none)" : options_.hint_role;
   LOG(INFO) << "DoublePirOperator: timing"
             << " init_ms=" << init_ms
             << " setup_ms=" << setup_ms
             << " hint_hit=" << (hint_hit ? 1 : 0)
             << " queries=" << idx_strs.size()
-            << " query_total_ms=" << query_total_ms;
+            << " query_total_ms=" << query_total_ms
+            << " hint_role=" << role_tag
+            << " hint_recv_ms=" << hint_recv_ms;
   return retcode::SUCCESS;
 }
 
