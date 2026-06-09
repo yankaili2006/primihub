@@ -41,6 +41,7 @@ cc_library(
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
         "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_protocol",
+        "//src/primihub/kernel/pir/operator/simple_pir:hint_cache",
         "@com_github_glog_glog//:glog",
     ] + select({
         ":enable_real": ["@simplepir//:simplepir_c_kernels"],
@@ -67,6 +68,37 @@ cc_library(
         "//src/primihub/kernel/pir/operator/pir_core:gaussian",
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+# SimpleHintGen — extracts Init+Setup+Squish into a reusable static
+# function (SimplePIR sibling of double_pir:hint_gen).
+cc_library(
+    name = "hint_gen",
+    srcs = ["hint_gen.cc"],
+    hdrs = ["hint_gen.h"],
+    deps = [
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_protocol",
+        "@com_github_glog_glog//:glog",
+    ],
+)
+
+# SimpleHintCache — process-local LRU wrapping SimpleHintGen, keyed by
+# (l, m, p, logq, FNV-1a(DB)). SimplePIR sibling of double_pir:hint_cache.
+cc_library(
+    name = "hint_cache",
+    srcs = ["hint_cache.cc"],
+    hdrs = ["hint_cache.h"],
+    deps = [
+        ":hint_gen",
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
         "@com_github_glog_glog//:glog",
     ],
 )

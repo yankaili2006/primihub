@@ -370,3 +370,18 @@ cc_test(
     ],
     size = "small",
 )
+
+# SimpleHintCache unit tests — fingerprint + LRU + GetOrComputeHint.
+# Mirrors hint_cache_test for the SimplePIR sibling implementation.
+cc_test(
+    name = "simple_pir_hint_cache_test",
+    srcs = ["simple_pir_hint_cache_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/simple_pir:hint_cache",
+        "//src/primihub/kernel/pir/operator/pir_core:database",
+        "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
+        "//src/primihub/kernel/pir/operator/pir_core:matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

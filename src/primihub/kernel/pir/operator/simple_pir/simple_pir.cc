@@ -16,6 +16,7 @@
 #include "src/primihub/kernel/pir/operator/pir_core/matrix.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 #include "src/primihub/kernel/pir/operator/simple_pir/simple_pir_protocol.h"
+#include "src/primihub/kernel/pir/operator/simple_pir/hint_cache.h"
 
 namespace primihub::pir {
 
@@ -151,24 +152,37 @@ retcode SimplePirOperator::OnExecute(const PirDataType& input,
   // EndToEndRetrievesCorrectEntry comments for the derivation).
   db.mutable_data().ScalarSub(static_cast<uint32_t>(params.p / 2));
 
-  // Run Init + Setup + Squish + GenSecret once for the whole batch.
-  core::Matrix A;
-  rc = simple_pir::SimplePirProtocol::Init(params, &A, &err);
+  // Run Init + Setup + Squish once for the whole batch via the
+  // cache-aware GetOrComputeHint wrapper (SimplePIR sibling of
+  // DoublePIR task 5.6 chunks 1+2). On cache hit, caller re-runs
+  // db.Squish locally because the cache stores hint matrices only,
+  // not the squished DB; cost is O(L·M) vs O(L·M·n) for fresh Setup.
+  simple_pir::SimplePirHint hint;
+  simple_pir::SimpleHintGenStats hint_stats;
+  bool hint_hit = false;
+  rc = simple_pir::GetOrComputeHint(&db, params, &hint, &err,
+                                     &hint_stats, &hint_hit);
   if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "SimplePirOperator: Init failed: " << err;
+    LOG(ERROR) << "SimplePirOperator: GetOrComputeHint failed: " << err;
     return retcode::FAIL;
   }
-  core::Matrix H;
-  rc = simple_pir::SimplePirProtocol::Setup(&db, A, params, &H, &err);
-  if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "SimplePirOperator: Setup failed: " << err;
-    return retcode::FAIL;
+  if (hint_hit) {
+    // Cache hit: SimpleHintGen::Compute did NOT run, so db is still
+    // un-shifted and un-squished. SimplePirProtocol::Setup folds in
+    // a +p/2 shift via db.Data.Add(p/2) before computing H; we apply
+    // the equivalent shift here, then Squish, so subsequent Answer
+    // sees the same db state Compute would have produced.
+    db.mutable_data().ScalarAdd(static_cast<uint32_t>(params.p / 2));
+    std::string sq_err;
+    if (db.Squish(kSquishBasis, kSquishingFactor, &sq_err) !=
+        retcode::SUCCESS) {
+      LOG(ERROR) << "SimplePirOperator: cache-hit re-Squish failed: "
+                 << sq_err;
+      return retcode::FAIL;
+    }
   }
-  rc = db.Squish(kSquishBasis, kSquishingFactor, &err);
-  if (rc != retcode::SUCCESS) {
-    LOG(ERROR) << "SimplePirOperator: Database::Squish failed: " << err;
-    return retcode::FAIL;
-  }
+  const core::Matrix& A = hint.A;
+  const core::Matrix& H = hint.H;
   core::Matrix secret;
   rc = simple_pir::SimplePirProtocol::GenSecret(params, &secret, &err);
   if (rc != retcode::SUCCESS) {
