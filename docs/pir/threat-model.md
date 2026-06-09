@@ -114,6 +114,15 @@ weaker than the user's `min_threat_model` constraint.
     `fusion0` / `fusion1` nodes **must be operated by different
     organizations** with no shared infrastructure (different cloud
     accounts, different physical hosts, different on-call paging).
+  - The `hint_role="primary"` / `hint_role="secondary"` mechanism
+    (task 5.6 chunks 6+7) lets one peer compute the hint and ship it
+    to the other over `LinkContext` so the secondary never needs to
+    re-run `HintGen`. This is purely a compute optimization — it does
+    **not** alter the non-colluding assumption. Both peers still hold
+    the database and answer independent halves of the query; the
+    privacy proof rules out collusion on **query traces**, not hint
+    bytes (which are identical across both servers anyway). See
+    `docs/pir/multi-algo-guide.md` § Two-peer hint distribution.
   - Audit log retention should be configured so neither party can
     retroactively reconstruct the other's view.
 
@@ -168,6 +177,12 @@ Before going to production with any algorithm, verify:
 3. **Hint distribution is integrity-protected.** A malicious adversary
    that swaps a fake hint can sometimes degrade privacy; ship hints
    through a channel with TLS + signed checksums, not plain HTTP.
+   The in-band `hint_role` transport for DoublePIR reuses primihub's
+   `LinkContext` channel, which is TLS-by-default in production
+   deployments — no extra integrity work needed for that path. The
+   OSS / NFS / gRPC-push patterns documented in
+   `docs/pir/hint-lifecycle.md` still need explicit checksum
+   verification by callers.
 4. **Algorithm's `ThreatModel` matches your `min_threat_model`.** The
    selector enforces this when called via the CLI, but custom callers
    constructing `Options` directly need to check by hand.
