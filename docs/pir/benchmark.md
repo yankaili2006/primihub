@@ -139,6 +139,57 @@ Observations:
 1e8 cell is task 5.10's long-term target, pending a host with enough
 RAM (the LWE intermediate matrices grow to several GB at N=1e8).
 
+### `bench/double_pir_persistence_bench.sh` (task 5.6 chunks 1-5)
+
+Runs each N twice against the same hint file — first cold (rm -f
+the file first), second warm — then emits JSON with cold + warm
+sub-objects and a `wall_speedup` ratio. The bench cc_binary
+(`double_pir_latency_bench --hint-path PATH`) drives
+`DoublePirOperator` through `MaybeLoadOnce` + `SaveToFile`; on the
+warm pass the cache hit short-circuits the O(L·M·n) Setup.
+
+Baseline on .50 (queries=4):
+
+| N    | cold setup_ms | warm setup_ms | wall speedup |
+|------|---------------|---------------|--------------|
+| 64   | 43            | 0             | 1.6×         |
+| 256  | 60            | 0             | 1.7×         |
+| 1024 | 97            | 0             | 1.8×         |
+| 4096 | 224           | 0             | 3.4×         |
+
+The speedup grows with N because cold Setup is O(L·M·n) while warm
+Setup is fixed at 0. At 1e8 the paper's ~110 s Setup vs ~70 ms
+per-query yields >1000× warm-start wall speedup.
+
+### `bench/simple_pir_persistence_bench.sh` (SimplePIR sibling)
+
+Same shape as the DoublePIR wrapper but drives
+`simple_pir_latency_bench` → `SimplePirOperator`. SimplePIR's hint
+is just `{A, H}` (vs DoublePIR's 5-matrix bundle), and the online
+path is one `MulVecPacked` + `Recover`, so absolute wall times are
+1-2 orders of magnitude lower than DoublePIR's at the same N.
+
+Baseline on .50 (queries=4):
+
+| N        | cold (Init+Setup)_ms | warm (Init+Setup)_ms | wall speedup |
+|----------|----------------------|----------------------|--------------|
+| 64       | 0.7                  | 0                    | 2.3×         |
+| 256      | 1.5                  | 0                    | 2.5×         |
+| 1024     | 3.3                  | 0                    | 2.7×         |
+| 4096     | 7.5                  | 0                    | 2.7×         |
+| 16384    | 19                   | 0                    | 2.4×         |
+| 65536    | 55                   | 0                    | 4.1×         |
+| 262144   | 145                  | 0                    | 4.1×         |
+| 1048576  | 381                  | 0                    | 3.0×         |
+| 4194304  | 2205                 | 0                    | 3.7×         |
+
+Peak speedup at moderate N (~4×); at very large N the cache-file
+load + per-query work start to claim a non-trivial fraction of the
+warm wall, capping the ratio. Setup work itself stays fully
+short-circuited (warm `init_ms = setup_ms = squish_ms = 0`).
+
+Reproduce via `bench/simple_pir_persistence_bench.sh --n-list '...'`.
+
 ## Result file shapes
 
 ### `pir_selector_sweep_*.json`
@@ -204,8 +255,10 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `id_pir`     | 1e6   | 1-3 s           | TBD          | TBD          | TBD        |
 | `apsi`       | 1e6   | sub-second      | TBD          | TBD          | TBD        |
 | `spiral`     | 1e8   | 2-3 s           | TBD          | TBD          | (skeleton) |
+| `double_pir` | 4M    | (claim is 1e8)  | per-query ~71ms | TBD       | bench/double_pir_latency_bench.sh (.50) |
 | `double_pir` | 1e8   | ~10 ms          | TBD          | TBD          | (real, bench task 5.10 pending) |
-| `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, bench TBD)              |
+| `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
+| `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
 | `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | (skeleton) |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 
