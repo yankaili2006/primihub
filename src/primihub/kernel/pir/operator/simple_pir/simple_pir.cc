@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <random>
 #include <string>
+#include <chrono>
 #include <vector>
 
 #include <glog/logging.h>
@@ -203,6 +204,8 @@ retcode SimplePirOperator::OnExecute(const PirDataType& input,
                 << options_.hint_path;
     }
   }
+  using clock = std::chrono::steady_clock;
+  const auto t_setup_end = clock::now();
   const core::Matrix& A = hint.A;
   const core::Matrix& H = hint.H;
   core::Matrix secret;
@@ -257,9 +260,25 @@ retcode SimplePirOperator::OnExecute(const PirDataType& input,
     recovered_strs.push_back(std::to_string(recovered));
   }
   (*result)[kOutRecovered] = std::move(recovered_strs);
+  const auto t_end = clock::now();
+  using ms_d = std::chrono::duration<double, std::milli>;
+  const double init_ms = hint_stats.init_ms;
+  const double setup_ms = hint_stats.setup_ms;
+  const double squish_ms = hint_stats.squish_ms;
+  const double query_total_ms = ms_d(t_end - t_setup_end).count();
   LOG(INFO) << "SimplePirOperator: retrieved " << idx_strs.size()
             << " entries from " << n_entries << "-entry DB "
             << "(l=" << params.l << ", m=" << params.m << ")";
+  // Structured timing line — parseable as key=value pairs. Used by
+  // bench/simple_pir_persistence_bench.sh and useful for production
+  // observability without external profilers.
+  LOG(INFO) << "SimplePirOperator: timing"
+            << " init_ms=" << init_ms
+            << " setup_ms=" << setup_ms
+            << " squish_ms=" << squish_ms
+            << " hint_hit=" << (hint_hit ? 1 : 0)
+            << " queries=" << idx_strs.size()
+            << " query_total_ms=" << query_total_ms;
   return retcode::SUCCESS;
 }
 

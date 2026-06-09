@@ -21,3 +21,15 @@ cc_binary(
         "@com_github_glog_glog//:glog",
     ],
 )
+
+# simple_pir_latency_bench — sibling of double_pir_latency_bench for
+# SimplePirOperator. Driven by bench/simple_pir_persistence_bench.sh.
+cc_binary(
+    name = "simple_pir_latency_bench",
+    srcs = ["simple_pir_latency_bench.cc"],
+    deps = [
+        "//src/primihub/kernel/pir:common_def",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "@com_github_glog_glog//:glog",
+    ],
+)
