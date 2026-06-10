@@ -28,6 +28,20 @@ cc_library(
     "//src/primihub/task/language:language_parser_factory",
     "//src/primihub/task/semantic:task_semantic_parser",
     "//src/primihub/service/dataset/meta_service:meta_service_factory",
+    # PIR multi-algo registry (task 1.12 — main.cc calls
+    # PirRegistry::EnsureRegistered() to surface all alwayslink
+    # algorithm registrars at startup; the registry header must
+    # therefore be visible at node compile time and the operator
+    # cc_libraries below must be linked in so their static
+    # initializers fire). Mirrors pir_inspect's dep list at
+    # src/primihub/cli/pir_inspect/BUILD.
+    "//src/primihub/kernel/pir/operator:registry",
+    "//src/primihub/kernel/pir/operator:id_pir_operator",
+    "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+    "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+    "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
+    "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
+    "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
     "@com_github_glog_glog//:glog",
     "@com_github_grpc_grpc//:grpc++",
     "@com_google_absl//absl/flags:flag",
