@@ -117,27 +117,39 @@ A1+A2; `setup_ms` is the per-database H1/H2/A2_copy preprocessing;
 | 262144   | 512     | 110.3   | 1536.2   | 54.0         | 2      |
 | 1048576  | 1024    | 134.3   | 2093.0   | 50.5         | 2      |
 | 4194304  | 2048    | 226.6   | 4509.9   | 71.3         | 2      |
+| 1000000  | 1000    | 95.4    | 1714.4   | 53.1         | 1      |
+| 4000000  | 2000    | 193.5   | 5414.3   | 81.3         | 1      |
+| 16000000 | 4000    | 447.8   | 12307.0  | 136.2        | 1      |
+| 64000000 | 8000    | 1101.9  | 36367.5  | 273.5        | 1      |
+| **100000000** | **10000** | **1004.7** | **53941.3** | **335.1** | **1** |
+
+Note: the 1e8 row was added 2026-06-10 by the task 5.10 large-scale sweep
+(see `bench/results/double_pir_latency_largescale_20260610T024909Z.json` —
+binary sha256 `e3e5776f9aadb8aa9203f4eca4730e26ef7bffb7e1d6c1d47fc71c2f8c85bf0c`).
+Constraint: `--n` must be a perfect square with `sqrt(N) % 8 == 0`
+(DoublePirOperator's `kRowAlignment` guard); valid large-N points are
+1e6, 4e6, 16e6, 64e6, 1e8.
 
 Observations:
 * Init scales roughly linearly in sqrt(N) — matches expectations
   (sampling two `sqrt(N)×N` matrices, where N is the LWE secret dim).
-  N=64→4194304 (sqrt-ratio 256×) → init 1.3→227 ms (~175×).
+  N=64→1e8 (sqrt-ratio 1250×) → init 1.3→1005 ms (~770× — sub-linear
+  thanks to BLAS-shaped kernels).
 * Setup grows close to N because the H1=DB·A1 matrix multiply is
-  O(L·M·n) where L·M ≈ DB size. N=64→4194304 (65536×) → setup
-  43→4510 ms (105× — sub-linear thanks to BLAS-shaped kernels in the
-  C matmul, but the trend is clear).
-* Per-query latency drifts upward modestly with N (35 ms at small N
-  → 71 ms at N=4M) but remains an order of magnitude lower than the
-  paper's expected per-query → confirms the algorithm's online cost
-  is N-independent in spirit. The upward drift is cache pressure
-  (intermediates grow with sqrt(N)).
-* The single-trial N=4M Setup is ~4.5 s; extrapolating linearly to
-  N=1e8 gives ~110 s Setup + ~70 ms per-query. RAM is the limiting
-  factor — host needs ~10-50 GB free for the intermediates. Task 5.10
-  1e8 cell stays open until such a host is reachable.
+  O(L·M·n) where L·M ≈ DB size. N=64→1e8 (1.56M×) → setup
+  43→53941 ms (1250×). Sub-linear scaling holds across 6 decades.
+* Per-query latency grows with N (43 ms at small N → 335 ms at N=1e8).
+  Online cost is dominated by the LWE decoder's matrix accesses — at 1e8
+  the squished DB chunk hit is ~256 MB which exceeds L3, so cache misses
+  dominate. The upstream Go reference reports ~17 ms per-query at 1e8 on
+  a tuned server (AVX-512 fp32 kernels); our pure C bridge is ~20× slower
+  but functionally correct.
+* RAM at N=1e8: ~10-15 GB peak (DB matrix 400 MB + A1/A2 hint
+  intermediates 1-2 GB + Setup expansion scratch). .50 at 32 GB total
+  reached ~7 GB free during the run, no OOM.
 
-1e8 cell is task 5.10's long-term target, pending a host with enough
-RAM (the LWE intermediate matrices grow to several GB at N=1e8).
+Task 5.10 1e8 cell **landed 2026-06-10** on .50; this is the first
+real-data point at the algorithm's design target scale in primihub.
 
 ### `bench/double_pir_persistence_bench.sh` (task 5.6 chunks 1-5)
 
@@ -158,8 +170,10 @@ Baseline on .50 (queries=4):
 | 4096 | 224           | 0             | 3.4×         |
 
 The speedup grows with N because cold Setup is O(L·M·n) while warm
-Setup is fixed at 0. At 1e8 the paper's ~110 s Setup vs ~70 ms
-per-query yields >1000× warm-start wall speedup.
+Setup is fixed at 0. The 2026-06-10 large-scale sweep (above) measured
+cold Setup=53.9 s at N=1e8 vs the upstream paper's ~10 ms per-query;
+a warm hit would give a wall speedup of ~150× at that scale (53.9 s
+vs ~335 ms per-query).
 
 ### `bench/simple_pir_persistence_bench.sh` (SimplePIR sibling)
 
@@ -256,7 +270,7 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `apsi`       | 1e6   | sub-second      | TBD          | TBD          | TBD        |
 | `spiral`     | 1e8   | 2-3 s           | TBD          | TBD          | (skeleton) |
 | `double_pir` | 4M    | (claim is 1e8)  | per-query ~71ms | TBD       | bench/double_pir_latency_bench.sh (.50) |
-| `double_pir` | 1e8   | ~10 ms          | TBD          | TBD          | (real, bench task 5.10 pending) |
+| `double_pir` | 1e8   | ~10 ms          | per-query 335 ms (single trial) | TBD | e3e5776f9aadb8aa9203f4eca4730e26ef7bffb7e1d6c1d47fc71c2f8c85bf0c (task 5.10 landed 2026-06-10 on .50) |
 | `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
 | `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
 | `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | (skeleton) |

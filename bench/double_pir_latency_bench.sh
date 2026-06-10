@@ -104,9 +104,15 @@ for N in $N_LIST; do
   trial_count=0
   status=ok
   for ((t = 0; t < TRIALS; ++t)); do
-    line=$("$BENCH_BIN" --n "$N" --queries "$QUERIES" --csv 2>/dev/null || echo "$N,NA,NA,NA,NA,binary_failed")
-    # v2 CSV: n,init_ms,setup_ms,per_query_ms,wall_ms,status
-    IFS=, read -r got_n init setup perq wall tstatus <<<"$line"
+    line=$("$BENCH_BIN" --n "$N" --queries "$QUERIES" --csv 2>/dev/null || echo "$N,NA,NA,NA,NA,0,binary_failed")
+    # v3 CSV: n,init_ms,setup_ms,per_query_ms,wall_ms,hint_hit,status
+    # (v2 backwards-compat: if 6 fields, hint_hit defaults to 0)
+    field_count=$(awk -F, '{print NF}' <<<"$line")
+    if [[ "$field_count" == 7 ]]; then
+      IFS=, read -r got_n init setup perq wall hint_hit tstatus <<<"$line"
+    else
+      IFS=, read -r got_n init setup perq wall tstatus <<<"$line"
+    fi
     if [[ "$tstatus" != "ok" ]]; then
       status="$tstatus"
       break
