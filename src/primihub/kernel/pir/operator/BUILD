@@ -92,3 +92,28 @@ cc_library(
         "//src/primihub/kernel/pir/operator/keyword_pir_impl:keyword_pir_registrar",
     ],
 )
+
+# Aggregator (task 1.9 — single dep that pulls in registry + all
+# default-enabled PIR algorithm operators so their alwayslink
+# registrars fire at process start). Consumers (//:node,
+# //src/primihub/cli/pir_inspect, future cc_binary targets) depend on
+# :pir instead of enumerating the six operator targets locally — adding
+# a new algorithm becomes a one-line change here. APSI / keyword_pir
+# stays opt-in via select() on //:microsoft-apsi to match the historical
+# build flag, since linking APSI pulls in microsoft-apsi's SEAL toolchain
+# (cm/cpr/seal/zstd) and isn't free.
+cc_library(
+    name = "pir",
+    deps = [
+        ":registry",
+        ":id_pir_operator",
+        "//src/primihub/kernel/pir/operator/simple_pir:simple_pir_operator",
+        "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
+        "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
+    ] + select({
+        "//:microsoft-apsi": [":keyword_pir_operator"],
+        "//conditions:default": [],
+    }),
+)
