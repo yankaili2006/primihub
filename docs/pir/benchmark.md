@@ -185,17 +185,28 @@ path is one `MulVecPacked` + `Recover`, so absolute wall times are
 
 Baseline on .50 (queries=4):
 
-| N        | cold (Init+Setup)_ms | warm (Init+Setup)_ms | wall speedup |
-|----------|----------------------|----------------------|--------------|
-| 64       | 0.7                  | 0                    | 2.3×         |
-| 256      | 1.5                  | 0                    | 2.5×         |
-| 1024     | 3.3                  | 0                    | 2.7×         |
-| 4096     | 7.5                  | 0                    | 2.7×         |
-| 16384    | 19                   | 0                    | 2.4×         |
-| 65536    | 55                   | 0                    | 4.1×         |
-| 262144   | 145                  | 0                    | 4.1×         |
-| 1048576  | 381                  | 0                    | 3.0×         |
-| 4194304  | 2205                 | 0                    | 3.7×         |
+| N        | cold (Init+Setup)_ms | warm (Init+Setup)_ms | per_query_ms | wall speedup |
+|----------|----------------------|----------------------|--------------|--------------|
+| 64       | 0.7                  | 0                    | n/a          | 2.3×         |
+| 256      | 1.5                  | 0                    | n/a          | 2.5×         |
+| 1024     | 3.3                  | 0                    | n/a          | 2.7×         |
+| 4096     | 7.5                  | 0                    | n/a          | 2.7×         |
+| 16384    | 19                   | 0                    | n/a          | 2.4×         |
+| 65536    | 55                   | 0                    | n/a          | 4.1×         |
+| 262144   | 145                  | 0                    | n/a          | 4.1×         |
+| 1048576  | 381                  | 0                    | n/a          | 3.0×         |
+| 4194304  | 2205                 | 0                    | n/a          | 3.7×         |
+| 16000000 | 6348                 | 0                    | 14.2 → 13.5  | 3.0×         |
+| 64000000 | 22597                | 0                    | 36.4 → 36.4  | 3.2×         |
+| **100000000** | **38413**       | **0**                | **51.8 → 49.5** | **3.2×** |
+
+Note: the 16M / 64M / 1e8 rows landed 2026-06-10 alongside the DoublePIR
+1e8 measurement (task 5.10) — same sweep methodology, same .50 host.
+SimplePIR's per-query at 1e8 is **6.5× faster than DoublePIR's at the same
+scale** (52 ms vs 335 ms), reflecting SimplePIR's single matrix
+multiplication online cost vs DoublePIR's nested LWE recovery. Result
+JSON: `bench/results/simple_pir_persistence_largescale_20260610T030543Z.json`,
+binary sha256 `94a706ff8e04eed5064bedfd0f897e8b19c630b612aafbef4e711fe5bd1b1220`.
 
 Peak speedup at moderate N (~4×); at very large N the cache-file
 load + per-query work start to claim a non-trivial fraction of the
@@ -273,6 +284,7 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `double_pir` | 1e8   | ~10 ms          | per-query 335 ms (single trial) | TBD | e3e5776f9aadb8aa9203f4eca4730e26ef7bffb7e1d6c1d47fc71c2f8c85bf0c (task 5.10 landed 2026-06-10 on .50) |
 | `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
 | `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
+| `simple_pir` | 1e8   | sub-second      | per-query 52 ms (single trial) | TBD | 94a706ff8e04eed5064bedfd0f897e8b19c630b612aafbef4e711fe5bd1b1220 (landed 2026-06-10 alongside DoublePIR 1e8) |
 | `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | (skeleton) |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 
