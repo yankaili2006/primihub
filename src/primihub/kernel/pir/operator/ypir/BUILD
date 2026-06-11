@@ -21,6 +21,24 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+
+cc_library(
+    name = "ypir_matmul",
+    srcs = ["ypir_matmul.cc"],
+    hdrs = ["ypir_matmul.h"],
+    defines = select({
+        ":enable_real": ["PIR_YPIR_RUNTIME_VENDORED=1"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/primihub/common:common_defination",
+    ] + select({
+        ":enable_real": ["@ypir//:ypir_matmul_kernels"],
+        "//conditions:default": [],
+    }),
+)
+
 cc_library(
     name = "ypir_operator",
     srcs = [
