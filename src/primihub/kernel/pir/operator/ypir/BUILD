@@ -47,6 +47,14 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+
+cc_library(
+    name = "ypir_negacyclic",
+    srcs = ["ypir_negacyclic.cc"],
+    hdrs = ["ypir_negacyclic.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "ypir_operator",
     srcs = [

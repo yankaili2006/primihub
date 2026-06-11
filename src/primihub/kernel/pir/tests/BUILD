@@ -303,6 +303,17 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "ypir_negacyclic_test",
+    srcs = ["ypir_negacyclic_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_negacyclic",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+
 
 
 
