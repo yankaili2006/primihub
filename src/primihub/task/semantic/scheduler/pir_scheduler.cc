@@ -77,16 +77,22 @@ retcode PIRScheduler::dispatch(const PushTaskRequest *pushTaskRequest) {
   const auto& task_info = push_request.task().task_info();
   std::string TASK_INFO_STR = pb_util::TaskInfoToString(task_info);
   // if query request using query keyword instead of dataset,
-  // add client access info as dispatch server info
+  // add client access info as dispatch server info — but only when the
+  // caller did NOT already supply a CLIENT entry in party_access_info.
+  // Overwriting unconditionally breaks multi-node deployments where CLIENT
+  // is a distinct node (and breaks single-host 3-node test topologies where
+  // CLIENT runs on a different port than the SERVER receiving the dispatch).
   auto it = params.find("clientData");
   if (it != params.end()) {
     auto& pv_client_data = it->second;
     if (pv_client_data.is_array()) {
       auto party_access_info =
           push_request.mutable_task()->mutable_party_access_info();
-      auto& party_info = (*party_access_info)[PARTY_CLIENT];
-      auto& local_node = getLocalNodeCfg();
-      node2PbNode(local_node, &party_info);
+      if (party_access_info->find(PARTY_CLIENT) == party_access_info->end()) {
+        auto& party_info = (*party_access_info)[PARTY_CLIENT];
+        auto& local_node = getLocalNodeCfg();
+        node2PbNode(local_node, &party_info);
+      }
     }
   }
   // Resolve the selected algorithm for diagnostic / routing context. The

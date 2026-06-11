@@ -7,6 +7,9 @@ build:linux_x86_64 --copt=-DENABLE_SSE
 build:linux_x86_64 --define cpu=amd64
 build:linux_x86_64 --define cpu_arch=x86_64
 build:linux_x86_64 --define microsoft-apsi=true
+build:linux_x86_64 --define enable_pir_task=true
+build:linux_x86_64 --define enable_psi_task=true
+build:linux_x86_64 --define enable_mpc_task=true
 build:linux_x86_64 --copt=-maes
 build:linux_x86_64 --copt=-msse2
 build:linux_x86_64 --copt=-msse3
@@ -21,6 +24,9 @@ build:linux_aarch64 --linkopt=-lstdc++fs
 build:linux_aarch64 --define cpu=arm64
 build:linux_aarch64 --define cpu_arch=aarch64
 build:linux_aarch64 --define microsoft-apsi=true
+build:linux_aarch64 --define enable_pir_task=true
+build:linux_aarch64 --define enable_psi_task=true
+build:linux_aarch64 --define enable_mpc_task=true
 #build:linux_aarch64 --define enable_mysql_driver=false
 
 build:linux_asan --copt=-DENABLE_SSE
@@ -44,6 +50,9 @@ build:linux_asan --copt=-msse3
 build:linux_asan --copt=-msse4.1
 build:linux_asan --copt=-mpclmul
 build:linux_asan --define enable_mysql_driver=true
+build:linux_asan --define enable_pir_task=true
+build:linux_asan --define enable_psi_task=true
+build:linux_asan --define enable_mpc_task=true
 
 # Coverage configuration
 coverage --collect_code_coverage
