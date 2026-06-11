@@ -293,6 +293,17 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "ypir_lwe_params_test",
+    srcs = ["ypir_lwe_params_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_lwe_params",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+
 
 
 # pir_core::Matrix unit tests. Most tests are unconditional; the three

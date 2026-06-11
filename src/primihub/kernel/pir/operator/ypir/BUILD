@@ -39,6 +39,14 @@ cc_library(
     }),
 )
 
+
+cc_library(
+    name = "ypir_lwe_params",
+    srcs = ["ypir_lwe_params.cc"],
+    hdrs = ["ypir_lwe_params.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "ypir_operator",
     srcs = [
