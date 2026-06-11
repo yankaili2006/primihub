@@ -13,6 +13,14 @@ config_setting(
     define_values = {"enable_ypir_real": "1"},
 )
 
+
+cc_library(
+    name = "ypir_transpose",
+    srcs = ["ypir_transpose.cc"],
+    hdrs = ["ypir_transpose.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "ypir_operator",
     srcs = [

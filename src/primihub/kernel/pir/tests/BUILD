@@ -273,6 +273,17 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "ypir_transpose_test",
+    srcs = ["ypir_transpose_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_transpose",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+
 # pir_core::Matrix unit tests. Most tests are unconditional; the three
 # kernel-bridge tests bifurcate on kPirCoreKernelsVendored. Build with
 # --define=enable_pir_core_real=1 + --override_repository=simplepir=<p>
