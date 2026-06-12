@@ -55,6 +55,14 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+
+cc_library(
+    name = "ypir_bits",
+    srcs = ["ypir_bits.cc"],
+    hdrs = ["ypir_bits.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "ypir_operator",
     srcs = [

@@ -313,6 +313,17 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "ypir_bits_test",
+    srcs = ["ypir_bits_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_bits",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+
 
 
 
