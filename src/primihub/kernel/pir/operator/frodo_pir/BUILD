@@ -39,7 +39,10 @@ cc_library(
     hdrs = ["frodo_database.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":frodo_format",
         ":frodo_matrices",
+        "//src/primihub/common:common_defination",
+        "@com_github_base64_cpp//:base64_lib",
     ],
 )
 

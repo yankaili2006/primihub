@@ -2,21 +2,24 @@
  * Copyright (c) 2026 by PrimiHub
  * Licensed under the Apache License, Version 2.0
  *
- * frodo_database_test — verifies the Database struct port (the
- * deterministic, base64-free subset of upstream src/db.rs's
- * `pub struct Database`). Covers the data ctor, in-place format
- * switch, dot product against a column, row accessor, and the
- * matrix-width helper (static + self).
+ * frodo_database_test — verifies the Database struct port. Chunk
+ * 3a covers the data ctor + simple methods; chunk 3b adds
+ * ConstructRows + Database::New from base64-encoded strings.
  */
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_database.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "base64.h"  // NOLINT — for fixture encoding
+
 namespace primihub::pir::frodo {
 namespace {
+
+// ---- Chunk 3a tests (struct + simple methods) ------------------
 
 // Helper: a 3-row, 2-col DB in column-form (entries[col][row]).
 //   row 0: {1, 2}
@@ -42,14 +45,11 @@ TEST(FrodoDatabaseTest, Getters_ReturnConstructorArgs) {
 }
 
 TEST(FrodoDatabaseTest, GetMatrixWidth_Static_ExactDivision) {
-  // 16 bits at 8 bits/entry -> 2 entries; 256 bits at 32 -> 8.
   EXPECT_EQ(Database::GetMatrixWidth(16, 8), 2u);
   EXPECT_EQ(Database::GetMatrixWidth(256, 32), 8u);
 }
 
 TEST(FrodoDatabaseTest, GetMatrixWidth_Static_RoundsUp) {
-  // 17 bits at 8 bits/entry -> ceil(17/8) = 3.
-  // 33 bits at 8 -> 5; 32 at 32 -> 1; 0 at 32 -> 0.
   EXPECT_EQ(Database::GetMatrixWidth(17, 8), 3u);
   EXPECT_EQ(Database::GetMatrixWidth(33, 8), 5u);
   EXPECT_EQ(Database::GetMatrixWidth(32, 32), 1u);
@@ -57,7 +57,6 @@ TEST(FrodoDatabaseTest, GetMatrixWidth_Static_RoundsUp) {
 }
 
 TEST(FrodoDatabaseTest, GetMatrixWidth_Static_PlaintextBitsZero) {
-  // Soft boundary — upstream would divide by zero.
   EXPECT_EQ(Database::GetMatrixWidth(16, 0), 0u);
 }
 
@@ -65,33 +64,23 @@ TEST(FrodoDatabaseTest, SwitchFmt_RoundtripIsIdentity) {
   auto db = MakeSmallDb();
   const auto before = db.EntriesForTest();
   db.SwitchFmt();
-  // After one switch we should see the row-form: {{1,2},{3,4},{5,6}}.
   const std::vector<std::vector<std::uint32_t>> row_form = {
-      {1u, 2u},
-      {3u, 4u},
-      {5u, 6u},
+      {1u, 2u}, {3u, 4u}, {5u, 6u},
   };
   EXPECT_EQ(db.EntriesForTest(), row_form);
   db.SwitchFmt();
-  // Back to column-form.
   EXPECT_EQ(db.EntriesForTest(), before);
 }
 
 TEST(FrodoDatabaseTest, VecMult_HandComputed) {
   const auto db = MakeSmallDb();
-  // entries[col 0] = {1, 3, 5}; row = {2, 4, 6}.
-  // dot = 1*2 + 3*4 + 5*6 = 2 + 12 + 30 = 44.
   const std::vector<std::uint32_t> row = {2u, 4u, 6u};
-  EXPECT_EQ(db.VecMult(row, 0), 44u);
-  // entries[col 1] = {2, 4, 6}; same row dot = 2*2 + 4*4 + 6*6
-  //                                          = 4 + 16 + 36 = 56.
-  EXPECT_EQ(db.VecMult(row, 1), 56u);
+  EXPECT_EQ(db.VecMult(row, 0), 44u);  // 1*2+3*4+5*6
+  EXPECT_EQ(db.VecMult(row, 1), 56u);  // 2*2+4*4+6*6
 }
 
 TEST(FrodoDatabaseTest, GetRow_ReturnsExactClone) {
   const auto db = MakeSmallDb();
-  // entries is in column form, so GetRow(0) returns column 0:
-  //   {1, 3, 5}.
   EXPECT_EQ(db.GetRow(0),
             std::vector<std::uint32_t>({1u, 3u, 5u}));
   EXPECT_EQ(db.GetRow(1),
@@ -105,14 +94,163 @@ TEST(FrodoDatabaseTest, GetRow_OutOfRange_ReturnsEmpty) {
 }
 
 TEST(FrodoDatabaseTest, VecMult_AfterSwitchFmt_ColumnsMatchOriginalRows) {
-  // Pre-switch entries: column-form {{1,3,5}, {2,4,6}}.
-  // Post-switch entries: row-form {{1,2}, {3,4}, {5,6}}.
-  // After switch, entries[0] = {1,2}; dot with {7, 11}
-  //   = 1*7 + 2*11 = 7 + 22 = 29.
   auto db = MakeSmallDb();
   db.SwitchFmt();
   const std::vector<std::uint32_t> row = {7u, 11u};
-  EXPECT_EQ(db.VecMult(row, 0), 29u);
+  EXPECT_EQ(db.VecMult(row, 0), 29u);  // {1,2}·{7,11} = 7+22
+}
+
+// ---- Chunk 3b tests (ConstructRows + Database::New) ------------
+
+// Helper: encode a byte sequence as base64 via the same library
+// Database::New uses, so fixtures stay self-consistent.
+std::string B64(const std::vector<std::uint8_t>& bytes) {
+  std::string s(bytes.begin(), bytes.end());
+  return base64_encode(reinterpret_cast<const unsigned char*>(s.data()),
+                       s.size());
+}
+
+TEST(FrodoConstructRowsTest, SingleByte_HandComputed) {
+  // 1 element = {0xAB} (1 byte = 8 bits).
+  // elem_size=8, plaintext_bits=8 -> row_width = 1.
+  // bytes_to_bits_le(0xAB) = {1,1,0,1,0,1,0,1}.
+  // bits_to_u32_le on all 8 = 0xAB = 171.
+  std::vector<std::string> elements = {B64({0xABu})};
+  std::vector<std::vector<std::uint32_t>> rows;
+  std::string err;
+  ASSERT_EQ(
+      ConstructRows(elements, /*m=*/1, /*elem_size=*/8,
+                    /*plaintext_bits=*/8, &rows, &err),
+      retcode::SUCCESS)
+      << err;
+  ASSERT_EQ(rows.size(), 1u);
+  ASSERT_EQ(rows[0].size(), 1u);
+  EXPECT_EQ(rows[0][0], 0xABu);
+}
+
+TEST(FrodoConstructRowsTest, TwoBytes_FourBitPlaintextChunks) {
+  // 1 element = {0xAB, 0xCD} (2 bytes = 16 bits).
+  // elem_size=16, plaintext_bits=4 -> row_width = 4.
+  // bytes_to_bits_le({0xAB,0xCD}):
+  //   0xAB = 1010_1011 LSB-first -> 1,1,0,1,0,1,0,1
+  //   0xCD = 1100_1101 LSB-first -> 1,0,1,1,0,0,1,1
+  // Concat = 1,1,0,1, 0,1,0,1, 1,0,1,1, 0,0,1,1.
+  // Chunks of 4:
+  //   chunk 0 = {1,1,0,1} = 0xB (LSB-first: 1+2+0+8=11)
+  //   chunk 1 = {0,1,0,1} = 0xA (LSB-first: 0+2+0+8=10)
+  //   chunk 2 = {1,0,1,1} = 0xD (1+0+4+8=13)
+  //   chunk 3 = {0,0,1,1} = 0xC (0+0+4+8=12)
+  std::vector<std::string> elements = {B64({0xABu, 0xCDu})};
+  std::vector<std::vector<std::uint32_t>> rows;
+  std::string err;
+  ASSERT_EQ(
+      ConstructRows(elements, /*m=*/1, /*elem_size=*/16,
+                    /*plaintext_bits=*/4, &rows, &err),
+      retcode::SUCCESS)
+      << err;
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_EQ(rows[0],
+            std::vector<std::uint32_t>({0xBu, 0xAu, 0xDu, 0xCu}));
+}
+
+TEST(FrodoConstructRowsTest, MultipleElements_RowOrder) {
+  // 3 elements, each 1 byte. Hand-computed rows must come out in
+  // the same order as elements.
+  std::vector<std::string> elements = {
+      B64({0x01u}),
+      B64({0x80u}),  // 1000_0000 LSB-first = 0,0,0,0,0,0,0,1 = 0x80
+      B64({0xFFu}),
+  };
+  std::vector<std::vector<std::uint32_t>> rows;
+  std::string err;
+  ASSERT_EQ(
+      ConstructRows(elements, /*m=*/3, /*elem_size=*/8,
+                    /*plaintext_bits=*/8, &rows, &err),
+      retcode::SUCCESS)
+      << err;
+  ASSERT_EQ(rows.size(), 3u);
+  EXPECT_EQ(rows[0][0], 0x01u);
+  EXPECT_EQ(rows[1][0], 0x80u);
+  EXPECT_EQ(rows[2][0], 0xFFu);
+}
+
+TEST(FrodoConstructRowsTest, SizeMismatch_Fails) {
+  std::vector<std::string> elements = {B64({0x01u}), B64({0x02u})};
+  std::vector<std::vector<std::uint32_t>> rows;
+  std::string err;
+  EXPECT_EQ(ConstructRows(elements, /*m=*/3, /*elem_size=*/8,
+                          /*plaintext_bits=*/8, &rows, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("elements.size()=2"), std::string::npos) << err;
+  EXPECT_NE(err.find("m=3"), std::string::npos) << err;
+}
+
+TEST(FrodoConstructRowsTest, NullOut_Fails) {
+  std::vector<std::string> elements = {B64({0x01u})};
+  std::string err;
+  EXPECT_EQ(ConstructRows(elements, /*m=*/1, /*elem_size=*/8,
+                          /*plaintext_bits=*/8, nullptr, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("out must be non-null"), std::string::npos)
+      << err;
+}
+
+TEST(FrodoDatabaseNewTest, EndToEnd_TwoElementsColumnForm) {
+  // 2 elements, each 1 byte: {0x12, 0x34}.
+  // elem_size=8, plaintext_bits=8 -> row_width = 1.
+  // construct_rows yields row-form [[0x12], [0x34]].
+  // After swap_matrix_fmt, column-form = [[0x12, 0x34]].
+  std::vector<std::string> elements = {B64({0x12u}), B64({0x34u})};
+  Database db;  // default ctor placeholder
+  std::string err;
+  ASSERT_EQ(Database::New(elements, /*m=*/2, /*elem_size=*/8,
+                          /*plaintext_bits=*/8, &db, &err),
+            retcode::SUCCESS)
+      << err;
+  const std::vector<std::vector<std::uint32_t>> expected_col_form = {
+      {0x12u, 0x34u},
+  };
+  EXPECT_EQ(db.EntriesForTest(), expected_col_form);
+  EXPECT_EQ(db.GetMatrixHeight(), 2u);
+  EXPECT_EQ(db.GetElemSize(), 8u);
+  EXPECT_EQ(db.GetPlaintextBits(), 8u);
+  EXPECT_EQ(db.GetMatrixWidthSelf(), 1u);
+}
+
+TEST(FrodoDatabaseNewTest, SwitchFmt_RecoversRowForm) {
+  // Same fixture; after one SwitchFmt the row-form should match
+  // [[0x12], [0x34]] (i.e. ConstructRows's output).
+  std::vector<std::string> elements = {B64({0x12u}), B64({0x34u})};
+  Database db;
+  std::string err;
+  ASSERT_EQ(Database::New(elements, 2, 8, 8, &db, &err), retcode::SUCCESS);
+  db.SwitchFmt();
+  const std::vector<std::vector<std::uint32_t>> row_form = {
+      {0x12u}, {0x34u},
+  };
+  EXPECT_EQ(db.EntriesForTest(), row_form);
+}
+
+TEST(FrodoDatabaseNewTest, NullOutDb_Fails) {
+  std::vector<std::string> elements = {B64({0x01u})};
+  std::string err;
+  EXPECT_EQ(Database::New(elements, 1, 8, 8, nullptr, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("out_db must be non-null"), std::string::npos)
+      << err;
+}
+
+TEST(FrodoDatabaseNewTest, SizeMismatch_PropagatesConstructRowsError) {
+  // m != elements.size() must surface ConstructRows's diagnostic
+  // (the elements.size()=N and m=M tokens), proving the failure
+  // path is wired.
+  std::vector<std::string> elements = {B64({0x01u})};
+  Database db;
+  std::string err;
+  EXPECT_EQ(Database::New(elements, 3, 8, 8, &db, &err),
+            retcode::FAIL);
+  EXPECT_NE(err.find("elements.size()=1"), std::string::npos) << err;
+  EXPECT_NE(err.find("m=3"), std::string::npos) << err;
 }
 
 }  // namespace
