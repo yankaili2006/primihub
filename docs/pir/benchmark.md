@@ -285,7 +285,8 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
 | `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
 | `simple_pir` | 1e8   | sub-second      | per-query 52 ms (single trial) | TBD | 94a706ff8e04eed5064bedfd0f897e8b19c630b612aafbef4e711fe5bd1b1220 (landed 2026-06-10 alongside DoublePIR 1e8) |
-| `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | ✅ real     |
+| `frodo_pir`  | 1e6   | ms class (paper) | per-query 2308 ms (single trial) | TBD | 00b0b9ae6e3736ba45868141290df3e2ead566e3ee5dd4743eda2f5806648150 (task 7.1 landed 2026-06-12 on .50, unoptimised C++ port) |
+| `frodo_pir`  | 1e7   | ms class (paper) | TBD (port unoptimised, single-trial >12 min wall on .50; revisit after SIMD) | TBD | (skipped, see 1e6 baseline) |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 
 `pir_matrix_bench.sh` (planned as task 10.1) will be the matrix runner

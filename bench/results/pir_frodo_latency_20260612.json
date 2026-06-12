@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-06-12T12:02:52Z",
+  "binary_path": "bazel-out/k8-opt/bin/src/primihub/kernel/pir/bench/frodo_pir_latency_bench",
+  "binary_sha256": "00b0b9ae6e3736ba45868141290df3e2ead566e3ee5dd4743eda2f5806648150",
+  "algorithm": "frodo_pir",
+  "lwe_dim": 512,
+  "plaintext_bits": 10,
+  "queries_per_cell": 8,
+  "results": [
+    {"n": 1000, "setup_ms": 26.455, "per_query_ms": 2.734, "wall_ms": 61.365, "status": "ok"},
+    {"n": 10000, "setup_ms": 258.394, "per_query_ms": 31.585, "wall_ms": 650.559, "status": "ok"},
+    {"n": 100000, "setup_ms": 2745.514, "per_query_ms": 205.736, "wall_ms": 5733.881, "status": "ok"},
+    {"n": 1000000, "setup_ms": 18755.576, "per_query_ms": 2307.691, "wall_ms": 49437.140, "status": "ok"}
+  ]
+}

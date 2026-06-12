@@ -33,3 +33,19 @@ cc_binary(
         "@com_github_glog_glog//:glog",
     ],
 )
+
+# frodo_pir_latency_bench — sibling of double/simple_pir_latency_bench
+# for FrodoPirOperator. Driven by bench/frodo_pir_latency_bench.sh.
+# FrodoPIR is self-contained (no upstream override) so this builds in
+# the default config — no --define / --override_repository flags needed.
+cc_binary(
+    name = "frodo_pir_latency_bench",
+    srcs = ["frodo_pir_latency_bench.cc"],
+    deps = [
+        "//src/primihub/common:common_defination",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_api",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_database",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_params",
+        "@com_github_base64_cpp//:base64_lib",
+    ],
+)
