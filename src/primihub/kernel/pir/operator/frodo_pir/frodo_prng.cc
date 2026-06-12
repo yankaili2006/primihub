@@ -119,6 +119,53 @@ std::uint64_t SeededRng::NextU64() {
   return v;
 }
 
+void SeededRng::FillBytesBulk(std::uint8_t* out, std::size_t n) {
+  if (n == 0) return;
+  // Drain whatever bytes remain in the current block first so
+  // the stream offset stays consistent with NextU32/NextU64
+  // callers that interleave with bulk fills.
+  std::size_t taken = 0;
+  if (block_pos_ < block_.size()) {
+    const std::size_t avail = block_.size() - block_pos_;
+    const std::size_t want = (avail < n) ? avail : n;
+    std::memcpy(out, block_.data() + block_pos_, want);
+    block_pos_ += want;
+    taken = want;
+  }
+
+  // Bulk-encrypt the entire middle range in ONE EVP call. We
+  // zero `out` first so EVP_EncryptUpdate xors zero against
+  // the keystream — same effect as the per-64-byte loop, just
+  // with two-orders-of-magnitude lower call overhead.
+  if (taken < n) {
+    const std::size_t bulk = ((n - taken) / 64) * 64;
+    if (bulk > 0) {
+      std::memset(out + taken, 0, bulk);
+      int out_len = 0;
+      if (EVP_EncryptUpdate(ctx_, out + taken, &out_len,
+                             out + taken,
+                             static_cast<int>(bulk)) != 1) {
+        OpensslFatal("EVP_EncryptUpdate-bulk");
+      }
+      if (static_cast<std::size_t>(out_len) != bulk) {
+        OpensslFatal("EVP_EncryptUpdate-bulk-short-write");
+      }
+      taken += bulk;
+    }
+  }
+
+  // Partial tail (< 64 bytes) — refill a block and memcpy. We
+  // cannot use a smaller EVP call here without leaving the
+  // block buffer in a wrong-position state for subsequent
+  // NextU32 callers.
+  if (taken < n) {
+    RefillBlock();
+    const std::size_t want = n - taken;
+    std::memcpy(out + taken, block_.data(), want);
+    block_pos_ = want;
+  }
+}
+
 
 
 namespace os_rng {

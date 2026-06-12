@@ -107,6 +107,18 @@ class SeededRng {
   // May straddle a ChaCha20 block boundary.
   std::uint64_t NextU64();
 
+  // Bulk-fills `out` with `n` bytes of keystream. Drains any
+  // unconsumed bytes from the current block first, then issues
+  // ONE EVP_EncryptUpdate over a zero-buffered input that
+  // writes directly into `out`. Final partial 64-byte tail is
+  // staged through a freshly refilled block_ so subsequent
+  // NextU32 calls see the correct stream position.
+  //
+  // Semantics MATCH the equivalent loop of NextU32 calls — the
+  // byte stream is the same; only the number of EVP calls
+  // shrinks. Tests in frodo_prng_test pin this equivalence.
+  void FillBytesBulk(std::uint8_t* out, std::size_t n);
+
  private:
   // Reads `n` bytes from the keystream into `out`, refilling the
   // block buffer as needed. `n` MUST be <= 64 (used internally

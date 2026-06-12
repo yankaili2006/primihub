@@ -141,12 +141,19 @@ std::vector<std::vector<std::uint32_t>> GenerateLweMatrixFromSeed(
   SeededRng rng(seed);
   std::vector<std::vector<std::uint32_t>> a;
   a.reserve(width);
+  // Bulk-fill each row in one EVP_EncryptUpdate call rather
+  // than `lwe_dim` separate NextU32 invocations. On x86_64
+  // little-endian (the only build target — .bazelrc gates SSE)
+  // reading the keystream bytes into a u32 buffer directly
+  // matches the LE assembly done by NextU32. Cross-checked by
+  // FrodoMatricesTest GenerateLweMatrixFromSeed_ColumnOrder
+  // MatchesUpstream which pins this against direct SeededRng.
+  static_assert(sizeof(std::uint32_t) == 4,
+                "frodo_matrices: u32 must be 4 bytes");
   for (std::size_t col = 0; col < width; ++col) {
-    std::vector<std::uint32_t> v;
-    v.reserve(lwe_dim);
-    for (std::size_t row = 0; row < lwe_dim; ++row) {
-      v.push_back(rng.NextU32());
-    }
+    std::vector<std::uint32_t> v(lwe_dim, 0u);
+    rng.FillBytesBulk(reinterpret_cast<std::uint8_t*>(v.data()),
+                       lwe_dim * sizeof(std::uint32_t));
     a.push_back(std::move(v));
   }
   return a;
