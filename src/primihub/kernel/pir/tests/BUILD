@@ -355,6 +355,16 @@ cc_test(
 )
 
 cc_test(
+    name = "frodo_prng_test",
+    srcs = ["frodo_prng_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_prng",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
     name = "frodo_matrices_test",
     srcs = ["frodo_matrices_test.cc"],
     deps = [

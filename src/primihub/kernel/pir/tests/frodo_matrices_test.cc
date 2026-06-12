@@ -158,5 +158,68 @@ TEST(FrodoMatricesTest, VecMultU32U32_NullOut_FailsWithMessage) {
   EXPECT_NE(err.find("out must be non-null"), std::string::npos) << err;
 }
 
+
+
+// ---- Chunk 2b-i tests (GenerateLweMatrixFromSeed) --------------
+
+namespace {
+SeedBytes IotaSeed(std::uint8_t start) {
+  SeedBytes s;
+  for (std::size_t i = 0; i < 32; ++i) {
+    s[i] = static_cast<std::uint8_t>(start + i);
+  }
+  return s;
+}
+}  // namespace
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_Shape) {
+  const auto seed = IotaSeed(0);
+  const std::size_t lwe_dim = 13;
+  const std::size_t width = 7;
+  const auto a = GenerateLweMatrixFromSeed(seed, lwe_dim, width);
+  ASSERT_EQ(a.size(), width);
+  for (const auto& col : a) {
+    EXPECT_EQ(col.size(), lwe_dim);
+  }
+}
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_Deterministic) {
+  const auto seed = IotaSeed(42);
+  const auto a = GenerateLweMatrixFromSeed(seed, 8, 5);
+  const auto b = GenerateLweMatrixFromSeed(seed, 8, 5);
+  EXPECT_EQ(a, b)
+      << "same seed must produce identical matrices — required "
+      << "for client/server matrix A agreement";
+}
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_DifferentSeeds) {
+  // Cross-seed independence — with 8*5=40 u32s drawn, the
+  // probability that all match is ~2^-1280.
+  const auto a = GenerateLweMatrixFromSeed(IotaSeed(0), 8, 5);
+  const auto b = GenerateLweMatrixFromSeed(IotaSeed(1), 8, 5);
+  EXPECT_NE(a, b)
+      << "different seeds produced identical matrices — PRNG seed "
+      << "derivation is broken";
+}
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_ColumnOrderMatchesUpstream) {
+  // Upstream fills column-by-column (outer loop is over `width`,
+  // inner over `lwe_dim`). This test pins the iteration order:
+  // generating a 1xN matrix must match the FIRST N u32s of the
+  // SeededRng stream from the same seed.
+  const auto seed = IotaSeed(7);
+  SeededRng ref(seed);
+  std::vector<std::uint32_t> expected_first_col;
+  expected_first_col.reserve(6);
+  for (int i = 0; i < 6; ++i) {
+    expected_first_col.push_back(ref.NextU32());
+  }
+  const auto a = GenerateLweMatrixFromSeed(seed, /*lwe_dim=*/6,
+                                            /*width=*/1);
+  ASSERT_EQ(a.size(), 1u);
+  EXPECT_EQ(a[0], expected_first_col)
+      << "column-major iteration order does not match upstream";
+}
+
 }  // namespace
 }  // namespace primihub::pir::frodo

@@ -22,12 +22,22 @@ cc_library(
 
 
 
+
+
+cc_library(
+    name = "frodo_prng",
+    srcs = ["frodo_prng.cc"],
+    hdrs = ["frodo_prng.h"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "frodo_matrices",
     srcs = ["frodo_matrices.cc"],
     hdrs = ["frodo_matrices.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":frodo_prng",
         "//src/primihub/common:common_defination",
     ],
 )

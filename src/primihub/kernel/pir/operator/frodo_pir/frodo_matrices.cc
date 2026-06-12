@@ -6,6 +6,8 @@
 
 #include <sstream>
 
+#include "src/primihub/kernel/pir/operator/frodo_pir/frodo_prng.h"
+
 namespace primihub::pir::frodo {
 
 std::vector<std::vector<std::uint32_t>> SwapMatrixFmt(
@@ -71,6 +73,33 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
   }
   *out = acc;
   return retcode::SUCCESS;
+}
+
+
+
+std::vector<std::vector<std::uint32_t>> GenerateLweMatrixFromSeed(
+    const SeedBytes& seed, std::size_t lwe_dim, std::size_t width) {
+  // Upstream:
+  //   let mut a = Vec::with_capacity(width);
+  //   let mut rng = get_seeded_rng(seed);
+  //   for _ in 0..width {
+  //     let mut v = Vec::with_capacity(lwe_dim);
+  //     for _ in 0..lwe_dim { v.push(rng.next_u32()); }
+  //     a.push(v);
+  //   }
+  //   a
+  SeededRng rng(seed);
+  std::vector<std::vector<std::uint32_t>> a;
+  a.reserve(width);
+  for (std::size_t col = 0; col < width; ++col) {
+    std::vector<std::uint32_t> v;
+    v.reserve(lwe_dim);
+    for (std::size_t row = 0; row < lwe_dim; ++row) {
+      v.push_back(rng.NextU32());
+    }
+    a.push_back(std::move(v));
+  }
+  return a;
 }
 
 }  // namespace primihub::pir::frodo
