@@ -19,6 +19,8 @@
 
 #include <gtest/gtest.h>
 
+#include "base64.h"  // NOLINT - for fixture decode-and-compare
+
 namespace primihub::pir::frodo {
 namespace {
 
@@ -152,6 +154,22 @@ TEST(FrodoFormatTest, BytesFromU32Slice_KnownPattern) {
 TEST(FrodoFormatTest, BytesFromU32Slice_EmptyInput_ReturnsEmpty) {
   auto out = BytesFromU32Slice({}, 8, 8);
   EXPECT_TRUE(out.empty());
+}
+
+
+
+TEST(FrodoFormatTest, Base64FromU32Slice_RoundtripViaBytesFromU32Slice) {
+  // {0xFu, 0x3u}, entry_bit_len=4, total_bit_len=6 -> 1 byte = 0x3F
+  // (see BytesFromU32Slice_KnownPattern). Base64 of {0x3F} is "Pw==".
+  auto s = Base64FromU32Slice({0xFu, 0x3u}, 4, 6);
+  EXPECT_EQ(s, std::string("Pw=="));
+  auto decoded = base64_decode(s);
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(static_cast<std::uint8_t>(decoded[0]), 0x3Fu);
+}
+
+TEST(FrodoFormatTest, Base64FromU32Slice_Empty_ReturnsEmptyString) {
+  EXPECT_EQ(Base64FromU32Slice({}, 8, 8), std::string());
 }
 
 }  // namespace

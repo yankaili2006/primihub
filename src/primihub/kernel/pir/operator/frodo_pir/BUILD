@@ -16,6 +16,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/primihub/common:common_defination",
+        "@com_github_base64_cpp//:base64_lib",
     ],
 )
 

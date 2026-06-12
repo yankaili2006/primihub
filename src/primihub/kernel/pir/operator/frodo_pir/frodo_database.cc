@@ -168,4 +168,17 @@ retcode Database::New(const std::vector<std::string>& elements,
   return retcode::SUCCESS;
 }
 
+
+
+std::string Database::GetDbEntry(std::size_t i) const {
+  // Upstream: base64_from_u32_slice(
+  //              &get_matrix_second_at(&self.entries, i),
+  //              self.plaintext_bits, self.elem_size).
+  // GetMatrixSecondAt returns empty on OOB or empty input — that
+  // propagates through Base64FromU32Slice which also returns empty
+  // on empty input, so the OOB soft boundary is honored end-to-end.
+  return Base64FromU32Slice(
+      GetMatrixSecondAt(entries_, i), plaintext_bits_, elem_size_);
+}
+
 }  // namespace primihub::pir::frodo

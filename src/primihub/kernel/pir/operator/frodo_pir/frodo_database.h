@@ -136,6 +136,14 @@ class Database {
   // returns an empty vector (upstream Rust would panic).
   std::vector<std::uint32_t> GetRow(std::size_t i) const;
 
+  // Returns the i-th DB entry as a base64-encoded string. Mirrors
+  // upstream `get_db_entry(&self, i: usize) -> String` =
+  // base64_from_u32_slice(get_matrix_second_at(entries, i),
+  //                       plaintext_bits, elem_size).
+  // On OOB returns empty string (upstream Rust would panic on
+  // get_matrix_second_at indexing).
+  std::string GetDbEntry(std::size_t i) const;
+
   // Static helper: width of the DB matrix = ceil(elem_size /
   // plaintext_bits). Returns 0 if plaintext_bits is 0 (upstream
   // would panic on integer-divide-by-zero).

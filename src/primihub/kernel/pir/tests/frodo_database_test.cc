@@ -253,5 +253,86 @@ TEST(FrodoDatabaseNewTest, SizeMismatch_PropagatesConstructRowsError) {
   EXPECT_NE(err.find("m=3"), std::string::npos) << err;
 }
 
+
+
+// ---- Chunk 3c tests (GetDbEntry) -------------------------------
+
+// Upstream quirk: when elem_size % plaintext_bits == 0 the writer
+// bytes_from_u32_slice treats the LAST entry as having `remainder
+// = 0` bits, losing plaintext_bits worth of data. The reader
+// construct_rows does NOT compensate (last chunk's end_bound==
+// bits.len() takes the full remaining plaintext_bits). So the
+// roundtrip is identity only when remainder != 0. Our port
+// mirrors that byte-for-byte; the test fixtures below pick
+// parameters that exercise the working configuration.
+//
+// elem_size=8, plaintext_bits=5: row_width=ceil(8/5)=2,
+// remainder=8%5=3. row[0]=5 bits, row[1]=3 bits. 5+3==8 so the
+// roundtrip is exact. This is the smallest single-byte fixture
+// that avoids the exact-divide quirk.
+
+TEST(FrodoGetDbEntryTest, Roundtrip_SingleByte_ParamsAvoidUpstreamQuirk) {
+  const std::vector<std::uint8_t> orig_bytes = {0xABu};
+  std::vector<std::string> elements = {B64(orig_bytes)};
+  Database db;
+  std::string err;
+  ASSERT_EQ(Database::New(elements, /*m=*/1, /*elem_size=*/8,
+                          /*plaintext_bits=*/5, &db, &err),
+            retcode::SUCCESS)
+      << err;
+  const std::string got_b64 = db.GetDbEntry(0);
+  const std::string got_bytes = base64_decode(got_b64);
+  ASSERT_EQ(got_bytes.size(), orig_bytes.size());
+  EXPECT_EQ(static_cast<std::uint8_t>(got_bytes[0]), orig_bytes[0]);
+}
+
+TEST(FrodoGetDbEntryTest, Roundtrip_TwoElements_OrderPreserved) {
+  const std::vector<std::vector<std::uint8_t>> orig = {
+      {0x12u}, {0x34u},
+  };
+  std::vector<std::string> elements = {B64(orig[0]), B64(orig[1])};
+  Database db;
+  std::string err;
+  ASSERT_EQ(Database::New(elements, /*m=*/2, /*elem_size=*/8,
+                          /*plaintext_bits=*/5, &db, &err),
+            retcode::SUCCESS)
+      << err;
+  for (std::size_t i = 0; i < 2; ++i) {
+    const std::string b64 = db.GetDbEntry(i);
+    const std::string bytes = base64_decode(b64);
+    ASSERT_EQ(bytes.size(), 1u) << "elem " << i;
+    EXPECT_EQ(static_cast<std::uint8_t>(bytes[0]), orig[i][0])
+        << "elem " << i;
+  }
+}
+
+TEST(FrodoGetDbEntryTest, ExactDivide_MatchesUpstreamQuirk_LosesLastChunk) {
+  // Anti-roundtrip test pinning upstream byte-for-byte fidelity:
+  // elem_size=8, plaintext_bits=8 -> row_width=1, remainder=0.
+  // bytes_from_u32_slice's last entry takes 0 bits, so the
+  // entire byte is lost on encode. GetDbEntry must return the
+  // empty string. If a well-meaning future fix changes this,
+  // it breaks the upstream-fidelity invariant and this test
+  // will catch it.
+  const std::vector<std::uint8_t> orig_bytes = {0xABu};
+  std::vector<std::string> elements = {B64(orig_bytes)};
+  Database db;
+  std::string err;
+  ASSERT_EQ(Database::New(elements, /*m=*/1, /*elem_size=*/8,
+                          /*plaintext_bits=*/8, &db, &err),
+            retcode::SUCCESS)
+      << err;
+  EXPECT_EQ(db.GetDbEntry(0), std::string())
+      << "Upstream quirk: exact-divide case drops the last chunk; "
+      << "if this changes we have silently diverged from "
+      << "brave-experiments/frodo-pir.";
+}
+
+TEST(FrodoGetDbEntryTest, OutOfRange_ReturnsEmptyString) {
+  // Soft boundary (upstream panics on get_matrix_second_at).
+  const auto db = MakeSmallDb();  // 2 columns of 3 entries each
+  EXPECT_EQ(db.GetDbEntry(100), std::string());
+}
+
 }  // namespace
 }  // namespace primihub::pir::frodo

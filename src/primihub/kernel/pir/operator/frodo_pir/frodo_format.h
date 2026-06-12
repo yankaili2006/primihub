@@ -38,6 +38,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "src/primihub/common/common.h"
@@ -80,6 +81,16 @@ retcode BitsToU32Le(const std::vector<std::uint8_t>& bits,
 // resulting bit-stream is then byte-packed via BitsToBytesLe.
 // Returns an empty vector when `v` is empty.
 std::vector<std::uint8_t> BytesFromU32Slice(
+    const std::vector<std::uint32_t>& v, std::size_t entry_bit_len,
+    std::size_t total_bit_len);
+
+
+
+// base64-encode of BytesFromU32Slice(v, entry_bit_len, total_bit_len).
+// Mirrors upstream `base64_from_u32_slice`. Returns empty string
+// when `v` is empty. base64 charset is the standard (non-URL,
+// non-PEM, non-MIME-wrapped) one provided by @com_github_base64_cpp.
+std::string Base64FromU32Slice(
     const std::vector<std::uint32_t>& v, std::size_t entry_bit_len,
     std::size_t total_bit_len);
 

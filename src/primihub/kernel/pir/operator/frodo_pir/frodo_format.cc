@@ -6,6 +6,8 @@
 
 #include <sstream>
 
+#include "base64.h"  // NOLINT — @com_github_base64_cpp//:base64_lib
+
 namespace primihub::pir::frodo {
 
 std::vector<std::uint8_t> U8ToBitsLe(std::uint8_t byte) {
@@ -114,6 +116,19 @@ std::vector<std::uint8_t> BytesFromU32Slice(
     }
   }
   return BitsToBytesLe(bits);
+}
+
+
+
+std::string Base64FromU32Slice(
+    const std::vector<std::uint32_t>& v, std::size_t entry_bit_len,
+    std::size_t total_bit_len) {
+  // Upstream: base64::encode(bytes_from_u32_slice(v, e, t)).
+  const auto bytes = BytesFromU32Slice(v, entry_bit_len, total_bit_len);
+  if (bytes.empty()) {
+    return std::string();
+  }
+  return base64_encode(bytes.data(), bytes.size());
 }
 
 }  // namespace primihub::pir::frodo
