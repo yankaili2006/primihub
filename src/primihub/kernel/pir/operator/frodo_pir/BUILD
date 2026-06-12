@@ -19,6 +19,18 @@ cc_library(
     ],
 )
 
+
+
+cc_library(
+    name = "frodo_matrices",
+    srcs = ["frodo_matrices.cc"],
+    hdrs = ["frodo_matrices.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/primihub/common:common_defination",
+    ],
+)
+
 cc_library(
     name = "frodo_pir_operator",
     srcs = ["frodo_pir.cc"],
