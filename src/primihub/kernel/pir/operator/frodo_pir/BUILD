@@ -99,10 +99,14 @@ cc_library(
     hdrs = ["frodo_pir.h"],
     alwayslink = True,
     deps = [
+        ":frodo_api",
+        ":frodo_database",
+        ":frodo_params",
         "//src/primihub/kernel/pir:common_def",
         "//src/primihub/kernel/pir/operator:base_pir_operator",
         "//src/primihub/kernel/pir/operator:capabilities",
         "//src/primihub/kernel/pir/operator:registry",
+        "@com_github_base64_cpp//:base64_lib",
         "@com_github_glog_glog//:glog",
     ],
 )

@@ -99,7 +99,7 @@ declare -A IS_SKELETON=(
   [spiral]=1
   [double_pir]=0
   [simple_pir]=0
-  [frodo_pir]=1
+  [frodo_pir]=0
   [ypir]=1
   [tiptoe_pir]=1
 )

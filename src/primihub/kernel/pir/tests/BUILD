@@ -389,6 +389,17 @@ cc_test(
 )
 
 cc_test(
+    name = "frodo_pir_test",
+    srcs = ["frodo_pir_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
+        "@com_github_base64_cpp//:base64_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
     name = "frodo_api_test",
     srcs = ["frodo_api_test.cc"],
     deps = [
