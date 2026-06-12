@@ -375,6 +375,20 @@ cc_test(
 )
 
 cc_test(
+    name = "frodo_params_test",
+    srcs = ["frodo_params_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_database",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_matrices",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_params",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_prng",
+        "@com_github_base64_cpp//:base64_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
     name = "frodo_database_test",
     srcs = ["frodo_database_test.cc"],
     deps = [
