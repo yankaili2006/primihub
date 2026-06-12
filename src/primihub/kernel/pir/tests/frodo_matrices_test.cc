@@ -269,5 +269,89 @@ TEST(FrodoMatricesTest, RandomTernaryVector_EmptyOk) {
   EXPECT_TRUE(RandomTernaryVector(0).empty());
 }
 
+// ---- AVX2 inner-kernel equivalence -------------------------------
+//
+// VecMultU32U32 dispatches to an AVX2 helper for length >= 16 on
+// AVX2-capable hardware. These tests pin the SIMD path against
+// independent scalar computation for sizes that straddle the
+// 8-lane boundary, the dispatch threshold, and a typical
+// FrodoPIR LWE-dim length (512).
+
+namespace {
+
+std::uint32_t ScalarVecMult(const std::vector<std::uint32_t>& a,
+                            const std::vector<std::uint32_t>& b) {
+  std::uint32_t acc = 0u;
+  for (std::size_t i = 0; i < a.size(); ++i) acc += a[i] * b[i];
+  return acc;
+}
+
+std::vector<std::uint32_t> Mt19937Vec(std::size_t n, std::uint64_t seed) {
+  std::mt19937_64 rng(seed);
+  std::vector<std::uint32_t> v(n);
+  for (auto& x : v) x = static_cast<std::uint32_t>(rng());
+  return v;
+}
+
+}  // namespace
+
+TEST(FrodoMatricesTest, VecMultU32U32_SimdMatchesScalar_Below16) {
+  // Below the n >= 16 dispatch threshold — exercises the scalar path
+  // even on AVX2 hardware, ensuring the dispatch decision is right.
+  for (std::size_t n : {1u, 7u, 8u, 9u, 15u}) {
+    auto a = Mt19937Vec(n, 0xCAFE0001 + n);
+    auto b = Mt19937Vec(n, 0xCAFE0002 + n);
+    std::uint32_t got = 0u;
+    std::string err;
+    ASSERT_EQ(VecMultU32U32(a, b, &got, &err), retcode::SUCCESS) << err;
+    EXPECT_EQ(got, ScalarVecMult(a, b)) << "mismatch at n=" << n;
+  }
+}
+
+TEST(FrodoMatricesTest, VecMultU32U32_SimdMatchesScalar_BoundaryAndTail) {
+  // Sizes that straddle the 8-lane boundary in the AVX2 main loop +
+  // exercise the scalar tail of various widths.
+  for (std::size_t n : {16u, 17u, 23u, 24u, 31u, 32u, 33u, 64u, 100u}) {
+    auto a = Mt19937Vec(n, 0xDEAD0001 + n);
+    auto b = Mt19937Vec(n, 0xDEAD0002 + n);
+    std::uint32_t got = 0u;
+    std::string err;
+    ASSERT_EQ(VecMultU32U32(a, b, &got, &err), retcode::SUCCESS) << err;
+    EXPECT_EQ(got, ScalarVecMult(a, b))
+        << "SIMD diverges from scalar at n=" << n;
+  }
+}
+
+TEST(FrodoMatricesTest, VecMultU32U32_SimdMatchesScalar_LweDim512) {
+  // Typical FrodoPIR LWE-dim VecMult length.
+  const std::size_t n = 512;
+  auto a = Mt19937Vec(n, 0xBEEF0001);
+  auto b = Mt19937Vec(n, 0xBEEF0002);
+  std::uint32_t got = 0u;
+  std::string err;
+  ASSERT_EQ(VecMultU32U32(a, b, &got, &err), retcode::SUCCESS) << err;
+  EXPECT_EQ(got, ScalarVecMult(a, b));
+}
+
+TEST(FrodoMatricesTest, VecMultU32U32_SimdMatchesScalar_LargeWrappingValues) {
+  // Pre-load values near 2^32 to exercise wrapping mul overflow.
+  const std::size_t n = 64;
+  std::vector<std::uint32_t> a(n), b(n);
+  std::mt19937_64 rng(0xF00DBABE);
+  for (std::size_t i = 0; i < n; ++i) {
+    // 75% chance of upper-half values to force overflow paths.
+    a[i] = (rng() % 4u == 0u) ? static_cast<std::uint32_t>(rng())
+                              : static_cast<std::uint32_t>(0x80000000ULL
+                                                            | rng());
+    b[i] = (rng() % 4u == 0u) ? static_cast<std::uint32_t>(rng())
+                              : static_cast<std::uint32_t>(0x80000000ULL
+                                                            | rng());
+  }
+  std::uint32_t got = 0u;
+  std::string err;
+  ASSERT_EQ(VecMultU32U32(a, b, &got, &err), retcode::SUCCESS) << err;
+  EXPECT_EQ(got, ScalarVecMult(a, b));
+}
+
 }  // namespace
 }  // namespace primihub::pir::frodo

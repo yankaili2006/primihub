@@ -4,11 +4,66 @@
  */
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_matrices.h"
 
+#include <cstdint>
 #include <sstream>
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#endif
 
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_prng.h"
 
 namespace primihub::pir::frodo {
+
+namespace {
+
+#if defined(__x86_64__) || defined(_M_X64)
+// AVX2 inner kernel: 8-wide u32 wrapping mul + add reduction.
+// __attribute__((target("avx2"))) lets this compile under the
+// default linux_x86_64 toolchain (.bazelrc only enables SSE4.1).
+// Runtime dispatch via __builtin_cpu_supports keeps non-AVX2
+// hardware on the scalar path.
+__attribute__((target("avx2")))
+std::uint32_t VecMultU32U32Avx2(const std::uint32_t* a,
+                                const std::uint32_t* b,
+                                std::size_t n) {
+  __m256i acc = _mm256_setzero_si256();
+  std::size_t i = 0;
+  for (; i + 8 <= n; i += 8) {
+    __m256i va = _mm256_loadu_si256(
+        reinterpret_cast<const __m256i*>(a + i));
+    __m256i vb = _mm256_loadu_si256(
+        reinterpret_cast<const __m256i*>(b + i));
+    __m256i prod = _mm256_mullo_epi32(va, vb);  // wrap mod 2^32
+    acc = _mm256_add_epi32(acc, prod);           // wrap mod 2^32
+  }
+  // Horizontal sum of 8 u32 lanes; explicit wrapping carries.
+  alignas(32) std::uint32_t lanes[8];
+  _mm256_store_si256(reinterpret_cast<__m256i*>(lanes), acc);
+  std::uint32_t hsum = 0u;
+  for (int j = 0; j < 8; ++j) hsum += lanes[j];
+  // Scalar tail.
+  for (; i < n; ++i) hsum += a[i] * b[i];
+  return hsum;
+}
+#endif
+
+std::uint32_t VecMultU32U32Inner(const std::uint32_t* a,
+                                 const std::uint32_t* b,
+                                 std::size_t n) {
+#if defined(__x86_64__) || defined(_M_X64)
+  // Use AVX2 path for any length that crosses one 8-lane block
+  // (smaller inputs hit cache effects + dispatch overhead).
+  if (n >= 16 && __builtin_cpu_supports("avx2")) {
+    return VecMultU32U32Avx2(a, b, n);
+  }
+#endif
+  std::uint32_t acc = 0u;
+  for (std::size_t i = 0; i < n; ++i) acc += a[i] * b[i];
+  return acc;
+}
+
+}  // namespace
 
 std::vector<std::vector<std::uint32_t>> SwapMatrixFmt(
     const std::vector<std::vector<std::uint32_t>>& matrix) {
@@ -62,15 +117,10 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
     }
     return retcode::FAIL;
   }
-  // Upstream: for i in 0..row.len() {
-  //   acc = acc.wrapping_add(row[i].wrapping_mul(col[i]));
-  // }
-  // C++ unsigned arithmetic is already wrap-around (mod 2^32) by
-  // the language spec — no explicit wrap macros needed.
-  std::uint32_t acc = 0u;
-  for (std::size_t i = 0; i < row.size(); ++i) {
-    acc += row[i] * col[i];
-  }
+  const std::size_t n = row.size();
+  const std::uint32_t* a = row.data();
+  const std::uint32_t* b = col.data();
+  std::uint32_t acc = VecMultU32U32Inner(a, b, n);
   *out = acc;
   return retcode::SUCCESS;
 }
