@@ -216,5 +216,61 @@ TEST(FrodoSeededRngTest, ChaCha20_NotMt19937_LegacyComparison) {
       << "different engine";
 }
 
+
+
+// ---- Chunk 2c tests (OsRng + GenerateSeed) ---------------------
+
+TEST(FrodoOsRngTest, FillBytes_FillsAllRequestedBytes) {
+  // Probability that all 64 OS-RNG bytes are zero is astronomically
+  // small (2^-512). Use that as a "did it actually run" check.
+  std::array<std::uint8_t, 64> buf;
+  buf.fill(0);
+  os_rng::FillBytes(buf.data(), buf.size());
+  bool any_nonzero = false;
+  for (std::uint8_t b : buf) {
+    if (b != 0) {
+      any_nonzero = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(any_nonzero)
+      << "OS RNG produced 64 zero bytes — extremely unlikely; "
+      << "RAND_bytes call probably failed silently";
+}
+
+TEST(FrodoOsRngTest, FillBytes_ZeroLength_NoCrash) {
+  std::uint8_t buf[1] = {0xAB};
+  os_rng::FillBytes(buf, 0);
+  EXPECT_EQ(buf[0], 0xABu) << "0-length fill should not touch buf";
+}
+
+TEST(FrodoOsRngTest, NextU32_TwoCallsDiffer) {
+  // Probability of collision ≈ 2^-32 — fine.
+  const std::uint32_t a = os_rng::NextU32();
+  const std::uint32_t b = os_rng::NextU32();
+  EXPECT_NE(a, b)
+      << "two consecutive OsRng::NextU32 calls returned the same "
+      << "value " << a << " — possible CSPRNG failure";
+}
+
+TEST(FrodoGenerateSeedTest, ProducesNonzero_AndVaries) {
+  const auto a = GenerateSeed();
+  const auto b = GenerateSeed();
+  bool a_any_nonzero = false;
+  for (auto byte : a) {
+    if (byte != 0) {
+      a_any_nonzero = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(a_any_nonzero)
+      << "GenerateSeed produced an all-zero seed — extremely "
+      << "unlikely unless RAND_bytes failed";
+  // Two calls should differ — probability of collision is 2^-256.
+  EXPECT_NE(a, b)
+      << "GenerateSeed returned the same seed on consecutive calls; "
+      << "if you see this, the OS RNG is wedged";
+}
+
 }  // namespace
 }  // namespace primihub::pir::frodo

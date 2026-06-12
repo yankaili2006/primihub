@@ -102,4 +102,45 @@ std::vector<std::vector<std::uint32_t>> GenerateLweMatrixFromSeed(
   return a;
 }
 
+
+
+namespace {
+
+// Upstream:
+//   const TERNARY_INTERVAL_SIZE: u32 = (u32::MAX - 2) / 3;
+//   const TERNARY_REJECTION_SAMPLING_MAX: u32 = TERNARY_INTERVAL_SIZE * 3;
+// We mirror these byte-for-byte.
+constexpr std::uint32_t kTernaryIntervalSize =
+    (0xFFFFFFFFu - 2u) / 3u;
+constexpr std::uint32_t kTernaryRejectionMax =
+    kTernaryIntervalSize * 3u;
+
+}  // namespace
+
+std::uint32_t RandomTernary() {
+  std::uint32_t val = os_rng::NextU32();
+  while (val > kTernaryRejectionMax) {
+    val = os_rng::NextU32();
+  }
+  // val now in [0, 3*kTernaryIntervalSize]; trichotomy mirrors
+  // upstream (note inclusive lower-bound on the first interval).
+  if (val > kTernaryIntervalSize &&
+      val <= kTernaryIntervalSize * 2u) {
+    return 1u;
+  }
+  if (val > kTernaryIntervalSize * 2u) {
+    return 0xFFFFFFFFu;  // upstream uses u32::MAX (= -1 mod 2^32)
+  }
+  return 0u;
+}
+
+std::vector<std::uint32_t> RandomTernaryVector(std::size_t width) {
+  std::vector<std::uint32_t> out;
+  out.reserve(width);
+  for (std::size_t i = 0; i < width; ++i) {
+    out.push_back(RandomTernary());
+  }
+  return out;
+}
+
 }  // namespace primihub::pir::frodo

@@ -9,6 +9,7 @@
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_prng.h"
 
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -116,6 +117,42 @@ std::uint64_t SeededRng::NextU64() {
     v |= static_cast<std::uint64_t>(buf[i]) << (i * 8);
   }
   return v;
+}
+
+
+
+namespace os_rng {
+
+void FillBytes(std::uint8_t* out, std::size_t n) {
+  if (n == 0) {
+    return;
+  }
+  // RAND_bytes returns 1 on success, 0 on failure, -1 if not
+  // supported. Treat anything but 1 as fatal — a degraded OsRng
+  // would silently weaken every downstream cryptographic primitive.
+  const int rc = RAND_bytes(out, static_cast<int>(n));
+  if (rc != 1) {
+    throw std::runtime_error(
+        "frodo_prng::os_rng::FillBytes: RAND_bytes returned non-1 "
+        "(possible kernel entropy / RAND_status failure)");
+  }
+}
+
+std::uint32_t NextU32() {
+  std::uint8_t buf[4];
+  FillBytes(buf, 4);
+  return static_cast<std::uint32_t>(buf[0]) |
+         (static_cast<std::uint32_t>(buf[1]) << 8) |
+         (static_cast<std::uint32_t>(buf[2]) << 16) |
+         (static_cast<std::uint32_t>(buf[3]) << 24);
+}
+
+}  // namespace os_rng
+
+SeedBytes GenerateSeed() {
+  SeedBytes seed;
+  os_rng::FillBytes(seed.data(), seed.size());
+  return seed;
 }
 
 }  // namespace primihub::pir::frodo

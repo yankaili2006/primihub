@@ -221,5 +221,53 @@ TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_ColumnOrderMatchesUpstream) {
       << "column-major iteration order does not match upstream";
 }
 
+
+
+// ---- Chunk 2c tests (RandomTernary + RandomTernaryVector) ------
+
+TEST(FrodoMatricesTest, RandomTernary_OnlyValidValues) {
+  // Every output must be in {0, 1, 0xFFFFFFFF}. Over 1024 trials
+  // the probability of accidentally missing an invalid output is
+  // dominated by an OsRng failure, not by the test design.
+  for (int i = 0; i < 1024; ++i) {
+    const std::uint32_t v = RandomTernary();
+    const bool ok = (v == 0u) || (v == 1u) || (v == 0xFFFFFFFFu);
+    EXPECT_TRUE(ok) << "RandomTernary returned " << v
+                    << " — not in {0, 1, 0xFFFFFFFF}";
+  }
+}
+
+TEST(FrodoMatricesTest, RandomTernary_AllThreeValuesAppear) {
+  // Each value has roughly 1/3 probability; over 1024 trials the
+  // probability of missing any one value is (2/3)^1024 ≈ 0.
+  // Failing this test indicates a broken distribution.
+  std::array<bool, 3> seen = {false, false, false};
+  for (int i = 0; i < 1024; ++i) {
+    const std::uint32_t v = RandomTernary();
+    if (v == 0u) seen[0] = true;
+    else if (v == 1u) seen[1] = true;
+    else if (v == 0xFFFFFFFFu) seen[2] = true;
+  }
+  EXPECT_TRUE(seen[0]) << "value 0 never produced in 1024 trials";
+  EXPECT_TRUE(seen[1]) << "value 1 never produced in 1024 trials";
+  EXPECT_TRUE(seen[2])
+      << "value 0xFFFFFFFF never produced in 1024 trials";
+}
+
+TEST(FrodoMatricesTest, RandomTernaryVector_SizeAndValues) {
+  const std::size_t n = 128;
+  const auto v = RandomTernaryVector(n);
+  ASSERT_EQ(v.size(), n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const bool ok = (v[i] == 0u) || (v[i] == 1u) ||
+                    (v[i] == 0xFFFFFFFFu);
+    EXPECT_TRUE(ok) << "elem " << i << " = " << v[i];
+  }
+}
+
+TEST(FrodoMatricesTest, RandomTernaryVector_EmptyOk) {
+  EXPECT_TRUE(RandomTernaryVector(0).empty());
+}
+
 }  // namespace
 }  // namespace primihub::pir::frodo

@@ -123,6 +123,36 @@ class SeededRng {
   std::size_t block_pos_ = 64;  // 64 = empty (forces RefillBlock)
 };
 
+
+// ====================================================================
+// OS-RNG-backed helpers (chunk 2c).
+//
+// Wraps OpenSSL RAND_bytes to mirror upstream's rand_core::OsRng.
+// Used for entropy sources that must NOT be reproducible across
+// runs — e.g. fresh public seeds (BaseParams::new) and ternary
+// noise samples for the client secret (CommonParams::mult_left).
+// ====================================================================
+
+namespace os_rng {
+
+// Fills `out` with `n` cryptographically-random bytes via OpenSSL
+// RAND_bytes. Throws std::runtime_error if the underlying CSPRNG
+// fails (very rare — indicates kernel entropy / RAND_status
+// failure). Mirrors upstream `OsRng.fill_bytes(&mut buf)`.
+void FillBytes(std::uint8_t* out, std::size_t n);
+
+// Convenience: returns one cryptographically-random u32. Mirrors
+// upstream `OsRng.next_u32()`. Equivalent to FillBytes(buf, 4)
+// + little-endian assembly.
+std::uint32_t NextU32();
+
+}  // namespace os_rng
+
+// Generates a fresh 32-byte seed via OS RNG. Mirrors upstream's
+// file-private `fn generate_seed() -> [u8; 32]` in db.rs. Used by
+// BaseParams::New (chunk 4) to produce the public LWE seed.
+SeedBytes GenerateSeed();
+
 }  // namespace primihub::pir::frodo
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_FRODO_PIR_FRODO_PRNG_H_

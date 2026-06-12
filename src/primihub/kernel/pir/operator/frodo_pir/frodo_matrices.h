@@ -111,6 +111,36 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
 std::vector<std::vector<std::uint32_t>> GenerateLweMatrixFromSeed(
     const SeedBytes& seed, std::size_t lwe_dim, std::size_t width);
 
+
+
+// ====================================================================
+// Ternary-distribution sampling (chunk 2c).
+//
+// Implements the rejection-sampling distribution used by upstream
+// FrodoPIR client.gen_query for the LWE secret error vector.
+// Mirrors upstream src/utils.rs `pub fn random_ternary` byte-for-
+// byte including the slight one-off bias toward the value 0 caused
+// by the inclusive lower-bound interval in the trichotomy.
+// ====================================================================
+
+// Returns one of {0, 1, UINT32_MAX} via rejection sampling on an
+// OsRng-generated u32. Mirrors upstream `random_ternary`. The
+// triple {0, 1, UINT32_MAX} represents {0, 1, -1} after mod 2^32
+// reduction — what FrodoPIR's LWE secret error vector needs.
+//
+// Distribution: TERNARY_INTERVAL_SIZE = (UINT32_MAX - 2) / 3.
+//   val in [0, TIS]                → 0
+//   val in (TIS, 2*TIS]            → 1
+//   val in (2*TIS, 3*TIS]          → UINT32_MAX (= -1 mod 2^32)
+//   val > 3*TIS                    → reject and resample
+// The first interval has TIS+1 integers, the next two have TIS
+// each — a 1-out-of-2^32 bias toward 0 that mirrors upstream.
+std::uint32_t RandomTernary();
+
+// Width-many independent RandomTernary calls. Mirrors upstream
+// `random_ternary_vector(width)`.
+std::vector<std::uint32_t> RandomTernaryVector(std::size_t width);
+
 }  // namespace primihub::pir::frodo
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_FRODO_PIR_FRODO_MATRICES_H_
