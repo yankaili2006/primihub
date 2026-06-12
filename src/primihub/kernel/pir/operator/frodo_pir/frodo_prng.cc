@@ -2,72 +2,120 @@
  * Copyright (c) 2026 by PrimiHub
  * Licensed under the Apache License, Version 2.0
  *
- * !! WARNING !! See frodo_prng.h header for the full security
- * regression analysis. Short version: this file backs SeededRng
- * with std::mt19937_64 which is NOT cryptographically secure.
- * Chunk 2b-ii will swap to OpenSSL ChaCha20 keeping the same API
- * surface. Do not deploy this version to production.
+ * SeededRng backed by OpenSSL ChaCha20 (chunk 2b-ii). See
+ * frodo_prng.h header for the cryptographic-property checklist
+ * and the swap rationale from chunk 2b-i.
  */
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_prng.h"
 
-#include <vector>
+#include <openssl/evp.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
+#include <string>
 
 namespace primihub::pir::frodo {
 
 namespace {
 
-// Deterministic seed-derivation that uses every byte of the 32-byte
-// seed. We pack the seed into 8 u32s (little-endian within each
-// 4-byte chunk) and feed them through std::seed_seq to the engine.
-// std::seed_seq is implementation-defined but reproducible within
-// a fixed libstdc++ version; that's enough for our threat model
-// while chunk 2b-ii is pending.
-std::mt19937_64 MakeEngineFromSeed(const SeedBytes& seed) {
-  std::vector<std::uint32_t> u32s(8, 0);
-  for (std::size_t i = 0; i < 8; ++i) {
-    std::uint32_t v = 0;
-    for (std::size_t b = 0; b < 4; ++b) {
-      v |= static_cast<std::uint32_t>(seed[i * 4 + b]) << (b * 8);
-    }
-    u32s[i] = v;
-  }
-  std::seed_seq ss(u32s.begin(), u32s.end());
-  return std::mt19937_64(ss);
+// Aborts the process with a diagnostic when an OpenSSL EVP call
+// returns a failure. Used in the ctor and refill — both code paths
+// where a failure means our crypto invariant is broken and the
+// caller's keystream would be unsafe to use, so failing fast is
+// safer than continuing with a degraded RNG.
+[[noreturn]] void OpensslFatal(const char* where) {
+  std::string msg = "frodo_prng: OpenSSL call failed at ";
+  msg += where;
+  // Throw rather than abort so unit tests can observe and we don't
+  // SIGABRT the test binary. SeededRng is constructed only inside
+  // GenerateLweMatrixFromSeed which runs early in BaseParams::New;
+  // bubbling up gives that path a clean failure.
+  throw std::runtime_error(msg);
 }
 
 }  // namespace
 
-SeededRng::SeededRng(const SeedBytes& seed)
-    : engine_(MakeEngineFromSeed(seed)),
-      buffer_(0),
-      buffer_has_hi_(false) {}
+SeededRng::SeededRng(const SeedBytes& seed) {
+  ctx_ = EVP_CIPHER_CTX_new();
+  if (ctx_ == nullptr) {
+    OpensslFatal("EVP_CIPHER_CTX_new");
+  }
+  // ChaCha20 expects a 16-byte IV: 4-byte block counter + 12-byte
+  // nonce per RFC 8439 (OpenSSL's EVP layer takes them concatenated
+  // little-endian, counter first). We use all-zero so the keystream
+  // starts at counter=0 — same convention as upstream
+  // rand_chacha::ChaCha12Rng::from_seed.
+  std::array<std::uint8_t, 16> iv{};
+  if (EVP_EncryptInit_ex(ctx_, EVP_chacha20(), nullptr, seed.data(),
+                         iv.data()) != 1) {
+    EVP_CIPHER_CTX_free(ctx_);
+    ctx_ = nullptr;
+    OpensslFatal("EVP_EncryptInit_ex(EVP_chacha20)");
+  }
+  block_pos_ = 64;  // empty — first NextU32/NextU64 will refill
+}
+
+SeededRng::~SeededRng() {
+  if (ctx_ != nullptr) {
+    EVP_CIPHER_CTX_free(ctx_);
+    ctx_ = nullptr;
+  }
+}
+
+void SeededRng::RefillBlock() {
+  // Feed 64 zero bytes through ChaCha20 to harvest one 64-byte
+  // keystream block. Out-of-place is fine; both buffers must be
+  // distinct per EVP contract.
+  std::array<std::uint8_t, 64> zeros{};  // value-init -> all zero
+  int out_len = 0;
+  if (EVP_EncryptUpdate(ctx_, block_.data(), &out_len, zeros.data(),
+                        static_cast<int>(zeros.size())) != 1) {
+    OpensslFatal("EVP_EncryptUpdate");
+  }
+  if (out_len != 64) {
+    OpensslFatal("EVP_EncryptUpdate-short-write");
+  }
+  block_pos_ = 0;
+}
+
+void SeededRng::ReadBytes(std::uint8_t* out, std::size_t n) {
+  // Drain the byte stream in pieces, refilling the buffer as needed.
+  // For n in {4, 8} this loops at most twice (once if n bytes fit
+  // in the current block, twice if it straddles a block boundary).
+  std::size_t taken = 0;
+  while (taken < n) {
+    if (block_pos_ >= block_.size()) {
+      RefillBlock();
+    }
+    const std::size_t avail = block_.size() - block_pos_;
+    const std::size_t want = n - taken;
+    const std::size_t chunk = (avail < want) ? avail : want;
+    std::memcpy(out + taken, block_.data() + block_pos_, chunk);
+    block_pos_ += chunk;
+    taken += chunk;
+  }
+}
 
 std::uint32_t SeededRng::NextU32() {
-  // Pull 64 bits, hand out the low 32, stash the high 32 for the
-  // next call. Consecutive NextU32 calls thus return (lo, hi) of
-  // the same u64 — equivalent to NextU64() split little-endian.
-  if (!buffer_has_hi_) {
-    buffer_ = engine_();
-    buffer_has_hi_ = true;
-    return static_cast<std::uint32_t>(buffer_ & 0xFFFFFFFFu);
-  }
-  buffer_has_hi_ = false;
-  return static_cast<std::uint32_t>((buffer_ >> 32) & 0xFFFFFFFFu);
+  std::uint8_t buf[4];
+  ReadBytes(buf, 4);
+  // Little-endian assembly — matches upstream rand_chacha
+  // LeRng::next_u32 which reads the keystream LE.
+  return static_cast<std::uint32_t>(buf[0]) |
+         (static_cast<std::uint32_t>(buf[1]) << 8) |
+         (static_cast<std::uint32_t>(buf[2]) << 16) |
+         (static_cast<std::uint32_t>(buf[3]) << 24);
 }
 
 std::uint64_t SeededRng::NextU64() {
-  // If there's a stashed high half from an odd NextU32 call, we
-  // need to drain it first so NextU32/NextU64 mix coherently.
-  if (buffer_has_hi_) {
-    const std::uint32_t hi = static_cast<std::uint32_t>(buffer_ >> 32);
-    buffer_has_hi_ = false;
-    const std::uint64_t fresh = engine_();
-    return (static_cast<std::uint64_t>(
-                static_cast<std::uint32_t>(fresh & 0xFFFFFFFFu))
-            << 32) |
-           hi;
+  std::uint8_t buf[8];
+  ReadBytes(buf, 8);
+  std::uint64_t v = 0;
+  for (std::size_t i = 0; i < 8; ++i) {
+    v |= static_cast<std::uint64_t>(buf[i]) << (i * 8);
   }
-  return engine_();
+  return v;
 }
 
 }  // namespace primihub::pir::frodo

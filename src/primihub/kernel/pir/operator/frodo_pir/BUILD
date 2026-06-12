@@ -29,6 +29,9 @@ cc_library(
     srcs = ["frodo_prng.cc"],
     hdrs = ["frodo_prng.h"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@openssl",
+    ],
 )
 
 cc_library(
