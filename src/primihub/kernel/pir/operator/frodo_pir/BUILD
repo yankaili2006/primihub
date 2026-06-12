@@ -1,6 +1,24 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
+
+cc_library(
+    name = "frodo_lwe_consts",
+    hdrs = ["frodo_lwe_consts.h"],
+    visibility = ["//visibility:public"],
+)
+
+
+cc_library(
+    name = "frodo_format",
+    srcs = ["frodo_format.cc"],
+    hdrs = ["frodo_format.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/primihub/common:common_defination",
+    ],
+)
+
 cc_library(
     name = "frodo_pir_operator",
     srcs = ["frodo_pir.cc"],

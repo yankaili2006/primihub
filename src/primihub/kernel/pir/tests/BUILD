@@ -334,6 +334,28 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "frodo_lwe_consts_test",
+    srcs = ["frodo_lwe_consts_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_lwe_consts",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
+    name = "frodo_format_test",
+    srcs = ["frodo_format_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_format",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+
+
 
 
 
