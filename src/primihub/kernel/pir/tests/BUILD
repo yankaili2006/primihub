@@ -364,6 +364,16 @@ cc_test(
     size = "small",
 )
 
+cc_test(
+    name = "frodo_database_test",
+    srcs = ["frodo_database_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_database",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
 
 
 

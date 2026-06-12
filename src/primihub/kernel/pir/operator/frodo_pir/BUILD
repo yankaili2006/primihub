@@ -31,6 +31,18 @@ cc_library(
     ],
 )
 
+
+
+cc_library(
+    name = "frodo_database",
+    srcs = ["frodo_database.cc"],
+    hdrs = ["frodo_database.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":frodo_matrices",
+    ],
+)
+
 cc_library(
     name = "frodo_pir_operator",
     srcs = ["frodo_pir.cc"],
