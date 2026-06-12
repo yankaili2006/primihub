@@ -168,6 +168,40 @@ run_real_smoke() {
     return
   fi
 
+  # frodo_pir runs an in-process operator test (no upstream vendored
+  # repo since the C++ port at task 7.1 is self-contained — chunks 1-5+7+8
+  # land utils/PRNG/db/params/api + OnExecute + registry tests).
+  if [[ "$algo" == "frodo_pir" ]]; then
+    if [[ -z "${PIR_SMOKE_RUN_BAZEL:-}" ]]; then
+      echo "SKIP(set PIR_SMOKE_RUN_BAZEL=1 to run bazel smoke)"
+      return
+    fi
+    local root="$SCRIPT_DIR"
+    while [[ "$root" != "/" && ! -f "$root/WORKSPACE" && ! -f "$root/WORKSPACE.bazel" ]]; do
+      root="$(dirname "$root")"
+    done
+    if [[ ! -f "$root/WORKSPACE" && ! -f "$root/WORKSPACE.bazel" ]]; then
+      echo "SKIP(WORKSPACE not found above $SCRIPT_DIR — run from primihub clone)"
+      return
+    fi
+    if ! command -v bazel >/dev/null 2>&1; then
+      echo "SKIP(bazel not on PATH)"
+      return
+    fi
+    local log
+    log="$(mktemp)"
+    if (cd "$root" && bazel test --config=linux_x86_64 \
+            //src/primihub/kernel/pir/tests:frodo_pir_test \
+            --test_output=summary) > "$log" 2>&1; then
+      rm -f "$log"
+      echo "PASS"
+    else
+      echo "FAIL(bazel test failed; last 5 lines: $(tail -5 "$log" | tr '\n' '; '))"
+      rm -f "$log"
+    fi
+    return
+  fi
+
   # Heavy path: actual primihub-cli invocation. We don't drive this from the
   # smoke yet because it requires a fully-provisioned cluster; gate it behind
   # an env-var so a future CI job can opt in.
