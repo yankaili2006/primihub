@@ -59,12 +59,12 @@ pir_inspect auto db-size=1e8 query-type=index latency-budget=ms \
 | `spiral`     | 1         | none       | ~26 KB         | 2-3 s         | 🚧 skeleton | USENIX'22        |
 | `simple_pir` | 1         | client (per-DB) | ~121 KB    | sub-second    | ✅ real      | USENIX'23        |
 | `double_pir` | 2 non-collude | client+server (per-DB) | ~4 KB | ~10 ms     | ✅ real      | USENIX'23        |
-| `frodo_pir`  | 1         | client (per-DB) | ~64 KB     | ms class      | 🚧 skeleton | PETS'23          |
+| `frodo_pir`  | 1         | client (per-DB) | ~64 KB     | ms class      | ✅ real      | PETS'23          |
 | `ypir`       | 1         | client (per-DB) | minimal    | sub-second    | 🚧 skeleton | USENIX'24        |
 
 > 🚧 **skeleton** = registrar / capabilities / proto compat are in place,
 > selector ranks them correctly, OnExecute returns FAIL. Real cryptographic
-> kernel lands per algorithm in OpenSpec change tasks 4.4 / 7.1 / 7.3.
+> kernel lands per algorithm in OpenSpec change tasks 4.4 / 7.3.
 >
 > ✅ **real** algorithms: id_pir (SealPIR, since project inception), apsi
 > (opt-in via --define microsoft-apsi=true), simple_pir (task 7.2 landed

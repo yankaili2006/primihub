@@ -87,7 +87,7 @@ weaker than the user's `min_threat_model` constraint.
   no per-client state, so a single hint serves all clients on the same
   DB version.
 
-### `frodo_pir` — FrodoPIR (PETS'23) 🚧 skeleton
+### `frodo_pir` — FrodoPIR (PETS'23) ✅ real (task 7.1)
 
 - **Assumption (planned):** Single server, semi-honest. Plain LWE with
   Frodo-style parameters (no ring structure → conservative).

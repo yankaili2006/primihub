@@ -7,7 +7,7 @@ interpret the JSON outputs that the scripts emit.
 > **State of the world (2026-06-08):** 3 of 6 registered algorithms are
 > real: id_pir (SealPIR, since project inception), simple_pir (task 7.2,
 > commit 2d77509a), and double_pir (task 5.5, commit 31e8fd43). The
-> remaining 3 (spiral / frodo_pir / ypir) are skeletons whose OnExecute
+> remaining 2 (spiral / ypir) are skeletons whose OnExecute
 > returns FAIL by design — real crypto kernels land in tasks 4.4 / 7.1
 > / 7.3. The bench scripts are structured to give useful output *today*
 > (selector regression + correctness smoke for the real ones) and pick
@@ -260,7 +260,7 @@ Reproduce via `bench/simple_pir_persistence_bench.sh --n-list '...'`.
     {"algorithm": "spiral",     "status": "SKIP-stub", "reason": "OnExecute returns FAIL by design"},
     {"algorithm": "double_pir", "status": "SKIP-stub", "reason": "OnExecute returns FAIL by design"},
     {"algorithm": "simple_pir", "status": "SKIP-stub", "reason": "OnExecute returns FAIL by design"},
-    {"algorithm": "frodo_pir",  "status": "SKIP-stub", "reason": "OnExecute returns FAIL by design"},
+    {"algorithm": "frodo_pir",  "status": "PASS",      "reason": ""},
     {"algorithm": "ypir",       "status": "SKIP-stub", "reason": "OnExecute returns FAIL by design"}
   ]
 }
@@ -285,7 +285,7 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
 | `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
 | `simple_pir` | 1e8   | sub-second      | per-query 52 ms (single trial) | TBD | 94a706ff8e04eed5064bedfd0f897e8b19c630b612aafbef4e711fe5bd1b1220 (landed 2026-06-10 alongside DoublePIR 1e8) |
-| `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | (skeleton) |
+| `frodo_pir`  | 1e7   | ms class        | TBD          | TBD          | ✅ real     |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 
 `pir_matrix_bench.sh` (planned as task 10.1) will be the matrix runner
