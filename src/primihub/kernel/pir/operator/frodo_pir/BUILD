@@ -75,6 +75,24 @@ cc_library(
     ],
 )
 
+
+
+cc_library(
+    name = "frodo_api",
+    srcs = ["frodo_api.cc"],
+    hdrs = ["frodo_api.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":frodo_database",
+        ":frodo_format",
+        ":frodo_lwe_consts",
+        ":frodo_matrices",
+        ":frodo_params",
+        ":frodo_prng",
+        "//src/primihub/common:common_defination",
+    ],
+)
+
 cc_library(
     name = "frodo_pir_operator",
     srcs = ["frodo_pir.cc"],
