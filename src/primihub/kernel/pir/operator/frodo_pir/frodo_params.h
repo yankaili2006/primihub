@@ -118,7 +118,26 @@ class BaseParams {
   //   3. For each i in [0, db.GetMatrixWidthSelf()):
   //        rhs[i] = [ db.VecMult(lhs[j], i) for j in [0, dim) ]
   //   4. Return rhs (column-form, shape w × dim).
+  //
+  // chunk g-5: kept as a public static returning the nested form
+  // so existing GenerateParamsRhs_MatchesHandComputed test +
+  // any external callers compile unchanged. Internally delegates
+  // to GenerateParamsRhsFlat and materialises the nested form
+  // once at the boundary. Production path goes straight through
+  // GenerateParamsRhsFlat via NewWithSeed -- the test-only nested
+  // copy is paid only by callers that explicitly request it.
   static std::vector<std::vector<std::uint32_t>> GenerateParamsRhs(
+      const Database& db, const SeedBytes& public_seed,
+      std::size_t dim, std::size_t m);
+
+  // chunk g-5: flat-buffer entry point used by NewWithSeed.
+  // Mirrors GenerateParamsRhs but operates on ColMajorMatrix
+  // end-to-end (no nested-vector materialisation). Uses
+  // GenerateLweMatrixFromSeedFlat + SwapMatrixFmtFlat (chunk g-2 +
+  // g-3) for the lhs construction, then the chunk g-4 raw-pointer
+  // VecMultU32U32 overload for the dot products against db
+  // columns. Result shape: height=dim, width=db.GetMatrixWidthSelf().
+  static ColMajorMatrix GenerateParamsRhsFlat(
       const Database& db, const SeedBytes& public_seed,
       std::size_t dim, std::size_t m);
 
@@ -139,10 +158,16 @@ class BaseParams {
   std::size_t GetPlaintextBits() const { return plaintext_bits_; }
   const SeedBytes& GetPublicSeed() const { return public_seed_; }
 
-  // Test accessor exposing the precomputed RHS matrix.
-  const std::vector<std::vector<std::uint32_t>>& RhsForTest() const {
-    return rhs_;
-  }
+  // Test accessor materialising the precomputed RHS matrix into
+  // the legacy nested form. Returns by value (the temporary lives
+  // through the full expression that uses it; tests can also bind
+  // to `const auto&` -- C++ reference lifetime extension covers
+  // the by-value temporary). Production never calls this.
+  std::vector<std::vector<std::uint32_t>> RhsForTest() const;
+
+  // Direct flat-matrix accessor for callers that already speak
+  // ColMajorMatrix. Skips the RhsForTest materialisation copy.
+  const ColMajorMatrix& RhsFlat() const { return rhs_; }
 
  private:
   std::size_t dim_;
@@ -150,7 +175,11 @@ class BaseParams {
   std::size_t elem_size_;
   std::size_t plaintext_bits_;
   SeedBytes public_seed_;
-  std::vector<std::vector<std::uint32_t>> rhs_;
+  // chunk g-5: column-major flat storage. Shape: height = dim,
+  // width = db.GetMatrixWidthSelf(). MultRight iterates columns
+  // via rhs_.column_data(i) without materialising any inner
+  // vector.
+  ColMajorMatrix rhs_;
 };
 
 class CommonParams {
@@ -159,20 +188,33 @@ class CommonParams {
   // pattern rationale.
   CommonParams();
 
-  // Construct from an already-derived matrix. Used internally by
-  // FromBaseParams and exposed for tests.
+  // Construct from an already-derived matrix in the nested form.
+  // Tests use this directly; FromBaseParams takes the flat-form
+  // overload below.
   explicit CommonParams(std::vector<std::vector<std::uint32_t>> matrix);
+
+  // chunk g-5: flat-form ctor for FromBaseParams. Skips the
+  // nested-to-flat copy at the construction boundary.
+  explicit CommonParams(ColMajorMatrix matrix);
 
   // Static factory mirroring upstream
   // `impl From<&BaseParams> for CommonParams`. Reconstructs A =
   // GenerateLweMatrixFromSeed(params.public_seed, params.dim,
   // params.m) — shape m × dim, column-form.
+  //
+  // chunk g-5: uses GenerateLweMatrixFromSeedFlat directly so the
+  // production path never materialises a nested vector.
   static CommonParams FromBaseParams(const BaseParams& params);
 
-  // Mirrors upstream as_matrix. Returns const ref to the matrix.
-  const std::vector<std::vector<std::uint32_t>>& AsMatrix() const {
-    return matrix_;
-  }
+  // Mirrors upstream as_matrix. Returns the matrix in the legacy
+  // nested form (materialised on demand from the flat storage).
+  // Tests can bind to `const auto&` -- C++ reference lifetime
+  // extension covers the by-value temporary.
+  std::vector<std::vector<std::uint32_t>> AsMatrix() const;
+
+  // Direct flat-matrix accessor. Skips the AsMatrix materialisation
+  // copy for callers that already speak ColMajorMatrix.
+  const ColMajorMatrix& MatrixFlat() const { return matrix_; }
 
   // Mirrors upstream mult_left. Computes b[i] = vec_mult(s,
   // cols[i]) + RandomTernary(), for each i in [0, matrix_.size()).
@@ -188,7 +230,10 @@ class CommonParams {
                    std::string* err) const;
 
  private:
-  std::vector<std::vector<std::uint32_t>> matrix_;
+  // chunk g-5: column-major flat storage for A. Shape: height = dim,
+  // width = m (mirrors GenerateLweMatrixFromSeedFlat output shape).
+  // MultLeft iterates columns via matrix_.column_data(i).
+  ColMajorMatrix matrix_;
 };
 
 }  // namespace primihub::pir::frodo
