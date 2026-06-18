@@ -292,6 +292,107 @@ TEST(FrodoMatricesTest, GenerateLweMatrixFromSeedFlat_MatchesPerColumn_Width2049
   }
 }
 
+TEST(FrodoMatricesTest, SwapMatrixFmtFlat_EmptyInput_ReturnsEmpty) {
+  // chunk g-3 boundary: empty input -> empty output. Mirrors the
+  // per-column SwapMatrixFmt path so migration is drop-in for
+  // callers that test for `.empty()`.
+  EXPECT_TRUE(SwapMatrixFmtFlat(ColMajorMatrix{}).empty());
+}
+
+TEST(FrodoMatricesTest, SwapMatrixFmtFlat_TilesMatchesNaive_BoundaryAndAgreesWithNaive) {
+  // chunk g-3 regression guard: cache-tiled flat transpose must
+  // produce the EXACT same output as a naive index-by-index
+  // transpose, even when both dimensions cross the tile-size
+  // (B=32) boundary. 33 x 17 is deliberate so neither dim is a
+  // multiple of B -- exercises full B x B tiles plus a 1-row tail
+  // plus partial-column tail. Matrix entries are filled with a
+  // hash so an off-by-one in either loop axis is immediately
+  // visible in the diff.
+  const std::size_t H = 33;
+  const std::size_t W = 17;
+  ColMajorMatrix in(/*height=*/H, /*width=*/W);
+  for (std::size_t c = 0; c < W; ++c) {
+    for (std::size_t r = 0; r < H; ++r) {
+      in.at(c, r) = static_cast<std::uint32_t>(c * 1000003u + r * 31u + 1u);
+    }
+  }
+  // Naive reference: output.at(r, c) = input.at(c, r).
+  ColMajorMatrix expected(/*height=*/W, /*width=*/H);
+  for (std::size_t c = 0; c < W; ++c) {
+    for (std::size_t r = 0; r < H; ++r) {
+      expected.at(/*col=*/r, /*row=*/c) = in.at(c, r);
+    }
+  }
+  const auto actual = SwapMatrixFmtFlat(in);
+  ASSERT_EQ(actual.height(), W);
+  ASSERT_EQ(actual.width(), H);
+  EXPECT_TRUE(actual == expected)
+      << "tiled flat transpose diverged from naive reference -- "
+         "tile-boundary remainder logic is wrong";
+}
+
+TEST(FrodoMatricesTest, SwapMatrixFmtFlat_TallSkinny_AgreesWithNaive) {
+  // chunk g-3 stress on a shape that mimics FrodoPIR Setup at
+  // (m x dim) = (1e6 x 512) but downsized so the test stays fast:
+  // 2057 x 257 crosses many B=32 tile boundaries on the long axis
+  // and one boundary on the narrow axis (257 = 8*32 + 1).
+  const std::size_t H = 2057;
+  const std::size_t W = 257;
+  ColMajorMatrix in(/*height=*/H, /*width=*/W);
+  for (std::size_t c = 0; c < W; ++c) {
+    for (std::size_t r = 0; r < H; ++r) {
+      // Mix of large + small to surface any silent truncation bug.
+      in.at(c, r) = static_cast<std::uint32_t>((r << 16) ^ (c * 2654435761u));
+    }
+  }
+  ColMajorMatrix expected(/*height=*/W, /*width=*/H);
+  for (std::size_t c = 0; c < W; ++c) {
+    for (std::size_t r = 0; r < H; ++r) {
+      expected.at(/*col=*/r, /*row=*/c) = in.at(c, r);
+    }
+  }
+  const auto actual = SwapMatrixFmtFlat(in);
+  EXPECT_TRUE(actual == expected)
+      << "tiled flat transpose diverged on tall-skinny 2057 x 257";
+}
+
+TEST(FrodoMatricesTest, SwapMatrixFmtFlat_AgreesWithPerColumnSwap) {
+  // chunk g-3 cross-form pin: the flat overload + per-column
+  // overload must produce the same conceptual matrix when fed
+  // equivalent inputs. We build a 6 x 4 (height=6, width=4)
+  // ColMajorMatrix and a vector<vector<u32>> with the same
+  // shape + content; the transposes should agree element-by-element.
+  // Ties the two transpose families together so future migration
+  // chunks (g-4/g-5) can be reviewed knowing the boundary
+  // semantics line up.
+  const std::size_t H = 6;
+  const std::size_t W = 4;
+  ColMajorMatrix flat_in(/*height=*/H, /*width=*/W);
+  std::vector<std::vector<std::uint32_t>> nested_in(W,
+      std::vector<std::uint32_t>(H));
+  for (std::size_t c = 0; c < W; ++c) {
+    for (std::size_t r = 0; r < H; ++r) {
+      const std::uint32_t v =
+          static_cast<std::uint32_t>(c * 101u + r * 17u);
+      flat_in.at(c, r) = v;
+      nested_in[c][r] = v;
+    }
+  }
+  const auto flat_out = SwapMatrixFmtFlat(flat_in);
+  const auto nested_out = SwapMatrixFmt(nested_in);
+  ASSERT_EQ(flat_out.height(), W);
+  ASSERT_EQ(flat_out.width(), H);
+  ASSERT_EQ(nested_out.size(), H);
+  for (std::size_t r = 0; r < H; ++r) {
+    ASSERT_EQ(nested_out[r].size(), W);
+    for (std::size_t c = 0; c < W; ++c) {
+      EXPECT_EQ(flat_out.at(/*col=*/r, /*row=*/c), nested_out[r][c])
+          << "flat vs nested transpose disagree at output(r=" << r
+          << ", c=" << c << ")";
+    }
+  }
+}
+
 
 
 // ---- Chunk 2c tests (RandomTernary + RandomTernaryVector) ------

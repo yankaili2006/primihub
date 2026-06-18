@@ -78,6 +78,41 @@ namespace primihub::pir::frodo {
 std::vector<std::vector<std::uint32_t>> SwapMatrixFmt(
     const std::vector<std::vector<std::uint32_t>>& matrix);
 
+// Flat-buffer transpose: same semantics as SwapMatrixFmt above but
+// operates on ColMajorMatrix (chunk g-1 container, populated by
+// chunk g-2 GenerateLweMatrixFromSeedFlat) without ever materialising
+// a std::vector<std::vector<uint32_t>> intermediate. Output shape
+// swaps the input axes: input.at(c, r) becomes output.at(r, c).
+//
+// Implementation is a cache-tiled transpose on flat memory. With
+// B=32 (B^2*4 = 4 KB per tile per direction, both fit in L1d), the
+// access pattern walks each input column in B-sized sequential
+// chunks while writing to B distinct output columns; once the tile
+// fits in L1 the strided output stores are cheap. At FrodoPIR
+// Setup-time shapes (input 1e6 x 512) the prior naive
+// vector<vector<u32>> form lost ~5.7 s to (a) per-column allocation
+// page-fault storms and (b) writing 1 u32 to each of 512 different
+// output vectors per input row -- both of which the flat layout
+// removes.
+//
+// Byte-for-byte invariant: every output element equals the
+// equivalent input element transposed -- the
+// SwapMatrixFmtFlat_TilesMatchesNaive_BoundaryAndAgreesWithNaive
+// test (33x17, crosses B on both axes) and
+// SwapMatrixFmtFlat_TallSkinny_AgreesWithNaive (2057x257,
+// FrodoPIR-shaped) pin this.
+//
+// Position in the FrodoPIR port plan (task 7.1):
+//   chunk g-1 -- ColMajorMatrix container
+//   chunk g-2 -- GenerateLweMatrixFromSeedFlat
+//   chunk g-3 -- THIS overload. Adds the flat-buffer transpose
+//                entry point. The per-column SwapMatrixFmt above
+//                stays in place for current callers
+//                (BaseParams::GenerateParamsRhs, the chunk-2c
+//                Database::SwitchFmt path); migration of those
+//                consumers lands in chunks g-4 + g-5.
+ColMajorMatrix SwapMatrixFmtFlat(const ColMajorMatrix& matrix);
+
 // Returns the column at index `secidx`, i.e. {matrix[0][secidx],
 // matrix[1][secidx], ..., matrix[h-1][secidx]}. Equivalent to
 // `SwapMatrixFmt(matrix)[secidx]` but with one pass and no

@@ -86,6 +86,62 @@ std::vector<std::vector<std::uint32_t>> SwapMatrixFmt(
   return swapped;
 }
 
+ColMajorMatrix SwapMatrixFmtFlat(const ColMajorMatrix& matrix) {
+  if (matrix.empty()) {
+    return ColMajorMatrix{};
+  }
+  const std::size_t H = matrix.height();
+  const std::size_t W = matrix.width();
+
+  // Output has axes swapped: output.height() == W, output.width() == H.
+  // NoInit because every output element is overwritten by the
+  // transpose -- skipping the value-init pass would save ~200 ms
+  // at N=1M shapes IF the future allocator switch (frodo_flat_matrix.h
+  // documents the NoInit hook) bypasses libstdc++ vector::resize's
+  // value-init. Today the tag is documentation only -- resize still
+  // zero-fills uint32_t -- but the call site doesn't change when
+  // that future revision lands.
+  ColMajorMatrix out(/*height=*/W, /*width=*/H, ColMajorMatrix::NoInit{});
+
+  // Cache-tiled transpose (chunk g-3). B=32 keeps the B^2 = 1024 u32
+  // working set (one tile per read + one per write = 8 KB total)
+  // comfortably inside L1d. Within a tile both read (one input
+  // column at a time, sequential) and write (one output element
+  // per output column at a time, B output columns hot in cache)
+  // streams stay short and predictable.
+  //
+  // Loop order rationale:
+  //   * Outer c0 (input column tile) -- input columns are contiguous
+  //     `H` u32s in flat storage; walking c0 in B-sized strides keeps
+  //     B input column pointers active simultaneously.
+  //   * Inner r0 (input row tile) -- each tile reads a B x B square
+  //     from the input, scattered along the H axis.
+  //   * Innermost c (one input column at a time) reads a CONTIGUOUS
+  //     B-element slice and writes to B different output columns
+  //     at the same offset c. This pins B output column pointers
+  //     in cache; subsequent c iterations reuse them.
+  //
+  // For non-tile-aligned H or W the loops naturally clip via
+  // std::min -- the
+  // SwapMatrixFmtFlat_TilesMatchesNaive_BoundaryAndAgreesWithNaive
+  // test runs on 33 x 17 to pin that path.
+  constexpr std::size_t B = 32;
+  for (std::size_t c0 = 0; c0 < W; c0 += B) {
+    const std::size_t c_end = std::min(c0 + B, W);
+    for (std::size_t r0 = 0; r0 < H; r0 += B) {
+      const std::size_t r_end = std::min(r0 + B, H);
+      for (std::size_t c = c0; c < c_end; ++c) {
+        const std::uint32_t* in_col = matrix.column_data(c);
+        for (std::size_t r = r0; r < r_end; ++r) {
+          // output.at(out_col=r, out_row=c) = input.at(in_col=c, in_row=r)
+          out.column_data(r)[c] = in_col[r];
+        }
+      }
+    }
+  }
+  return out;
+}
+
 std::vector<std::uint32_t> GetMatrixSecondAt(
     const std::vector<std::vector<std::uint32_t>>& matrix,
     std::size_t secidx) {
