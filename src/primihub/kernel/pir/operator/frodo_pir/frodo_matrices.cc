@@ -159,26 +159,47 @@ std::vector<std::uint32_t> GetMatrixSecondAt(
 retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
                       const std::vector<std::uint32_t>& col,
                       std::uint32_t* out, std::string* err) {
+  return VecMultU32U32(row, col.data(), col.size(), out, err);
+}
+
+retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
+                      const std::uint32_t* col, std::size_t col_len,
+                      std::uint32_t* out, std::string* err) {
   if (out == nullptr) {
     if (err) *err = "VecMultU32U32: out must be non-null";
     return retcode::FAIL;
   }
-  if (row.size() != col.size()) {
+  if (row.size() != col_len) {
     if (err) {
       std::ostringstream oss;
       oss << "VecMultU32U32: row_len: " << row.size()
-          << ", col_len: " << col.size()
+          << ", col_len: " << col_len
           << ". Upstream raises ErrorUnexpectedInputSize here.";
       *err = oss.str();
     }
     return retcode::FAIL;
   }
-  const std::size_t n = row.size();
-  const std::uint32_t* a = row.data();
-  const std::uint32_t* b = col.data();
-  std::uint32_t acc = VecMultU32U32Inner(a, b, n);
-  *out = acc;
+  // col may be null when col_len == 0 (empty inputs); the AVX2/scalar
+  // inner kernel reads zero bytes in that path so the null is fine.
+  *out = VecMultU32U32Inner(row.data(), col, row.size());
   return retcode::SUCCESS;
+}
+
+std::vector<std::uint32_t> GetMatrixSecondAtFlat(const ColMajorMatrix& matrix,
+                                                 std::size_t secidx) {
+  if (matrix.empty() || secidx >= matrix.height()) {
+    return {};
+  }
+  // ColMajorMatrix is column-major: element at (col, secidx) lives
+  // at storage[col * height + secidx]. To collect the secidx-th
+  // "row" across all `width` columns we step by `height` u32s.
+  const std::size_t w = matrix.width();
+  std::vector<std::uint32_t> row;
+  row.reserve(w);
+  for (std::size_t c = 0; c < w; ++c) {
+    row.push_back(matrix.column_data(c)[secidx]);
+  }
+  return row;
 }
 
 

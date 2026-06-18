@@ -84,6 +84,7 @@
 #include <vector>
 
 #include "src/primihub/common/common.h"
+#include "src/primihub/kernel/pir/operator/frodo_pir/frodo_flat_matrix.h"
 
 namespace primihub::pir::frodo {
 
@@ -157,11 +158,17 @@ class Database {
   std::size_t GetElemSize() const { return elem_size_; }
   std::size_t GetPlaintextBits() const { return plaintext_bits_; }
 
-  // Test-only accessor exposing the underlying matrix for
-  // hand-computed roundtrip checks. Not part of the upstream API.
-  const std::vector<std::vector<std::uint32_t>>& EntriesForTest() const {
-    return entries_;
-  }
+  // Test-only accessor exposing the underlying matrix in the
+  // legacy nested form (a copy materialised from the column-major
+  // flat storage). Tests that pin byte-for-byte expected layouts
+  // against std::vector<std::vector<u32>> literals keep working
+  // unchanged. Production hot paths do not call this.
+  std::vector<std::vector<std::uint32_t>> EntriesForTest() const;
+
+  // Direct flat-matrix accessor for callers that already speak
+  // ColMajorMatrix (e.g. chunk g-5 BaseParams::GenerateParamsRhs).
+  // Avoids the EntriesForTest() copy.
+  const ColMajorMatrix& EntriesFlat() const { return entries_; }
 
   // Default-constructible so callers can declare a placeholder
   // before Database::New writes into it via *out_db. The default
@@ -171,7 +178,13 @@ class Database {
   Database();
 
  private:
-  std::vector<std::vector<std::uint32_t>> entries_;
+  // chunk g-4: ColMajorMatrix replaces the prior
+  // std::vector<std::vector<uint32_t>> form. Same column-major
+  // layout convention: column c spans `entries_.column_data(c)
+  // .. column_data(c) + height()` u32s. SwapMatrixFmtFlat
+  // (chunk g-3) toggles between row-form and column-form in
+  // SwitchFmt without ever materialising a nested vector.
+  ColMajorMatrix entries_;
   std::size_t m_;
   std::size_t elem_size_;
   std::size_t plaintext_bits_;

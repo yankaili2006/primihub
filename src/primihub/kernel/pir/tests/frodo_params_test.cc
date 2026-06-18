@@ -130,7 +130,10 @@ TEST(FrodoBaseParamsTest, GenerateParamsRhs_MatchesHandComputed) {
       // Expected: dot product of a_swapped[j] (m u32s) against
       // db's i-th column (m u32s) with u32 wrapping arithmetic.
       const auto& r = a_swapped[j];
-      const auto& dbcol = db.EntriesForTest()[i];
+      // chunk g-4: EntriesForTest() now returns by value (materialised
+      // on demand from the ColMajorMatrix backing). Bind to a local
+      // copy so the temporary outlives the inner loop.
+      const auto dbcol = db.EntriesForTest()[i];
       std::uint32_t expected = 0;
       for (std::size_t k = 0; k < m; ++k) {
         expected += r[k] * dbcol[k];  // wraps mod 2^32 by spec

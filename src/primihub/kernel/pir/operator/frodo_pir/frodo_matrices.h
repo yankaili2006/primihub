@@ -131,6 +131,36 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
                       const std::vector<std::uint32_t>& col,
                       std::uint32_t* out, std::string* err);
 
+// Raw-pointer dot-product overload. Same wrapping u32 semantics as
+// the vector overload above; lets callers operate directly on a
+// ColMajorMatrix column (`column_data(c)` + `height()`) without
+// copying the column into a std::vector first. At N=1M / dim=512
+// that copy was 4 MB per VecMult call -- the killer cost chunk g-4
+// is here to remove.
+//
+// Same size-mismatch contract as the vector overload: row.size()
+// must equal col_len; on mismatch returns retcode::FAIL with `*err`
+// populated. `out` must be non-null. The hot-path AVX2 inner kernel
+// (chunk 13455d14) is invoked when `__builtin_cpu_supports("avx2")`
+// is true; otherwise the scalar fallback runs.
+retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
+                      const std::uint32_t* col, std::size_t col_len,
+                      std::uint32_t* out, std::string* err);
+
+// Flat-buffer equivalent of GetMatrixSecondAt. Returns the
+// secidx-th "row" across all columns of a ColMajorMatrix,
+// equivalent to {matrix.at(0, secidx), matrix.at(1, secidx), ...,
+// matrix.at(width-1, secidx)}. Used by Database::GetDbEntry once
+// Database::entries_ migrates to ColMajorMatrix in chunk g-4.
+// Named distinctly (not an overload of the vec<vec<u32>> form) to
+// keep `GetMatrixSecondAt({}, 0)` test calls unambiguous: a
+// brace-enclosed initialiser list can't pick between the two
+// argument types, so a name split sidesteps the resolution hazard.
+// OOB (secidx >= matrix.height()) returns an empty vector, matching
+// the per-column form's soft boundary.
+std::vector<std::uint32_t> GetMatrixSecondAtFlat(
+    const ColMajorMatrix& matrix, std::size_t secidx);
+
 
 
 // Generates an LWE matrix A from a public seed by drawing
