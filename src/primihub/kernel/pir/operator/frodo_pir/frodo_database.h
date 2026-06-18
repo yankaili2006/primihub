@@ -133,6 +133,14 @@ class Database {
   std::uint32_t VecMult(const std::vector<std::uint32_t>& row,
                         std::size_t col_idx) const;
 
+  // Raw-pointer overload of VecMult. Used by hot inner loops
+  // (BaseParams::GenerateParamsRhsFlat) where the input row
+  // already lives in a ColMajorMatrix column. Caller MUST
+  // satisfy row_len == entries_.height() and col_idx <
+  // entries_.width(); no validation is performed.
+  std::uint32_t VecMult(const std::uint32_t* row, std::size_t row_len,
+                        std::size_t col_idx) const;
+
   // Returns a copy of the i-th row of the entries matrix. On OOB
   // returns an empty vector (upstream Rust would panic).
   std::vector<std::uint32_t> GetRow(std::size_t i) const;

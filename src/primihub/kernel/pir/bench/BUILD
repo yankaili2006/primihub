@@ -49,3 +49,12 @@ cc_binary(
         "@com_github_base64_cpp//:base64_lib",
     ],
 )
+cc_binary(
+    name = "transpose_perf",
+    srcs = ["transpose_perf.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_matrices",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_flat_matrix",
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_prng",
+    ],
+)

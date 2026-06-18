@@ -81,6 +81,22 @@ std::uint32_t Database::VecMult(const std::vector<std::uint32_t>& row,
   return out;
 }
 
+std::uint32_t Database::VecMult(const std::uint32_t* row,
+                                std::size_t row_len,
+                                std::size_t col_idx) const {
+  // chunk g-5 follow-up: zero-overhead VecMult for hot loops where
+  // both operands already live in flat backings. Caller has verified
+  // shapes; no err propagation or diagnostic allocation.
+  assert(col_idx < entries_.width() && "VecMult: col_idx OOB");
+  assert(row_len == entries_.height() && "VecMult: row_len mismatch");
+  if (col_idx >= entries_.width() || row_len != entries_.height()) {
+    return 0u;
+  }
+  std::uint32_t out = 0u;
+  VecMultU32U32(row, entries_.column_data(col_idx), row_len, &out);
+  return out;
+}
+
 std::vector<std::uint32_t> Database::GetRow(std::size_t i) const {
   // chunk g-4: i indexes a column in the column-major matrix
   // (preserving upstream's `entries[i]` semantic). OOB returns

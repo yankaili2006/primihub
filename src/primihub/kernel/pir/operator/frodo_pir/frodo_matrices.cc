@@ -185,6 +185,14 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
   return retcode::SUCCESS;
 }
 
+void VecMultU32U32(const std::uint32_t* row, const std::uint32_t* col,
+                   std::size_t n, std::uint32_t* out) {
+  // chunk g-5 follow-up: zero-overhead path. No validation, no
+  // diagnostic; the inner kernel does the work. Used by hot inner
+  // loops where the caller has already verified shapes.
+  *out = VecMultU32U32Inner(row, col, n);
+}
+
 std::vector<std::uint32_t> GetMatrixSecondAtFlat(const ColMajorMatrix& matrix,
                                                  std::size_t secidx) {
   if (matrix.empty() || secidx >= matrix.height()) {

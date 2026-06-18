@@ -46,18 +46,18 @@ ColMajorMatrix BaseParams::GenerateParamsRhsFlat(
   const std::size_t w = db.GetMatrixWidthSelf();
   ColMajorMatrix rhs(/*height=*/dim, /*width=*/w,
                      ColMajorMatrix::NoInit{});
+  // chunk g-5 follow-up: feed both lhs columns and db columns to
+  // the raw-pointer VecMult path. The prior implementation
+  // constructed a vector<uint32_t>(m) per inner iteration, paying
+  // w*dim allocations of m u32s each (2 GB / 500 K page faults
+  // at N=1M / dim=512). Now the inner loop touches only the
+  // SwapMatrixFmtFlat-produced lhs storage and the Database flat
+  // entries; no per-iteration heap traffic.
   for (std::size_t i = 0; i < w; ++i) {
     std::uint32_t* rhs_col = rhs.column_data(i);
     for (std::size_t j = 0; j < dim; ++j) {
-      // lhs column j as a vector (interface required by the
-      // current VecMultU32U32 raw overload, which takes
-      // `const vector<u32>& row + const u32* col`). The vector is
-      // sized to m and constructed once per j; total allocations
-      // here are `w * dim` (independent of m) -- bounded and small
-      // for the typical FrodoPIR parameter sets.
       const std::uint32_t* lhs_col = lhs.column_data(j);
-      const std::vector<std::uint32_t> r(lhs_col, lhs_col + m);
-      rhs_col[j] = db.VecMult(r, i);
+      rhs_col[j] = db.VecMult(lhs_col, m, i);
     }
   }
   return rhs;

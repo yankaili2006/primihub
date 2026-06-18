@@ -147,6 +147,23 @@ retcode VecMultU32U32(const std::vector<std::uint32_t>& row,
                       const std::uint32_t* col, std::size_t col_len,
                       std::uint32_t* out, std::string* err);
 
+// All-raw-pointer dot-product overload. Lets callers operate on two
+// flat-buffer column streams without ever materialising a
+// std::vector. Used by BaseParams::GenerateParamsRhsFlat for the
+// per-(lhs col j, db col i) inner product loop where both operands
+// already live in a ColMajorMatrix backing -- the prior chunk-g-5
+// implementation paid w*dim vector<uint32_t>(m) allocations
+// (2 GB / 500 K page faults at N=1M / dim=512), exactly the cost
+// the flat-buffer refactor exists to remove.
+//
+// Same wrapping u32 semantics as the vector overload. No size
+// validation is performed (caller guarantees row_len == col_len);
+// `out` must be non-null. `row` / `col` may be null when
+// row_len == 0. AVX2 inner kernel auto-dispatch is the same as the
+// other overloads.
+void VecMultU32U32(const std::uint32_t* row, const std::uint32_t* col,
+                   std::size_t n, std::uint32_t* out);
+
 // Flat-buffer equivalent of GetMatrixSecondAt. Returns the
 // secidx-th "row" across all columns of a ColMajorMatrix,
 // equivalent to {matrix.at(0, secidx), matrix.at(1, secidx), ...,
