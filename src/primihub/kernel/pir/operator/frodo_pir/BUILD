@@ -110,3 +110,10 @@ cc_library(
         "@com_github_glog_glog//:glog",
     ],
 )
+
+cc_library(
+    name = "frodo_flat_matrix",
+    srcs = ["frodo_flat_matrix.cc"],
+    hdrs = ["frodo_flat_matrix.h"],
+    visibility = ["//visibility:public"],
+)

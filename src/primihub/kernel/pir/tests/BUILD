@@ -594,3 +594,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "frodo_flat_matrix_test",
+    srcs = ["frodo_flat_matrix_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_flat_matrix",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
