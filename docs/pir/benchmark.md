@@ -285,7 +285,7 @@ corresponding bench/<algo>_e2e.sh script lands per task 4.8 / 5.10.
 | `simple_pir` | 4M    | sub-second      | per-query ~8ms  | TBD       | bench/simple_pir_persistence_bench.sh (.50) |
 | `simple_pir` | 1e7   | sub-second      | TBD          | TBD          | (real, persistence bench peaks at ~4× speedup) |
 | `simple_pir` | 1e8   | sub-second      | per-query 52 ms (single trial) | TBD | 94a706ff8e04eed5064bedfd0f897e8b19c630b612aafbef4e711fe5bd1b1220 (landed 2026-06-10 alongside DoublePIR 1e8) |
-| `frodo_pir`  | 1e6   | ms class (paper) | per-query 2308 ms (single trial) | TBD | 00b0b9ae6e3736ba45868141290df3e2ead566e3ee5dd4743eda2f5806648150 (task 7.1 landed 2026-06-12 on .50, unoptimised C++ port) |
+| `frodo_pir`  | 1e6   | ms class (paper) | setup 10.9 s / per-query 2.5 s (post g-1..g-5b flat-buffer refactor; single trial) | TBD | 447110f30064ab3444ab7dc9cc7997dda75fd674ea9ac2009d616423856eb5f5 (task 7.1 chunks g-1..g-5b landed 2026-06-18 on .50, ColMajorMatrix flat-buffer; Setup ~40% faster vs 18.8 s baseline 00b0b9ae; per-query within noise) |
 | `frodo_pir`  | 1e7   | ms class (paper) | TBD (port unoptimised, single-trial >12 min wall on .50; revisit after SIMD) | TBD | (skipped, see 1e6 baseline) |
 | `ypir`       | 1e8   | sub-second      | TBD          | TBD          | (skeleton) |
 
