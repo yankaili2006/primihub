@@ -166,6 +166,46 @@ void SeededRng::FillBytesBulk(std::uint8_t* out, std::size_t n) {
   }
 }
 
+void SeededRng::FillKeystreamBulk(std::uint8_t* out, std::size_t n) {
+  if (n == 0) return;
+  // Identical control flow to FillBytesBulk except for the
+  // missing memset(out, 0, bulk) in the bulk branch. The
+  // contract documented in frodo_prng.h pins this asymmetry:
+  // caller swears `out[0..n)` is zero, so skipping the memset
+  // simply replaces "write zero then XOR with keystream" with
+  // "XOR keystream into already-zero" — same final byte stream
+  // when the precondition holds.
+  std::size_t taken = 0;
+  if (block_pos_ < block_.size()) {
+    const std::size_t avail = block_.size() - block_pos_;
+    const std::size_t want = (avail < n) ? avail : n;
+    std::memcpy(out, block_.data() + block_pos_, want);
+    block_pos_ += want;
+    taken = want;
+  }
+  if (taken < n) {
+    const std::size_t bulk = ((n - taken) / 64) * 64;
+    if (bulk > 0) {
+      int out_len = 0;
+      if (EVP_EncryptUpdate(ctx_, out + taken, &out_len,
+                             out + taken,
+                             static_cast<int>(bulk)) != 1) {
+        OpensslFatal("EVP_EncryptUpdate-bulk-keystream");
+      }
+      if (static_cast<std::size_t>(out_len) != bulk) {
+        OpensslFatal("EVP_EncryptUpdate-bulk-keystream-short-write");
+      }
+      taken += bulk;
+    }
+  }
+  if (taken < n) {
+    RefillBlock();
+    const std::size_t want = n - taken;
+    std::memcpy(out + taken, block_.data(), want);
+    block_pos_ = want;
+  }
+}
+
 
 
 namespace os_rng {

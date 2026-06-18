@@ -221,6 +221,77 @@ TEST(FrodoMatricesTest, GenerateLweMatrixFromSeed_ColumnOrderMatchesUpstream) {
       << "column-major iteration order does not match upstream";
 }
 
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeedFlat_EmptyDims_ReturnsEmpty) {
+  // chunk g-2 boundary: empty lwe_dim or width should return an
+  // empty ColMajorMatrix, matching the per-column overload's
+  // soft-boundary semantics. The downstream consumers (chunks
+  // g-3..g-5) rely on this so the flat-vs-nested migration is
+  // drop-in at any caller that handles empty inputs.
+  const auto seed = IotaSeed(0);
+  EXPECT_TRUE(GenerateLweMatrixFromSeedFlat(seed, 0, 5).empty());
+  EXPECT_TRUE(GenerateLweMatrixFromSeedFlat(seed, 5, 0).empty());
+  EXPECT_TRUE(GenerateLweMatrixFromSeedFlat(seed, 0, 0).empty());
+}
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeedFlat_MatchesSeededRng_Small) {
+  // chunk g-2 lower-level pin: the flat overload must produce
+  // exactly the first `lwe_dim * width` u32s of the SeededRng
+  // stream, in column-major order. Same shape of assertion as
+  // chunk-2b-i ColumnOrderMatchesUpstream but against the new
+  // overload.
+  const auto seed = IotaSeed(11);
+  const std::size_t lwe_dim = 6;
+  const std::size_t width = 4;
+
+  SeededRng ref(seed);
+  std::vector<std::uint32_t> expected;
+  expected.reserve(lwe_dim * width);
+  for (std::size_t i = 0; i < lwe_dim * width; ++i) {
+    expected.push_back(ref.NextU32());
+  }
+
+  const auto flat = GenerateLweMatrixFromSeedFlat(seed, lwe_dim, width);
+  ASSERT_EQ(flat.width(), width);
+  ASSERT_EQ(flat.height(), lwe_dim);
+  for (std::size_t c = 0; c < width; ++c) {
+    for (std::size_t r = 0; r < lwe_dim; ++r) {
+      EXPECT_EQ(flat.at(c, r), expected[c * lwe_dim + r])
+          << "flat overload byte stream mismatch at (col=" << c
+          << ", row=" << r << ")";
+    }
+  }
+}
+
+TEST(FrodoMatricesTest, GenerateLweMatrixFromSeedFlat_MatchesPerColumn_Width2049) {
+  // chunk g-2 BYTE-FOR-BYTE regression guard against the
+  // per-column overload at a width that crosses the prior
+  // chunk-d FillBytesBulk batching boundary (2049 > kColsPerBatch=1024
+  // in the prior batched form). The two overloads must produce
+  // the same column-major output -- this is the contract that
+  // lets chunks g-3..g-5 migrate consumers from the nested form
+  // to the flat form without changing observable behaviour at
+  // any FrodoPIR shard or query.
+  const auto seed = IotaSeed(5);
+  const std::size_t lwe_dim = 16;
+  const std::size_t width = 2049;
+
+  const auto old_form = GenerateLweMatrixFromSeed(seed, lwe_dim, width);
+  const auto flat = GenerateLweMatrixFromSeedFlat(seed, lwe_dim, width);
+
+  ASSERT_EQ(old_form.size(), width);
+  ASSERT_EQ(flat.width(), width);
+  ASSERT_EQ(flat.height(), lwe_dim);
+  for (std::size_t c = 0; c < width; ++c) {
+    ASSERT_EQ(old_form[c].size(), lwe_dim)
+        << "per-column overload produced wrong-size column at c=" << c;
+    for (std::size_t r = 0; r < lwe_dim; ++r) {
+      ASSERT_EQ(flat.at(c, r), old_form[c][r])
+          << "flat vs per-column overload diverged at (col=" << c
+          << ", row=" << r << ")";
+    }
+  }
+}
+
 
 
 // ---- Chunk 2c tests (RandomTernary + RandomTernaryVector) ------

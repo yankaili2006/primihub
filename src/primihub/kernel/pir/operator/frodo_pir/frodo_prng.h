@@ -119,6 +119,24 @@ class SeededRng {
   // shrinks. Tests in frodo_prng_test pin this equivalence.
   void FillBytesBulk(std::uint8_t* out, std::size_t n);
 
+  // Same byte stream as FillBytesBulk but the caller GUARANTEES
+  // that `out[0..n)` is already zero. Skips the internal memset
+  // and writes the keystream by XOR-ing it into the existing
+  // zeros (which is identity for ChaCha20-CTR -- the result is
+  // the pure keystream). Used by GenerateLweMatrixFromSeedFlat
+  // (chunk g-2) where the ColMajorMatrix backing storage is
+  // already zero-initialised by std::vector::resize's value-init
+  // path; calling FillBytesBulk there would memset the same
+  // n bytes a second time, which at FrodoPIR Setup-time
+  // shapes (n = m * dim * 4 = ~2 GB at N=1M) is hundreds of
+  // milliseconds of wasted write traffic.
+  //
+  // If the buffer is NOT zero, the output will be the XOR of
+  // the original contents with the keystream -- NOT the pure
+  // keystream. This is a sharp tool; do not use unless the
+  // pre-zero invariant is statically obvious.
+  void FillKeystreamBulk(std::uint8_t* out, std::size_t n);
+
  private:
   // Reads `n` bytes from the keystream into `out`, refilling the
   // block buffer as needed. `n` MUST be <= 64 (used internally

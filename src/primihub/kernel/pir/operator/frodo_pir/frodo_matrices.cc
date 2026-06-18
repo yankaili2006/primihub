@@ -161,6 +161,46 @@ std::vector<std::vector<std::uint32_t>> GenerateLweMatrixFromSeed(
 
 
 
+ColMajorMatrix GenerateLweMatrixFromSeedFlat(
+    const SeedBytes& seed, std::size_t lwe_dim, std::size_t width) {
+  // Empty-shape shortcut. Mirrors the per-column overload's
+  // "lwe_dim==0 || width==0 -> empty" boundary so the migration
+  // is drop-in.
+  if (lwe_dim == 0 || width == 0) {
+    return ColMajorMatrix{};
+  }
+  // NoInit: SeededRng is about to overwrite every byte via the
+  // ChaCha20 keystream. The zero-init from the regular ctor
+  // would be wasted writes.
+  ColMajorMatrix m(/*height=*/lwe_dim, /*width=*/width,
+                   ColMajorMatrix::NoInit{});
+  static_assert(sizeof(std::uint32_t) == 4,
+                "frodo_matrices: u32 must be 4 bytes");
+  // ColMajorMatrix's NoInit ctor goes through vector::resize which
+  // value-initialises uint32_t to 0 on libstdc++ — so the storage
+  // is already a zero buffer. Use FillKeystreamBulk which skips
+  // the internal memset that FillBytesBulk would otherwise repeat.
+  // For width=m and lwe_dim=512 the buffer is ~2 GB at N=1M;
+  // a redundant memset would cost ~200 ms of write bandwidth.
+  // OpenSSL's ChaCha20 AVX2 path saturates at ~3 GB/s on
+  // Broadwell so the EVP step itself is bandwidth-bound, not
+  // CPU-bound.
+  SeededRng rng(seed);
+  rng.FillKeystreamBulk(
+      reinterpret_cast<std::uint8_t*>(m.raw_data()),
+      m.total_u32s() * sizeof(std::uint32_t));
+  // Byte-for-byte equivalence with the per-column overload comes
+  // from the layout invariant: column c lives at
+  // storage[c * lwe_dim .. (c+1) * lwe_dim), which is exactly
+  // where the per-column form would have placed it after
+  // append. Pinned by
+  // FrodoMatricesTest::GenerateLweMatrixFromSeedFlat_MatchesPerColumn
+  // _Width2049.
+  return m;
+}
+
+
+
 namespace {
 
 // Upstream:

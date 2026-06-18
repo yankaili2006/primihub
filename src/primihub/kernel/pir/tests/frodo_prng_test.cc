@@ -216,6 +216,50 @@ TEST(FrodoSeededRngTest, ChaCha20_NotMt19937_LegacyComparison) {
       << "different engine";
 }
 
+TEST(FrodoSeededRngTest, FillKeystreamBulk_MatchesFillBytesBulk_PreZeroedInput) {
+  // chunk g-2 follow-up: FillKeystreamBulk MUST produce
+  // byte-for-byte the same output as FillBytesBulk when the input
+  // buffer starts zeroed. Use a non-tile-aligned length (333
+  // bytes) so the test covers both the bulk EVP path AND the
+  // sub-64-byte tail path.
+  const std::size_t n = 333;
+  std::vector<std::uint8_t> ref(n, 0u);
+  std::vector<std::uint8_t> got(n, 0u);
+  SeededRng a(MakeSeed(0x21));
+  SeededRng b(MakeSeed(0x21));
+  a.FillBytesBulk(ref.data(), n);
+  b.FillKeystreamBulk(got.data(), n);
+  EXPECT_EQ(ref, got)
+      << "FillKeystreamBulk diverged from FillBytesBulk on a "
+         "pre-zeroed buffer";
+}
+
+TEST(FrodoSeededRngTest, FillKeystreamBulk_XorsIntoExistingBuffer) {
+  // Sharp-tool contract: when the buffer is NOT zero,
+  // FillKeystreamBulk produces XOR(original, keystream) instead
+  // of the pure keystream. This test pins that behaviour so
+  // misuse is detectable and the contract is testable.
+  const std::size_t n = 192;
+  std::vector<std::uint8_t> keystream(n, 0u);
+  SeededRng a(MakeSeed(0x33));
+  a.FillBytesBulk(keystream.data(), n);
+
+  // Same seed, but seed an existing buffer with a non-zero mask.
+  std::vector<std::uint8_t> masked(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    masked[i] = static_cast<std::uint8_t>(0xA5);
+  }
+  SeededRng b(MakeSeed(0x33));
+  b.FillKeystreamBulk(masked.data(), n);
+
+  for (std::size_t i = 0; i < n; ++i) {
+    EXPECT_EQ(masked[i],
+              static_cast<std::uint8_t>(keystream[i] ^ 0xA5))
+        << "FillKeystreamBulk on non-zero buffer should XOR — index "
+        << i;
+  }
+}
+
 
 
 // ---- Chunk 2c tests (OsRng + GenerateSeed) ---------------------

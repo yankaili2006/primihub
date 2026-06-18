@@ -40,6 +40,9 @@ cc_library(
     hdrs = ["frodo_matrices.h"],
     visibility = ["//visibility:public"],
     deps = [
+        # chunk g-2: GenerateLweMatrixFromSeedFlat returns
+        # ColMajorMatrix; needed by the public header.
+        ":frodo_flat_matrix",
         ":frodo_prng",
         "//src/primihub/common:common_defination",
     ],
