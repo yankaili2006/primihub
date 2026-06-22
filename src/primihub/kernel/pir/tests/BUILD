@@ -746,3 +746,15 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_gadget_test",
+    srcs = ["ypir_gadget_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_gadget",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

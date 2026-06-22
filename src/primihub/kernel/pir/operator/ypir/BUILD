@@ -193,3 +193,11 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [":ypir_arith", ":ypir_params", ":ypir_poly_types"],
 )
+
+cc_library(
+    name = "ypir_gadget",
+    srcs = ["ypir_gadget.cc"],
+    hdrs = ["ypir_gadget.h"],
+    visibility = ["//visibility:public"],
+    deps = [":ypir_params", ":ypir_poly_types"],
+)
