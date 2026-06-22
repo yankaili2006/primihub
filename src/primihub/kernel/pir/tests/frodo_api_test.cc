@@ -161,8 +161,8 @@ TEST(FrodoShardTest, FromBase64StringsWithSeed_ReproducibleSetup) {
             retcode::SUCCESS) << err;
   EXPECT_EQ(a.GetBaseParams().GetPublicSeed(),
             b.GetBaseParams().GetPublicSeed());
-  EXPECT_EQ(a.GetBaseParams().RhsForTest(),
-            b.GetBaseParams().RhsForTest());
+  EXPECT_EQ(a.GetBaseParams().RhsFlat(),
+            b.GetBaseParams().RhsFlat());
 }
 
 TEST(FrodoShardTest, Respond_LengthMatchesDbWidth) {

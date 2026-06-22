@@ -108,23 +108,6 @@ std::vector<std::uint32_t> Database::GetRow(std::size_t i) const {
   return std::vector<std::uint32_t>(col, col + entries_.height());
 }
 
-std::vector<std::vector<std::uint32_t>> Database::EntriesForTest() const {
-  // chunk g-4: materialise the flat column-major buffer into the
-  // legacy nested form on demand. Test-only path; production never
-  // calls this. Returns shape `width x height` so tests can compare
-  // against literal `{{col0_row0, col0_row1, ...}, {col1_...}, ...}`
-  // fixtures unchanged.
-  const std::size_t w = entries_.width();
-  const std::size_t h = entries_.height();
-  std::vector<std::vector<std::uint32_t>> out;
-  out.reserve(w);
-  for (std::size_t c = 0; c < w; ++c) {
-    const std::uint32_t* col = entries_.column_data(c);
-    out.emplace_back(col, col + h);
-  }
-  return out;
-}
-
 std::size_t Database::GetMatrixWidth(std::size_t elem_size,
                                      std::size_t plaintext_bits) {
   if (plaintext_bits == 0) {

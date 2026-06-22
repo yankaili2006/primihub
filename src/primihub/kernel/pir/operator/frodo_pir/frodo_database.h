@@ -166,16 +166,9 @@ class Database {
   std::size_t GetElemSize() const { return elem_size_; }
   std::size_t GetPlaintextBits() const { return plaintext_bits_; }
 
-  // Test-only accessor exposing the underlying matrix in the
-  // legacy nested form (a copy materialised from the column-major
-  // flat storage). Tests that pin byte-for-byte expected layouts
-  // against std::vector<std::vector<u32>> literals keep working
-  // unchanged. Production hot paths do not call this.
-  std::vector<std::vector<std::uint32_t>> EntriesForTest() const;
-
-  // Direct flat-matrix accessor for callers that already speak
-  // ColMajorMatrix (e.g. chunk g-5 BaseParams::GenerateParamsRhs).
-  // Avoids the EntriesForTest() copy.
+  // Direct flat-matrix accessor exposing the column-major backing
+  // store (e.g. chunk g-5 BaseParams::GenerateParamsRhs). Tests
+  // compare against nested literals via ColsOfMatrix(EntriesFlat()).
   const ColMajorMatrix& EntriesFlat() const { return entries_; }
 
   // Default-constructible so callers can declare a placeholder

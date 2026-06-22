@@ -158,15 +158,9 @@ class BaseParams {
   std::size_t GetPlaintextBits() const { return plaintext_bits_; }
   const SeedBytes& GetPublicSeed() const { return public_seed_; }
 
-  // Test accessor materialising the precomputed RHS matrix into
-  // the legacy nested form. Returns by value (the temporary lives
-  // through the full expression that uses it; tests can also bind
-  // to `const auto&` -- C++ reference lifetime extension covers
-  // the by-value temporary). Production never calls this.
-  std::vector<std::vector<std::uint32_t>> RhsForTest() const;
-
-  // Direct flat-matrix accessor for callers that already speak
-  // ColMajorMatrix. Skips the RhsForTest materialisation copy.
+  // Direct flat-matrix accessor exposing the column-major RHS
+  // backing store. Tests compare against nested literals via
+  // ColsOfMatrix(RhsFlat()).
   const ColMajorMatrix& RhsFlat() const { return rhs_; }
 
  private:

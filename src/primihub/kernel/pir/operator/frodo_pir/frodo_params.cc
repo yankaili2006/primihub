@@ -140,22 +140,6 @@ retcode BaseParams::MultRight(
   return retcode::SUCCESS;
 }
 
-std::vector<std::vector<std::uint32_t>> BaseParams::RhsForTest() const {
-  // chunk g-5: materialise the column-major flat storage into the
-  // legacy nested form (one inner vec per column, height u32s
-  // each). Test-only path; production reads rhs_ directly via
-  // RhsFlat() or MultRight()'s column_data path.
-  const std::size_t w = rhs_.width();
-  const std::size_t h = rhs_.height();
-  std::vector<std::vector<std::uint32_t>> out;
-  out.reserve(w);
-  for (std::size_t i = 0; i < w; ++i) {
-    const std::uint32_t* col = rhs_.column_data(i);
-    out.emplace_back(col, col + h);
-  }
-  return out;
-}
-
 // ---------- CommonParams ----------
 
 CommonParams::CommonParams() = default;
