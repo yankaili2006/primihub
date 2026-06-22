@@ -626,3 +626,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_discrete_gaussian_test",
+    srcs = ["ypir_discrete_gaussian_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_discrete_gaussian",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

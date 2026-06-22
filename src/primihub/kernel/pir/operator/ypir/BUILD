@@ -106,3 +106,10 @@ cc_library(
     deps = [":ypir_bits"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_discrete_gaussian",
+    srcs = ["ypir_discrete_gaussian.cc"],
+    hdrs = ["ypir_discrete_gaussian.h"],
+    visibility = ["//visibility:public"],
+)
