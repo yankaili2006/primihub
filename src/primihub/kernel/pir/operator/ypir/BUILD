@@ -98,3 +98,11 @@ cc_library(
         "//conditions:default": [],
     }),
 )
+
+cc_library(
+    name = "ypir_modulus_switch",
+    srcs = ["ypir_modulus_switch.cc"],
+    hdrs = ["ypir_modulus_switch.h"],
+    deps = [":ypir_bits"],
+    visibility = ["//visibility:public"],
+)

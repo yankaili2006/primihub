@@ -616,3 +616,13 @@ cc_library(
     ],
     visibility = ["//visibility:private"],
 )
+
+cc_test(
+    name = "ypir_modulus_switch_test",
+    srcs = ["ypir_modulus_switch_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_modulus_switch",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
