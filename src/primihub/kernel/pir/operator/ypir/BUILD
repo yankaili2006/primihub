@@ -113,3 +113,11 @@ cc_library(
     hdrs = ["ypir_discrete_gaussian.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_lwe",
+    srcs = ["ypir_lwe.cc"],
+    hdrs = ["ypir_lwe.h"],
+    deps = [":ypir_negacyclic"],
+    visibility = ["//visibility:public"],
+)
