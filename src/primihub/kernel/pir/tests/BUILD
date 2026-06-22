@@ -701,3 +701,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_arith_test",
+    srcs = ["ypir_arith_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

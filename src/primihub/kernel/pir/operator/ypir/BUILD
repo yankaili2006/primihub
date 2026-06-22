@@ -156,3 +156,10 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = ["@hexl//:hexl"],
 )
+
+cc_library(
+    name = "ypir_arith",
+    srcs = ["ypir_arith.cc"],
+    hdrs = ["ypir_arith.h"],
+    visibility = ["//visibility:public"],
+)
