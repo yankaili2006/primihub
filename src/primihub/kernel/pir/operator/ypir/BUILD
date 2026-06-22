@@ -141,3 +141,10 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_convolution",
+    srcs = ["ypir_convolution.cc"],
+    hdrs = ["ypir_convolution.h"],
+    visibility = ["//visibility:public"],
+)

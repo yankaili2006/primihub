@@ -679,3 +679,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_convolution_test",
+    srcs = ["ypir_convolution_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_convolution",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
