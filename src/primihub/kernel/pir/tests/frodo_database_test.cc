@@ -15,9 +15,15 @@
 #include <gtest/gtest.h>
 
 #include "base64.h"  // NOLINT — for fixture encoding
+#include "src/primihub/kernel/pir/tests/frodo_test_helpers.h"
 
 namespace primihub::pir::frodo {
 namespace {
+
+// g-8: read DB column data through the ColMajorMatrix backing
+// (ColsOfMatrix(EntriesFlat()) is byte-for-byte the old EntriesForTest()
+// shape) so the EntriesForTest() materialisation shim can be dropped.
+using primihub::pir::frodo::testing::ColsOfMatrix;
 
 // ---- Chunk 3a tests (struct + simple methods) ------------------
 
@@ -62,14 +68,14 @@ TEST(FrodoDatabaseTest, GetMatrixWidth_Static_PlaintextBitsZero) {
 
 TEST(FrodoDatabaseTest, SwitchFmt_RoundtripIsIdentity) {
   auto db = MakeSmallDb();
-  const auto before = db.EntriesForTest();
+  const auto before = ColsOfMatrix(db.EntriesFlat());
   db.SwitchFmt();
   const std::vector<std::vector<std::uint32_t>> row_form = {
       {1u, 2u}, {3u, 4u}, {5u, 6u},
   };
-  EXPECT_EQ(db.EntriesForTest(), row_form);
+  EXPECT_EQ(ColsOfMatrix(db.EntriesFlat()), row_form);
   db.SwitchFmt();
-  EXPECT_EQ(db.EntriesForTest(), before);
+  EXPECT_EQ(ColsOfMatrix(db.EntriesFlat()), before);
 }
 
 TEST(FrodoDatabaseTest, VecMult_HandComputed) {
@@ -210,7 +216,7 @@ TEST(FrodoDatabaseNewTest, EndToEnd_TwoElementsColumnForm) {
   const std::vector<std::vector<std::uint32_t>> expected_col_form = {
       {0x12u, 0x34u},
   };
-  EXPECT_EQ(db.EntriesForTest(), expected_col_form);
+  EXPECT_EQ(ColsOfMatrix(db.EntriesFlat()), expected_col_form);
   EXPECT_EQ(db.GetMatrixHeight(), 2u);
   EXPECT_EQ(db.GetElemSize(), 8u);
   EXPECT_EQ(db.GetPlaintextBits(), 8u);
@@ -228,7 +234,7 @@ TEST(FrodoDatabaseNewTest, SwitchFmt_RecoversRowForm) {
   const std::vector<std::vector<std::uint32_t>> row_form = {
       {0x12u}, {0x34u},
   };
-  EXPECT_EQ(db.EntriesForTest(), row_form);
+  EXPECT_EQ(ColsOfMatrix(db.EntriesFlat()), row_form);
 }
 
 TEST(FrodoDatabaseNewTest, NullOutDb_Fails) {

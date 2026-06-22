@@ -26,9 +26,15 @@
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_database.h"
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_matrices.h"
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_prng.h"
+#include "src/primihub/kernel/pir/tests/frodo_test_helpers.h"
 
 namespace primihub::pir::frodo {
 namespace {
+
+// g-8: read params/DB column data through the ColMajorMatrix backing
+// (ColsOfMatrix(*Flat()) is byte-for-byte the old *ForTest() shape) so
+// the nested *ForTest() materialisation shims can be dropped.
+using primihub::pir::frodo::testing::ColsOfMatrix;
 
 SeedBytes IotaSeed(std::uint8_t start) {
   SeedBytes s;
@@ -69,8 +75,9 @@ TEST(FrodoBaseParamsTest, NewWithSeed_FillsAllFields) {
   EXPECT_EQ(params.GetPublicSeed(), seed);
   // rhs shape: w x dim = db.GetMatrixWidthSelf() x dim.
   // db row_width = ceil(8 / 5) = 2; dim = 3.
-  ASSERT_EQ(params.RhsForTest().size(), 2u);
-  for (const auto& col : params.RhsForTest()) {
+  const auto rhs = ColsOfMatrix(params.RhsFlat());
+  ASSERT_EQ(rhs.size(), 2u);
+  for (const auto& col : rhs) {
     EXPECT_EQ(col.size(), dim);
   }
 }
@@ -84,7 +91,7 @@ TEST(FrodoBaseParamsTest, NewWithSeed_Deterministic_SameSeedSameRhs) {
             retcode::SUCCESS);
   ASSERT_EQ(BaseParams::NewWithSeed(db, 4, seed, &b, &err),
             retcode::SUCCESS);
-  EXPECT_EQ(a.RhsForTest(), b.RhsForTest())
+  EXPECT_EQ(ColsOfMatrix(a.RhsFlat()), ColsOfMatrix(b.RhsFlat()))
       << "same seed must yield identical rhs — required for "
       << "client/server matrix A agreement";
   EXPECT_EQ(a.GetPublicSeed(), b.GetPublicSeed());
@@ -102,7 +109,7 @@ TEST(FrodoBaseParamsTest, New_ProducesFreshSeedAcrossCalls) {
   EXPECT_NE(a.GetPublicSeed(), b.GetPublicSeed())
       << "two BaseParams::New calls returned the same seed; "
       << "OS RNG is wedged";
-  EXPECT_NE(a.RhsForTest(), b.RhsForTest())
+  EXPECT_NE(ColsOfMatrix(a.RhsFlat()), ColsOfMatrix(b.RhsFlat()))
       << "two BaseParams::New calls produced identical rhs — "
       << "extremely unlikely";
 }
@@ -130,10 +137,10 @@ TEST(FrodoBaseParamsTest, GenerateParamsRhs_MatchesHandComputed) {
       // Expected: dot product of a_swapped[j] (m u32s) against
       // db's i-th column (m u32s) with u32 wrapping arithmetic.
       const auto& r = a_swapped[j];
-      // chunk g-4: EntriesForTest() now returns by value (materialised
-      // on demand from the ColMajorMatrix backing). Bind to a local
-      // copy so the temporary outlives the inner loop.
-      const auto dbcol = db.EntriesForTest()[i];
+      // g-8: read the DB's i-th column via the ColMajorMatrix backing
+      // (ColsOfMatrix(EntriesFlat()) == the old EntriesForTest() shape).
+      // Bind to a local copy so the temporary outlives the inner loop.
+      const auto dbcol = ColsOfMatrix(db.EntriesFlat())[i];
       std::uint32_t expected = 0;
       for (std::size_t k = 0; k < m; ++k) {
         expected += r[k] * dbcol[k];  // wraps mod 2^32 by spec
@@ -158,7 +165,7 @@ TEST(FrodoBaseParamsTest, MultRight_HandComputed) {
   ASSERT_EQ(params.MultRight(s, &got, &err), retcode::SUCCESS) << err;
 
   // Expected: for each rhs column i, sum_j s[j] * rhs[i][j].
-  const auto& rhs = params.RhsForTest();
+  const auto rhs = ColsOfMatrix(params.RhsFlat());
   ASSERT_EQ(got.size(), rhs.size());
   for (std::size_t i = 0; i < rhs.size(); ++i) {
     std::uint32_t expected = 0;

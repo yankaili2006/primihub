@@ -378,6 +378,7 @@ cc_test(
     name = "frodo_params_test",
     srcs = ["frodo_params_test.cc"],
     deps = [
+        ":frodo_test_helpers",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_database",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_matrices",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_params",
@@ -414,6 +415,7 @@ cc_test(
     name = "frodo_database_test",
     srcs = ["frodo_database_test.cc"],
     deps = [
+        ":frodo_test_helpers",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_database",
         "@com_github_base64_cpp//:base64_lib",
         "@com_google_googletest//:gtest_main",
@@ -603,4 +605,14 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
     size = "small",
+)
+
+cc_library(
+    name = "frodo_test_helpers",
+    testonly = True,
+    hdrs = ["frodo_test_helpers.h"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/frodo_pir:frodo_flat_matrix",
+    ],
+    visibility = ["//visibility:private"],
 )
