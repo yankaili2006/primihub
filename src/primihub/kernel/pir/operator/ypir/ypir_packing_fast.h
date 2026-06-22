@@ -37,6 +37,27 @@ PolyMatrixNTT CondenseMatrix(const Params& p, const PolyMatrixNTT& a);
 // Mirrors uncondense_matrix.
 PolyMatrixNTT UncondenseMatrix(const Params& p, const PolyMatrixNTT& a);
 
+// Scalar port of fast_multiply_no_reduce (the upstream version is AVX512,
+// absent on the Broadwell host; this computes the identical result). `a`
+// is 1xK and `b` is Kx1, both CONDENSED; multiplies per CRT limb and
+// accumulates WITHOUT modular reduction (the lo/hi 32-bit halves are the
+// two limbs). Returns a 1x1 UNCONDENSED matrix (limb m at [m*poly_len..]).
+// Caller must FastReduce before the values are used modularly; valid while
+// the un-reduced accumulators stay below 2^64 (K * (2^28)^2).
+PolyMatrixNTT FastMultiplyNoReduce(const Params& p, const PolyMatrixNTT& a,
+                                   const PolyMatrixNTT& b);
+
+// Reduce every limb of `res` mod its CRT modulus (barrett_coeff_u64).
+// Mirrors fast_reduce. Closes a lazy-reduction sequence.
+void FastReduce(const Params& p, PolyMatrixNTT& res);
+
+// res[i] += a[i] then lazy single-word Barrett (mirrors fast_add_into;
+// result congruent mod q, possibly in [0, 2q)).
+void FastAddInto(const Params& p, PolyMatrixNTT& res, const PolyMatrixNTT& a);
+
+// res[i] += a[i] with no reduction at all (mirrors fast_add_into_no_reduce).
+void FastAddIntoNoReduce(PolyMatrixNTT& res, const PolyMatrixNTT& a);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_FAST_H_
