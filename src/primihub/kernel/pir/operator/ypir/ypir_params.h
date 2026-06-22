@@ -70,6 +70,17 @@ struct Params {
                      std::size_t db_item_size, std::size_t version);
 };
 
+inline constexpr std::uint64_t kMinQ2Bits = 14;  // spiral_rs MIN_Q2_BITS
+
+// P5: the expansion-mode YPIR parameter preset, mirroring ypir
+// internal_params_for. Fixes n=1, t_gsw=3, t_conv=4, t_exp_right=2,
+// instances=1, poly_len=2048, noise_width=6.4, expand_queries=true,
+// version=0; q2_bits is clamped to >= kMinQ2Bits; db_item_size =
+// poly_len * ceil(log2(p)) / 8. db_dim_1/2 come from nu_1/nu_2.
+Params ParamsForExpansion(std::size_t nu_1, std::size_t nu_2, std::uint64_t p,
+                          std::uint64_t q2_bits, std::size_t t_exp_left,
+                          const std::vector<std::uint64_t>& moduli);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PARAMS_H_

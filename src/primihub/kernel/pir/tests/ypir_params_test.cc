@@ -82,5 +82,29 @@ TEST(YpirParamsTest, SingleModulus) {
   EXPECT_EQ(p.mod0_inv_mod1, 0u);  // unset when crt_count != 2
 }
 
+TEST(YpirParamsTest, ParamsForExpansion_Preset) {
+  const auto p = ParamsForExpansion(/*nu_1=*/9, /*nu_2=*/6, /*p=*/256,
+                                    /*q2_bits=*/28, /*t_exp_left=*/2,
+                                    {kQ0, kQ1});
+  EXPECT_EQ(p.poly_len, 2048u);
+  EXPECT_EQ(p.n, 1u);
+  EXPECT_EQ(p.pt_modulus, 256u);
+  EXPECT_EQ(p.t_gsw, 3u);
+  EXPECT_EQ(p.t_conv, 4u);
+  EXPECT_EQ(p.t_exp_left, 2u);
+  EXPECT_EQ(p.t_exp_right, 2u);
+  EXPECT_EQ(p.instances, 1u);
+  EXPECT_EQ(p.db_dim_1, 9u);
+  EXPECT_EQ(p.db_dim_2, 6u);
+  EXPECT_TRUE(p.expand_queries);
+  // db_item_size = 2048 * ceil(log2(256)=8) / 8 = 2048.
+  EXPECT_EQ(p.db_item_size, 2048u);
+}
+
+TEST(YpirParamsTest, ParamsForExpansion_ClampsQ2Bits) {
+  const auto p = ParamsForExpansion(9, 6, 256, /*q2_bits=*/5, 2, {kQ0, kQ1});
+  EXPECT_EQ(p.q2_bits, 14u);  // clamped to MIN_Q2_BITS
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

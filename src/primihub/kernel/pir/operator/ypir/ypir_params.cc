@@ -87,4 +87,21 @@ Params Params::Init(std::size_t poly_len, const std::vector<std::uint64_t>& modu
   return p;
 }
 
+Params ParamsForExpansion(std::size_t nu_1, std::size_t nu_2, std::uint64_t p,
+                          std::uint64_t q2_bits, std::size_t t_exp_left,
+                          const std::vector<std::uint64_t>& moduli) {
+  const std::size_t kPolyLen = 2048;
+  const std::size_t n = 1, t_gsw = 3, t_conv = 4, t_exp_right = 2,
+                    instances = 1, version = 0;
+  if (q2_bits < kMinQ2Bits) q2_bits = kMinQ2Bits;
+  // db_item_size (the db_item_size==0 default branch): instances*n*n *
+  // poly_len * ceil(log2(p)) / 8.
+  std::size_t db_item_size = instances * n * n;
+  db_item_size = db_item_size * kPolyLen * static_cast<std::size_t>(Log2Ceil(p)) / 8;
+  return Params::Init(kPolyLen, moduli, /*noise_width=*/6.4, n, p, q2_bits,
+                      t_conv, t_exp_left, t_exp_right, t_gsw,
+                      /*expand_queries=*/true, /*db_dim_1=*/nu_1,
+                      /*db_dim_2=*/nu_2, instances, db_item_size, version);
+}
+
 }  // namespace primihub::pir::ypir
