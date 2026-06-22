@@ -163,3 +163,11 @@ cc_library(
     hdrs = ["ypir_arith.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_params",
+    srcs = ["ypir_params.cc"],
+    hdrs = ["ypir_params.h"],
+    visibility = ["//visibility:public"],
+    deps = [":ypir_arith"],
+)

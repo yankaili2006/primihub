@@ -711,3 +711,14 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_params_test",
+    srcs = ["ypir_params_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
