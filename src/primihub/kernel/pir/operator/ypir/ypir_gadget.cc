@@ -51,14 +51,13 @@ PolyMatrixRaw BuildGadget(const Params& p, std::size_t rows, std::size_t cols) {
   return g;
 }
 
-PolyMatrixRaw GadgetInvert(const Params& p, std::size_t mx,
-                           const PolyMatrixRaw& inp) {
+PolyMatrixRaw GadgetInvertRdim(const Params& p, std::size_t mx,
+                               const PolyMatrixRaw& inp, std::size_t rdim) {
   const std::size_t pl = p.poly_len;
   PolyMatrixRaw out;
   out.rows = mx;
   out.cols = inp.cols;
   out.data.assign(mx * inp.cols * pl, 0);
-  const std::size_t rdim = inp.rows;
   const std::size_t num_elems = mx / rdim;
   const std::size_t bits_per = GetBitsPer(p, num_elems);
   const std::uint64_t mask = (1ull << bits_per) - 1;
@@ -77,6 +76,11 @@ PolyMatrixRaw GadgetInvert(const Params& p, std::size_t mx,
     }
   }
   return out;
+}
+
+PolyMatrixRaw GadgetInvert(const Params& p, std::size_t mx,
+                           const PolyMatrixRaw& inp) {
+  return GadgetInvertRdim(p, mx, inp, inp.rows);
 }
 
 }  // namespace primihub::pir::ypir

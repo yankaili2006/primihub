@@ -29,9 +29,15 @@ std::size_t GetBitsPer(const Params& p, std::size_t dim);
 // Power-of-(2^bits_per) gadget matrix, rows x cols (cols % rows == 0).
 PolyMatrixRaw BuildGadget(const Params& p, std::size_t rows, std::size_t cols);
 
+// Gadget decomposition with an explicit `rdim` (mirrors gadget_invert_rdim):
+// only the first `rdim` rows of `inp` are decomposed, each coefficient into
+// mx/rdim base-2^bits_per digits, written to out rows j + k*rdim. With
+// rdim=1 this decomposes only inp row 0 (as the GSW key-switch needs).
+PolyMatrixRaw GadgetInvertRdim(const Params& p, std::size_t mx,
+                               const PolyMatrixRaw& inp, std::size_t rdim);
+
 // Gadget decomposition of `inp` into `mx` rows (mx % inp.rows == 0):
-// each coefficient is split into mx/inp.rows base-2^bits_per digits.
-// Mirrors gadget_invert_alloc.
+// GadgetInvertRdim with rdim = inp.rows. Mirrors gadget_invert_alloc.
 PolyMatrixRaw GadgetInvert(const Params& p, std::size_t mx,
                            const PolyMatrixRaw& inp);
 

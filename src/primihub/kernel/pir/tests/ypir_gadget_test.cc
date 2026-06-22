@@ -66,5 +66,19 @@ TEST(YpirGadgetTest, BuildGadget_BinaryPowers) {
   }
 }
 
+TEST(YpirGadgetTest, GadgetInvertRdim1_DecomposesRow0Only) {
+  const auto p = Pl(64);
+  const std::size_t log_q = static_cast<std::size_t>(p.modulus_log2);
+  PolyMatrixRaw mat;
+  mat.rows = 2; mat.cols = 1; mat.data.assign(2 * 64, 0);
+  mat.Poly(0, 0, 64)[37] = 3;
+  mat.Poly(1, 0, 64)[37] = 99;  // row 1 must be ignored with rdim=1
+  const auto r = GadgetInvertRdim(p, log_q, mat, 1);
+  EXPECT_EQ(r.rows, log_q);
+  EXPECT_EQ(r.Poly(0, 0, 64)[37], 1u);  // binary of 3 = 11
+  EXPECT_EQ(r.Poly(1, 0, 64)[37], 1u);
+  EXPECT_EQ(r.Poly(2, 0, 64)[37], 0u);
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir
