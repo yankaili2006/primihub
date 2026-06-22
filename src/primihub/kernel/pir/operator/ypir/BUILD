@@ -128,3 +128,16 @@ cc_library(
     hdrs = ["ypir_chacha.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_lwe_client",
+    srcs = ["ypir_lwe_client.cc"],
+    hdrs = ["ypir_lwe_client.h"],
+    deps = [
+        ":ypir_chacha",
+        ":ypir_discrete_gaussian",
+        ":ypir_lwe",
+        ":ypir_lwe_params",
+    ],
+    visibility = ["//visibility:public"],
+)
