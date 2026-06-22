@@ -827,3 +827,21 @@ new_git_repository(
     shallow_since = "1696180302 -0400",
     build_file = "@//thirdparty/pir:BUILD.tiptoe",
 )
+
+# ---- Intel HEXL (NTT for @spiral_pir//:spiral_lib) + cpu_features dep ----
+# Added 2026-06-22 to unblock the C++ Spiral facade. native-only build.
+http_archive(
+    name = "cpu_features",
+    sha256 = "bdb3484de8297c49b59955c3b22dba834401bc2df984ef5cfc17acbe69c5018e",
+    strip_prefix = "cpu_features-0.9.0",
+    urls = ["https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.tar.gz"],
+)
+
+http_archive(
+    name = "hexl",
+    build_file = "//thirdparty/pir:BUILD.hexl",
+    patch_cmds = ["printf '#pragma once\\n#define HEXL_USE_GNU\\n#define HEXL_UNUSED(x) (void)(x)\\n' > hexl/include/hexl/util/defines.hpp"],
+    sha256 = "3692e6e6183dbc49253e51e86c3e52e7affcac925f57db0949dbb4d34b558a9a",
+    strip_prefix = "hexl-1.2.5",
+    urls = ["https://github.com/intel/hexl/archive/refs/tags/v1.2.5.tar.gz"],
+)
