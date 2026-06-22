@@ -121,3 +121,10 @@ cc_library(
     deps = [":ypir_negacyclic"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_chacha",
+    srcs = ["ypir_chacha.cc"],
+    hdrs = ["ypir_chacha.h"],
+    visibility = ["//visibility:public"],
+)

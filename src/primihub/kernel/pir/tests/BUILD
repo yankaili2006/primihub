@@ -646,3 +646,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_chacha_test",
+    srcs = ["ypir_chacha_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
