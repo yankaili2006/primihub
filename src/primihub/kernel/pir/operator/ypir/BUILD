@@ -201,3 +201,11 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [":ypir_params", ":ypir_poly_types"],
 )
+
+cc_library(
+    name = "ypir_packing_fast",
+    srcs = ["ypir_packing_fast.cc"],
+    hdrs = ["ypir_packing_fast.h"],
+    visibility = ["//visibility:public"],
+    deps = [":ypir_arith", ":ypir_params", ":ypir_poly_types"],
+)

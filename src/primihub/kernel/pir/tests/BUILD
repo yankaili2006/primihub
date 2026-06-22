@@ -758,3 +758,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_packing_fast_test",
+    srcs = ["ypir_packing_fast_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_packing_fast",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
