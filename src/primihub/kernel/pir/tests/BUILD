@@ -668,3 +668,14 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_spiral_smoke_test",
+    srcs = ["ypir_spiral_smoke_test.cc"],
+    tags = ["manual"],
+    deps = [
+        "@com_google_googletest//:gtest_main",
+        "@spiral_pir//:spiral_lib",
+    ],
+    size = "small",
+)
