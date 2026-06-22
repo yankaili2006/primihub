@@ -722,3 +722,27 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_poly_test",
+    srcs = ["ypir_poly_test.cc"],
+    tags = ["manual"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
+
+cc_test(
+    name = "ypir_poly_ops_test",
+    srcs = ["ypir_poly_ops_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_ops",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

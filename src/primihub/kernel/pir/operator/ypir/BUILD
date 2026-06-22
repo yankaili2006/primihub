@@ -171,3 +171,25 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [":ypir_arith"],
 )
+
+cc_library(
+    name = "ypir_poly",
+    srcs = ["ypir_poly.cc"],
+    hdrs = ["ypir_poly.h"],
+    visibility = ["//visibility:public"],
+    deps = [":ypir_arith", ":ypir_params", ":ypir_poly_types", "@hexl//:hexl"],
+)
+
+cc_library(
+    name = "ypir_poly_types",
+    hdrs = ["ypir_poly_types.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "ypir_poly_ops",
+    srcs = ["ypir_poly_ops.cc"],
+    hdrs = ["ypir_poly_ops.h"],
+    visibility = ["//visibility:public"],
+    deps = [":ypir_arith", ":ypir_params", ":ypir_poly_types"],
+)
