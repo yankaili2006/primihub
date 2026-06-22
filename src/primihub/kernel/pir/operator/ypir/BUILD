@@ -148,3 +148,11 @@ cc_library(
     hdrs = ["ypir_convolution.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "ypir_convolution_ntt",
+    srcs = ["ypir_convolution_ntt.cc"],
+    hdrs = ["ypir_convolution_ntt.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@hexl//:hexl"],
+)

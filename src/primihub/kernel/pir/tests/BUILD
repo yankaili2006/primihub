@@ -689,3 +689,15 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_convolution_ntt_test",
+    srcs = ["ypir_convolution_ntt_test.cc"],
+    tags = ["manual"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_convolution",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_convolution_ntt",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
