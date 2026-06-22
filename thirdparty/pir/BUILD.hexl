@@ -1,0 +1,40 @@
+# Bazel build for Intel HEXL v1.2.5 — native-only (no AVX512). Authored
+# 2026-06-22 to unblock @spiral_pir//:spiral_lib, which #includes
+# "hexl/ntt/ntt.hpp". The build host (.50, Xeon E5-2696 v4 / Broadwell)
+# has no AVX512, so the 12 *avx512*.cpp files are excluded; their call
+# sites inside the native .cpp are all `#ifdef HEXL_HAS_AVX512*` guarded
+# and those macros are left undefined, so no symbols dangle. The
+# CMake-configured hexl/util/defines.hpp is materialised by the
+# http_archive patch_cmds (HEXL_USE_GNU only).
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "hexl",
+    srcs = glob(
+        ["hexl/**/*.cpp"],
+        exclude = [
+            "hexl/**/*avx512*.cpp",
+            "hexl/experimental/**",
+        ],
+    ) + glob(
+        ["hexl/**/*.hpp"],
+        exclude = [
+            "hexl/include/**",
+            "hexl/experimental/**",
+        ],
+    ),
+    hdrs = glob(["hexl/include/hexl/**/*.hpp"]),
+    copts = [
+        "-O3",
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-Wno-unused-function",
+    ],
+    includes = [
+        "hexl",
+        "hexl/include",
+    ],
+    deps = ["@cpu_features//:cpuinfo"],
+)
