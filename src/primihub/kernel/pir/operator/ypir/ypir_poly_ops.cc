@@ -128,4 +128,40 @@ void CopyIntoNtt(const Params& p, PolyMatrixNTT& dst, const PolyMatrixNTT& src,
   }
 }
 
+PolyMatrixRaw NegateRaw(const Params& p, const PolyMatrixRaw& a) {
+  const std::size_t pl = p.poly_len;
+  PolyMatrixRaw res;
+  res.rows = a.rows;
+  res.cols = a.cols;
+  res.data.resize(a.rows * a.cols * pl);
+  for (std::size_t i = 0; i < a.rows; ++i) {
+    for (std::size_t j = 0; j < a.cols; ++j) {
+      const std::uint64_t* s = a.Poly(i, j, pl);
+      std::uint64_t* d = res.Poly(i, j, pl);
+      for (std::size_t z = 0; z < pl; ++z) d[z] = p.modulus - s[z];
+    }
+  }
+  return res;
+}
+
+PolyMatrixNTT NegateNtt(const Params& p, const PolyMatrixNTT& a) {
+  const std::size_t pl = p.poly_len;
+  const std::size_t cc_pl = p.crt_count * pl;
+  PolyMatrixNTT res;
+  res.rows = a.rows;
+  res.cols = a.cols;
+  res.data.resize(a.rows * a.cols * cc_pl);
+  for (std::size_t i = 0; i < a.rows; ++i) {
+    for (std::size_t j = 0; j < a.cols; ++j) {
+      const std::uint64_t* s = a.Poly(i, j, cc_pl);
+      std::uint64_t* d = res.Poly(i, j, cc_pl);
+      for (std::size_t c = 0; c < p.crt_count; ++c) {
+        const std::uint64_t m = p.moduli[c];
+        for (std::size_t z = 0; z < pl; ++z) d[c * pl + z] = (m - s[c * pl + z]) % m;
+      }
+    }
+  }
+  return res;
+}
+
 }  // namespace primihub::pir::ypir

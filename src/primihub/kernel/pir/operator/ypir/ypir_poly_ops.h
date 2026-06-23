@@ -44,6 +44,13 @@ void CopyIntoRaw(const Params& p, PolyMatrixRaw& dst, const PolyMatrixRaw& src,
 void CopyIntoNtt(const Params& p, PolyMatrixNTT& dst, const PolyMatrixNTT& src,
                  std::size_t target_row, std::size_t target_col);
 
+// Negate each coefficient. Raw mirrors spiral invert_poly verbatim
+// (modulus - a[i], NOT reduced, so a coeff of 0 maps to modulus). NTT
+// mirrors invert_poly_ntt/invert_modular ((moduli[c]-a)%moduli[c], 0->0).
+// Together these are -&PolyMatrixRaw / -&PolyMatrixNTT.
+PolyMatrixRaw NegateRaw(const Params& p, const PolyMatrixRaw& a);
+PolyMatrixNTT NegateNtt(const Params& p, const PolyMatrixNTT& a);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_POLY_OPS_H_

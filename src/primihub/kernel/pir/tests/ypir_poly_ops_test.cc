@@ -134,5 +134,28 @@ TEST(YpirPolyOpsTest, CopyIntoRaw_PlacesBlockAtOffset) {
   EXPECT_EQ(dst.Poly(0, 1, 2)[1], 0u);
 }
 
+TEST(YpirPolyOpsTest, NegateRaw_MatchesInvertPoly) {
+  auto p = P2x();
+  PolyMatrixRaw a;
+  a.rows = 1; a.cols = 2; a.data = {3, 0, 7, 100};  // poly(0,0)={3,0} (0,1)={7,100}
+  auto r = NegateRaw(p, a);
+  EXPECT_EQ(r.data[0], p.modulus - 3);
+  EXPECT_EQ(r.data[1], p.modulus - 0);  // verbatim: 0 -> modulus, not reduced
+  EXPECT_EQ(r.data[2], p.modulus - 7);
+  EXPECT_EQ(r.data[3], p.modulus - 100);
+}
+
+TEST(YpirPolyOpsTest, NegateNtt_MatchesInvertModular_AndInvolution) {
+  auto p = P2x();
+  PolyMatrixNTT a;
+  a.rows = 1; a.cols = 1; a.data = {5, 0, 9, 0};  // limb0 {5,0} limb1 {9,0}
+  auto r = NegateNtt(p, a);
+  EXPECT_EQ(r.data[0], (p.moduli[0] - 5) % p.moduli[0]);
+  EXPECT_EQ(r.data[1], 0u);  // 0 -> 0
+  EXPECT_EQ(r.data[2], (p.moduli[1] - 9) % p.moduli[1]);
+  EXPECT_EQ(r.data[3], 0u);
+  EXPECT_EQ(NegateNtt(p, r).data, a.data);  // involution
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir
