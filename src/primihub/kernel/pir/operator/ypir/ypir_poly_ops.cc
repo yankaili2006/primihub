@@ -104,4 +104,28 @@ PolyMatrixNTT PadTopNtt(const Params& p, const PolyMatrixNTT& a,
   return res;
 }
 
+void CopyIntoRaw(const Params& p, PolyMatrixRaw& dst, const PolyMatrixRaw& src,
+                 std::size_t target_row, std::size_t target_col) {
+  const std::size_t pl = p.poly_len;
+  for (std::size_t r = 0; r < src.rows; ++r) {
+    for (std::size_t c = 0; c < src.cols; ++c) {
+      const std::uint64_t* s = src.Poly(r, c, pl);
+      std::uint64_t* d = dst.Poly(target_row + r, target_col + c, pl);
+      std::copy(s, s + pl, d);
+    }
+  }
+}
+
+void CopyIntoNtt(const Params& p, PolyMatrixNTT& dst, const PolyMatrixNTT& src,
+                 std::size_t target_row, std::size_t target_col) {
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  for (std::size_t r = 0; r < src.rows; ++r) {
+    for (std::size_t c = 0; c < src.cols; ++c) {
+      const std::uint64_t* s = src.Poly(r, c, cc_pl);
+      std::uint64_t* d = dst.Poly(target_row + r, target_col + c, cc_pl);
+      std::copy(s, s + cc_pl, d);
+    }
+  }
+}
+
 }  // namespace primihub::pir::ypir

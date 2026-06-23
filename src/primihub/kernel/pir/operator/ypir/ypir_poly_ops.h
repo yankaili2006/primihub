@@ -37,6 +37,13 @@ PolyMatrixNTT MultiplyNtt(const Params& p, const PolyMatrixNTT& a,
 PolyMatrixNTT PadTopNtt(const Params& p, const PolyMatrixNTT& a,
                         std::size_t pad_rows);
 
+// Copy every poly of `src` into `dst` at block offset (target_row,
+// target_col); src must fit. Mirrors spiral-rs PolyMatrix::copy_into.
+void CopyIntoRaw(const Params& p, PolyMatrixRaw& dst, const PolyMatrixRaw& src,
+                 std::size_t target_row, std::size_t target_col);
+void CopyIntoNtt(const Params& p, PolyMatrixNTT& dst, const PolyMatrixNTT& src,
+                 std::size_t target_row, std::size_t target_col);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_POLY_OPS_H_
