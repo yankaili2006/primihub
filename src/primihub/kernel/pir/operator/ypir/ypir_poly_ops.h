@@ -51,6 +51,12 @@ void CopyIntoNtt(const Params& p, PolyMatrixNTT& dst, const PolyMatrixNTT& src,
 PolyMatrixRaw NegateRaw(const Params& p, const PolyMatrixRaw& a);
 PolyMatrixNTT NegateNtt(const Params& p, const PolyMatrixNTT& a);
 
+// Scalar (1x1) polynomial multiply in the NTT domain: res[i][j] = a[0][0]
+// (.) b[i][j], per-CRT-limb pointwise modular multiply. Mirrors spiral-rs
+// scalar_multiply. Result shape == b.
+PolyMatrixNTT ScalarMultiplyNtt(const Params& p, const PolyMatrixNTT& a,
+                                const PolyMatrixNTT& b);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_POLY_OPS_H_

@@ -164,4 +164,30 @@ PolyMatrixNTT NegateNtt(const Params& p, const PolyMatrixNTT& a) {
   return res;
 }
 
+PolyMatrixNTT ScalarMultiplyNtt(const Params& p, const PolyMatrixNTT& a,
+                                const PolyMatrixNTT& b) {
+  const std::size_t pl = p.poly_len;
+  const std::size_t cc = p.crt_count;
+  const std::size_t blk = cc * pl;
+  PolyMatrixNTT res;
+  res.rows = b.rows;
+  res.cols = b.cols;
+  res.data.resize(b.rows * b.cols * blk);
+  const std::uint64_t* ap = a.Poly(0, 0, blk);  // scalar (1x1)
+  for (std::size_t i = 0; i < b.rows; ++i) {
+    for (std::size_t j = 0; j < b.cols; ++j) {
+      const std::uint64_t* bp = b.Poly(i, j, blk);
+      std::uint64_t* rp = res.Poly(i, j, blk);
+      for (std::size_t m = 0; m < cc; ++m) {
+        for (std::size_t z = 0; z < pl; ++z) {
+          const std::size_t idx = m * pl + z;
+          rp[idx] = MultiplyModular(bp[idx], ap[idx], p.moduli[m],
+                                    p.barrett_cr_0[m], p.barrett_cr_1[m], cc);
+        }
+      }
+    }
+  }
+  return res;
+}
+
 }  // namespace primihub::pir::ypir

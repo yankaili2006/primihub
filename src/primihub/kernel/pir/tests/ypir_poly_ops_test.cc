@@ -157,5 +157,25 @@ TEST(YpirPolyOpsTest, NegateNtt_MatchesInvertModular_AndInvolution) {
   EXPECT_EQ(NegateNtt(p, r).data, a.data);  // involution
 }
 
+TEST(YpirPolyOpsTest, ScalarMultiplyNtt_PointwisePerLimb) {
+  auto p = P2x();
+  std::mt19937_64 rng(202);
+  const PolyMatrixNTT a = MakeRand(1, 1, rng);  // scalar
+  const PolyMatrixNTT b = MakeRand(2, 3, rng);
+  const auto r = ScalarMultiplyNtt(p, a, b);
+  ASSERT_EQ(r.rows, 2u);
+  ASSERT_EQ(r.cols, 3u);
+  const std::uint64_t q[2] = {kQ0, kQ1};
+  for (std::size_t i = 0; i < 2; ++i)
+    for (std::size_t j = 0; j < 3; ++j)
+      for (std::size_t mm = 0; mm < 2; ++mm)
+        for (std::size_t z = 0; z < 2; ++z) {
+          const std::uint64_t av = a.data[Idx(0, 0, 1, mm, z)];
+          const std::uint64_t bv = b.data[Idx(i, j, 3, mm, z)];
+          EXPECT_EQ(r.data[Idx(i, j, 3, mm, z)], (av * bv) % q[mm])
+              << "i" << i << " j" << j;
+        }
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir
