@@ -4,6 +4,9 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
+#include <algorithm>
+#include <cstddef>
+
 #include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
 
 namespace primihub::pir::ypir {
@@ -79,6 +82,23 @@ PolyMatrixNTT MultiplyNtt(const Params& p, const PolyMatrixNTT& a,
           }
         }
       }
+    }
+  }
+  return res;
+}
+
+PolyMatrixNTT PadTopNtt(const Params& p, const PolyMatrixNTT& a,
+                        std::size_t pad_rows) {
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  PolyMatrixNTT res;
+  res.rows = a.rows + pad_rows;
+  res.cols = a.cols;
+  res.data.assign(res.rows * res.cols * cc_pl, 0);
+  for (std::size_t i = 0; i < a.rows; ++i) {
+    for (std::size_t j = 0; j < a.cols; ++j) {
+      const std::uint64_t* src = a.Poly(i, j, cc_pl);
+      std::uint64_t* dst = res.Poly(i + pad_rows, j, cc_pl);
+      std::copy(src, src + cc_pl, dst);
     }
   }
   return res;

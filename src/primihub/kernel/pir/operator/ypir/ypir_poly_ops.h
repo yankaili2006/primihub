@@ -12,6 +12,8 @@
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_POLY_OPS_H_
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_POLY_OPS_H_
 
+#include <cstddef>
+
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
 
@@ -28,6 +30,12 @@ PolyMatrixNTT AddNtt(const Params& p, const PolyMatrixNTT& a,
 // is modular. Result shape a.rows x b.cols.
 PolyMatrixNTT MultiplyNtt(const Params& p, const PolyMatrixNTT& a,
                           const PolyMatrixNTT& b);
+
+// Prepend `pad_rows` zero rows: result is (a.rows + pad_rows) x a.cols,
+// with `a` copied into rows [pad_rows, pad_rows + a.rows) and the top
+// rows zero. Mirrors spiral-rs PolyMatrix::pad_top.
+PolyMatrixNTT PadTopNtt(const Params& p, const PolyMatrixNTT& a,
+                        std::size_t pad_rows);
 
 }  // namespace primihub::pir::ypir
 

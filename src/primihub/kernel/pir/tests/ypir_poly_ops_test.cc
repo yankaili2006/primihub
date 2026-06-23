@@ -80,5 +80,25 @@ TEST(YpirPolyOpsTest, Multiply_MatchesReference) {
         }
 }
 
+TEST(YpirPolyOpsTest, PadTopNtt_PrependsZeroRows) {
+  auto p = P2x();
+  std::mt19937_64 rng(99);
+  PolyMatrixNTT a = MakeRand(2, 3, rng);  // 2x3
+  PolyMatrixNTT r = PadTopNtt(p, a, 1);   // -> 3x3, top row zero
+  EXPECT_EQ(r.rows, 3u);
+  EXPECT_EQ(r.cols, 3u);
+  for (std::size_t j = 0; j < 3; ++j)
+    for (std::size_t mm = 0; mm < 2; ++mm)
+      for (std::size_t z = 0; z < 2; ++z)
+        EXPECT_EQ(r.data[Idx(0, j, 3, mm, z)], 0u);
+  for (std::size_t i = 0; i < 2; ++i)
+    for (std::size_t j = 0; j < 3; ++j)
+      for (std::size_t mm = 0; mm < 2; ++mm)
+        for (std::size_t z = 0; z < 2; ++z)
+          EXPECT_EQ(r.data[Idx(i + 1, j, 3, mm, z)],
+                    a.data[Idx(i, j, 3, mm, z)]);
+  EXPECT_EQ(PadTopNtt(p, a, 0).data, a.data);  // pad 0 = identity
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir
