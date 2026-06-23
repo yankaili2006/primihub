@@ -76,6 +76,15 @@ PolyMatrixNTT RegevEncrypt(const NttContext& ctx, const DiscreteGaussian& dg,
 PolyMatrixRaw RegevDecrypt(const NttContext& ctx, const PolyMatrixRaw& sk_reg,
                            const PolyMatrixNTT& ct);
 
+// Homomorphic Galois automorphism X->X^t on a 2x1 Regev ciphertext via a
+// gadget key-switch under pub_param (= RawGenerateExpansionParams[level]
+// for the same t). Mirrors packing.rs homomorphic_automorph. t_exp must
+// equal pub_param.cols (the gadget dimension). Decrypts to the plaintext
+// automorph: dec(HomomorphicAutomorph(enc(m), t)) == decode(automorph(encode(m))).
+PolyMatrixNTT HomomorphicAutomorph(const NttContext& ctx, std::size_t t,
+                                   std::size_t t_exp, const PolyMatrixNTT& ct,
+                                   const PolyMatrixNTT& pub_param);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_REGEV_H_

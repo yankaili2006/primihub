@@ -131,4 +131,29 @@ PolyMatrixRaw RegevDecrypt(const NttContext& ctx, const PolyMatrixRaw& sk_reg,
   return out;
 }
 
+PolyMatrixNTT HomomorphicAutomorph(const NttContext& ctx, std::size_t t,
+                                   std::size_t t_exp, const PolyMatrixNTT& ct,
+                                   const PolyMatrixNTT& pub_param) {
+  const Params& p = ctx.params();
+  const std::size_t pl = p.poly_len;
+  // ct (2x1) -> raw -> Galois automorph
+  const PolyMatrixRaw ct_raw = ctx.FromNtt(ct);
+  const PolyMatrixRaw ct_auto = Automorph(p, ct_raw, t);  // 2x1 raw
+  // gadget-decompose row 0 of ct_auto into t_exp digits (rdim=1)
+  PolyMatrixRaw ginv_ct = GadgetInvertRdim(p, t_exp, ct_auto, 1);  // t_exp x 1
+  // upstream transforms only rows 1..t_exp (drops the 2^0 digit). Equivalent:
+  // zero row 0 then ToNtt the whole matrix (NTT linear, NTT(0)=0).
+  std::uint64_t* g0 = ginv_ct.Poly(0, 0, pl);
+  for (std::size_t z = 0; z < pl; ++z) g0[z] = 0;
+  const PolyMatrixNTT ginv_ct_ntt = ctx.ToNtt(ginv_ct);
+  // key-switch: pub_param (2 x t_exp) * ginv_ct_ntt (t_exp x 1) -> 2x1
+  const PolyMatrixNTT w_times = MultiplyNtt(p, pub_param, ginv_ct_ntt);
+  // row 1 of ct_auto -> 1x1 -> NTT, padded to row 1, plus the key-switch term
+  PolyMatrixRaw ct_auto_1 = ctx.ZeroRaw(1, 1);
+  std::copy(ct_auto.Poly(1, 0, pl), ct_auto.Poly(1, 0, pl) + pl,
+            ct_auto_1.Poly(0, 0, pl));
+  const PolyMatrixNTT ct_auto_1_ntt = ctx.ToNtt(ct_auto_1);
+  return AddNtt(p, PadTopNtt(p, ct_auto_1_ntt, 1), w_times);
+}
+
 }  // namespace primihub::pir::ypir

@@ -18,6 +18,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_gadget.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
@@ -184,6 +185,42 @@ TEST(YpirRegevTest, RegevEncryptDecrypt_RoundTrip) {
   ASSERT_EQ(ct.cols, 1u);
   const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, ct);
   EXPECT_EQ(dec.data, m.data);  // exact round-trip (noise << Delta/2)
+}
+
+TEST(YpirRegevTest, HomomorphicAutomorph_E2E) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  const std::size_t t_exp = static_cast<std::size_t>(p.modulus_log2);
+  // small (gaussian) secret, as real YPIR uses -- needed so the dropped
+  // 2^0 gadget digit (automorph(sk)*digit0) stays tiny vs Delta/2.
+  auto sk_rng = ChaChaRng::FromSeed(Seed(11));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);
+  auto ep_rng = ChaChaRng::FromSeed(Seed(12));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(13));
+  const std::size_t num_exp = 3;  // i=0,1,2 -> t=9,5,3 for poly_len 8
+  const auto eps =
+      RawGenerateExpansionParams(ctx, dg, sk, num_exp, t_exp, ep_rng, ep_rng_pub);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 53u + 7u) % p.pt_modulus;
+  const std::size_t i = 1;
+  const std::size_t t = (p.poly_len >> i) + 1;  // 5
+  auto enc_rng = ChaChaRng::FromSeed(Seed(14));
+  auto enc_rng_pub = ChaChaRng::FromSeed(Seed(15));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, enc_rng, enc_rng_pub);
+  const PolyMatrixNTT ct2 = HomomorphicAutomorph(ctx, t, t_exp, ct, eps[i]);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, ct2);
+  // expected = decode(automorph(encode(m))): same Rescale path, noise drops out
+  PolyMatrixRaw dm = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    dm.data[z] = Rescale(m.data[z], p.pt_modulus, p.modulus);
+  const PolyMatrixRaw auto_dm = Automorph(p, dm, t);
+  PolyMatrixRaw expected = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    expected.data[z] = Rescale(auto_dm.data[z], p.modulus, p.pt_modulus);
+  EXPECT_EQ(dec.data, expected.data);
 }
 
 }  // namespace
