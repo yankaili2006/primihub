@@ -156,4 +156,18 @@ PolyMatrixNTT HomomorphicAutomorph(const NttContext& ctx, std::size_t t,
   return AddNtt(p, PadTopNtt(p, ct_auto_1_ntt, 1), w_times);
 }
 
+PolyMatrixNTT PackSingleLwe(const NttContext& ctx,
+                            const std::vector<PolyMatrixNTT>& pub_params,
+                            const PolyMatrixNTT& lwe_ct) {
+  const Params& p = ctx.params();
+  PolyMatrixNTT cur_r = lwe_ct;  // clone
+  for (std::size_t i = 0; i < p.poly_len_log2; ++i) {
+    const std::size_t t = (p.poly_len >> i) + 1;
+    const PolyMatrixNTT tau_of_r =
+        HomomorphicAutomorph(ctx, t, p.t_exp_left, cur_r, pub_params[i]);
+    cur_r = AddNtt(p, cur_r, tau_of_r);
+  }
+  return cur_r;
+}
+
 }  // namespace primihub::pir::ypir

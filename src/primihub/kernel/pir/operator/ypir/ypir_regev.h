@@ -85,6 +85,15 @@ PolyMatrixNTT HomomorphicAutomorph(const NttContext& ctx, std::size_t t,
                                    std::size_t t_exp, const PolyMatrixNTT& ct,
                                    const PolyMatrixNTT& pub_param);
 
+// Pack a single LWE/RLWE ciphertext via the automorphism trace: for i in
+// [0, poly_len_log2), cur += HomomorphicAutomorph(cur, t_i=poly_len/2^i+1)
+// using pub_params[i] and t_exp = params.t_exp_left. Mirrors packing.rs
+// pack_single_lwe. pub_params must have >= poly_len_log2 entries, each
+// built (RawGenerateExpansionParams) with m_exp == params.t_exp_left.
+PolyMatrixNTT PackSingleLwe(const NttContext& ctx,
+                            const std::vector<PolyMatrixNTT>& pub_params,
+                            const PolyMatrixNTT& lwe_ct);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_REGEV_H_

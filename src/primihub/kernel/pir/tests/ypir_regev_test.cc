@@ -27,6 +27,12 @@ namespace {
 
 constexpr std::uint64_t kQ0 = 268369921ull, kQ1 = 249561089ull;
 
+Params P8b() {  // binary expansion gadget (large t_exp_left -> bits_per=1,
+                // tiny key-switch noise) so the multi-fold pack stays exact
+  return Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 60, 2, 3, true,
+                      1, 1, 1, 0, 0);
+}
+
 Params P8() {
   return Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 2, 2, 3, true,
                       1, 1, 1, 0, 0);
@@ -220,6 +226,41 @@ TEST(YpirRegevTest, HomomorphicAutomorph_E2E) {
   PolyMatrixRaw expected = ctx.ZeroRaw(1, 1);
   for (std::size_t z = 0; z < p.poly_len; ++z)
     expected.data[z] = Rescale(auto_dm.data[z], p.modulus, p.pt_modulus);
+  EXPECT_EQ(dec.data, expected.data);
+}
+
+TEST(YpirRegevTest, PackSingleLwe_FoldEquivalence) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(21));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);  // small secret
+  auto ep_rng = ChaChaRng::FromSeed(Seed(22));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(23));
+  const auto eps = RawGenerateExpansionParams(ctx, dg, sk, p.poly_len_log2,
+                                              p.t_exp_left, ep_rng, ep_rng_pub);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 29u + 13u) % p.pt_modulus;
+  auto enc_rng = ChaChaRng::FromSeed(Seed(24));
+  auto enc_rng_pub = ChaChaRng::FromSeed(Seed(25));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, enc_rng, enc_rng_pub);
+  const PolyMatrixNTT packed = PackSingleLwe(ctx, eps, ct);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, packed);
+  // expected: the same automorphism fold on the plaintext encoding in R_q
+  PolyMatrixRaw dm = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    dm.data[z] = Rescale(m.data[z], p.pt_modulus, p.modulus);
+  PolyMatrixNTT acc = ctx.ToNtt(dm);
+  for (std::size_t i = 0; i < p.poly_len_log2; ++i) {
+    const std::size_t t = (p.poly_len >> i) + 1;
+    acc = AddNtt(p, acc, ctx.ToNtt(Automorph(p, ctx.FromNtt(acc), t)));
+  }
+  const PolyMatrixRaw acc_raw = ctx.FromNtt(acc);
+  PolyMatrixRaw expected = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    expected.data[z] = Rescale(acc_raw.data[z], p.modulus, p.pt_modulus);
   EXPECT_EQ(dec.data, expected.data);
 }
 
