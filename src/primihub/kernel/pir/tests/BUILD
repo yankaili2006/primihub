@@ -783,6 +783,7 @@ cc_test(
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly_ops",
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_gadget",
         "//src/primihub/kernel/pir/operator/ypir:ypir_regev",
         "@com_google_googletest//:gtest_main",
     ],

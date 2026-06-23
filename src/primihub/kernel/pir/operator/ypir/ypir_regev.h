@@ -14,6 +14,7 @@
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_REGEV_H_
 
 #include <cstddef>
+#include <vector>
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
@@ -51,6 +52,15 @@ PolyMatrixNTT GetFreshRegPublicKey(const NttContext& ctx,
                                    const DiscreteGaussian& dg,
                                    const PolyMatrixRaw& sk_reg, std::size_t m,
                                    ChaChaRng& rng, ChaChaRng& rng_pub);
+
+// Expansion (query-unpacking) public params: num_exp key-switch keys,
+// each a 2 x m_exp Regev encryption of automorph(sk, t_i) * gadget, where
+// t_i = poly_len/2^i + 1. Mirrors client.rs raw_generate_expansion_params.
+// Decrypts (col j) to e_j + (automorph(sk,t_i) * gadget)[j].
+std::vector<PolyMatrixNTT> RawGenerateExpansionParams(
+    const NttContext& ctx, const DiscreteGaussian& dg,
+    const PolyMatrixRaw& sk_reg, std::size_t num_exp, std::size_t m_exp,
+    ChaChaRng& rng, ChaChaRng& rng_pub);
 
 }  // namespace primihub::pir::ypir
 

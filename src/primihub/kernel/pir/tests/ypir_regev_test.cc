@@ -17,6 +17,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_gadget.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
@@ -124,6 +125,45 @@ TEST(YpirRegevTest, GetFreshRegPublicKey_EachColumnDecryptsToNoise) {
               row1.Poly(0, 0, cc_pl));
     const PolyMatrixNTT phase = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
     EXPECT_EQ(ctx.FromNtt(phase).data, e_ref.data) << "col " << i;
+  }
+}
+
+TEST(YpirRegevTest, RawGenerateExpansionParams_KeySwitchDecryptIdentity) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  const std::size_t num_exp = 2, m_exp = 2;
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const auto w =
+      RawGenerateExpansionParams(ctx, dg, sk, num_exp, m_exp, rng, rng_pub);
+  ASSERT_EQ(w.size(), num_exp);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  const PolyMatrixNTT g_exp_ntt = ctx.ToNtt(BuildGadget(p, 1, m_exp));
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));  // parallel noise stream
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  for (std::size_t i = 0; i < num_exp; ++i) {
+    ASSERT_EQ(w[i].rows, 2u);
+    ASSERT_EQ(w[i].cols, m_exp);
+    const std::size_t t = (p.poly_len >> i) + 1;
+    const PolyMatrixNTT prod =
+        MultiplyNtt(p, ctx.ToNtt(Automorph(p, sk, t)), g_exp_ntt);  // 1 x m_exp
+    for (std::size_t j = 0; j < m_exp; ++j) {
+      const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+      PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+      std::copy(w[i].Poly(0, j, cc_pl), w[i].Poly(0, j, cc_pl) + cc_pl,
+                row0.Poly(0, 0, cc_pl));
+      std::copy(w[i].Poly(1, j, cc_pl), w[i].Poly(1, j, cc_pl) + cc_pl,
+                row1.Poly(0, 0, cc_pl));
+      const PolyMatrixNTT phase = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+      PolyMatrixNTT prodj = ctx.ZeroNtt(1, 1);
+      std::copy(prod.Poly(0, j, cc_pl), prod.Poly(0, j, cc_pl) + cc_pl,
+                prodj.Poly(0, 0, cc_pl));
+      const PolyMatrixNTT diff = AddNtt(p, phase, NegateNtt(p, prodj));
+      EXPECT_EQ(ctx.FromNtt(diff).data, e_ref.data) << "i" << i << " j" << j;
+    }
   }
 }
 

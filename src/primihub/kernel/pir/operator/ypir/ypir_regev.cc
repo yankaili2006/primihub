@@ -4,6 +4,7 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
 
+#include "src/primihub/kernel/pir/operator/ypir/ypir_gadget.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
 namespace primihub::pir::ypir {
@@ -69,6 +70,25 @@ PolyMatrixNTT GetFreshRegPublicKey(const NttContext& ctx,
   for (std::size_t i = 0; i < m; ++i) {
     const PolyMatrixNTT sample = GetRegSample(ctx, dg, sk_reg, rng, rng_pub);
     CopyIntoNtt(p, res, sample, 0, i);  // column i
+  }
+  return res;
+}
+
+std::vector<PolyMatrixNTT> RawGenerateExpansionParams(
+    const NttContext& ctx, const DiscreteGaussian& dg,
+    const PolyMatrixRaw& sk_reg, std::size_t num_exp, std::size_t m_exp,
+    ChaChaRng& rng, ChaChaRng& rng_pub) {
+  const Params& p = ctx.params();
+  const PolyMatrixNTT g_exp_ntt = ctx.ToNtt(BuildGadget(p, 1, m_exp));
+  std::vector<PolyMatrixNTT> res;
+  res.reserve(num_exp);
+  for (std::size_t i = 0; i < num_exp; ++i) {
+    const std::size_t t = (p.poly_len >> i) + 1;
+    const PolyMatrixRaw tau_sk_reg = Automorph(p, sk_reg, t);
+    const PolyMatrixNTT prod = MultiplyNtt(p, ctx.ToNtt(tau_sk_reg), g_exp_ntt);
+    const PolyMatrixNTT sample =
+        GetFreshRegPublicKey(ctx, dg, sk_reg, m_exp, rng, rng_pub);
+    res.push_back(AddNtt(p, sample, PadTopNtt(p, prod, 1)));
   }
   return res;
 }
