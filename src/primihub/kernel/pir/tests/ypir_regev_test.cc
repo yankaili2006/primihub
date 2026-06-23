@@ -1,0 +1,74 @@
+/*
+ * Copyright (c) 2026 by PrimiHub
+ * Licensed under the Apache License, Version 2.0
+ *
+ * ypir_regev_test -- random_rng / noise raw constructors. Verifies RNG
+ * consumption order + reduction against a parallel ChaChaRng, determinism,
+ * and that noise samples come from the DiscreteGaussian.
+ */
+#include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
+
+#include <array>
+#include <cstdint>
+
+#include <gtest/gtest.h>
+
+#include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+
+namespace primihub::pir::ypir {
+namespace {
+
+constexpr std::uint64_t kQ0 = 268369921ull, kQ1 = 249561089ull;
+
+Params P8() {
+  return Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 2, 2, 3, true,
+                      1, 1, 1, 0, 0);
+}
+
+std::array<std::uint8_t, 32> Seed(std::uint8_t b) {
+  std::array<std::uint8_t, 32> s{};
+  for (auto& x : s) x = b;
+  return s;
+}
+
+TEST(YpirRegevTest, RandomRngRaw_ConsumesNextU64PerCoeffReduced) {
+  auto p = P8();
+  auto rng = ChaChaRng::FromSeed(Seed(7));
+  auto rng_ref = ChaChaRng::FromSeed(Seed(7));
+  auto a = RandomRngRaw(p, 2, 3, rng);
+  EXPECT_EQ(a.rows, 2u);
+  EXPECT_EQ(a.cols, 3u);
+  ASSERT_EQ(a.data.size(), 2u * 3u * 8u);
+  for (std::size_t r = 0; r < 2; ++r)
+    for (std::size_t c = 0; c < 3; ++c)
+      for (std::size_t z = 0; z < 8; ++z) {
+        const std::uint64_t expect = rng_ref.NextU64() % p.modulus;
+        EXPECT_EQ(a.data[(r * 3 + c) * 8 + z], expect);
+      }
+  for (auto v : a.data) EXPECT_LT(v, p.modulus);
+}
+
+TEST(YpirRegevTest, RandomRngRaw_Deterministic) {
+  auto p = P8();
+  auto r1 = ChaChaRng::FromSeed(Seed(9));
+  auto r2 = ChaChaRng::FromSeed(Seed(9));
+  EXPECT_EQ(RandomRngRaw(p, 1, 1, r1).data, RandomRngRaw(p, 1, 1, r2).data);
+}
+
+TEST(YpirRegevTest, NoiseRaw_MatchesDiscreteGaussianSamples) {
+  auto p = P8();
+  const auto dg = DiscreteGaussian::Init(6.4);
+  auto rng = ChaChaRng::FromSeed(Seed(3));
+  auto rng_ref = ChaChaRng::FromSeed(Seed(3));
+  auto e = NoiseRaw(p, 1, 2, dg, rng);
+  ASSERT_EQ(e.data.size(), 1u * 2u * 8u);
+  for (std::size_t z = 0; z < e.data.size(); ++z) {
+    const std::uint64_t sv = rng_ref.NextU64();
+    EXPECT_EQ(e.data[z], dg.Sample(p.modulus, sv));
+  }
+}
+
+}  // namespace
+}  // namespace primihub::pir::ypir

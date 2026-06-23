@@ -209,3 +209,16 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [":ypir_arith", ":ypir_params", ":ypir_poly_types"],
 )
+
+cc_library(
+    name = "ypir_regev",
+    srcs = ["ypir_regev.cc"],
+    hdrs = ["ypir_regev.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_chacha",
+        ":ypir_discrete_gaussian",
+        ":ypir_params",
+        ":ypir_poly_types",
+    ],
+)

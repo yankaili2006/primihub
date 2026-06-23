@@ -772,3 +772,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_regev_test",
+    srcs = ["ypir_regev_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_discrete_gaussian",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_regev",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
