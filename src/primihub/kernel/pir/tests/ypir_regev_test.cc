@@ -167,5 +167,24 @@ TEST(YpirRegevTest, RawGenerateExpansionParams_KeySwitchDecryptIdentity) {
   }
 }
 
+TEST(YpirRegevTest, RegevEncryptDecrypt_RoundTrip) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 37u + 5u) % p.pt_modulus;  // arbitrary plaintext < pt
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, rng, rng_pub);
+  ASSERT_EQ(ct.rows, 2u);
+  ASSERT_EQ(ct.cols, 1u);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, ct);
+  EXPECT_EQ(dec.data, m.data);  // exact round-trip (noise << Delta/2)
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

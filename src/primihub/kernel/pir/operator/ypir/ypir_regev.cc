@@ -4,7 +4,10 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
 
+#include <algorithm>
+
 #include "src/primihub/kernel/pir/operator/ypir/ypir_gadget.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
 namespace primihub::pir::ypir {
@@ -91,6 +94,41 @@ std::vector<PolyMatrixNTT> RawGenerateExpansionParams(
     res.push_back(AddNtt(p, sample, PadTopNtt(p, prod, 1)));
   }
   return res;
+}
+
+PolyMatrixNTT RegevEncrypt(const NttContext& ctx, const DiscreteGaussian& dg,
+                           const PolyMatrixRaw& sk_reg, const PolyMatrixRaw& m,
+                           ChaChaRng& rng, ChaChaRng& rng_pub) {
+  const Params& p = ctx.params();
+  const std::size_t pl = p.poly_len;
+  const PolyMatrixNTT ct = GetRegSample(ctx, dg, sk_reg, rng, rng_pub);
+  PolyMatrixRaw dm = ctx.ZeroRaw(2, 1);  // row0 = 0, row1 = Delta*m
+  std::uint64_t* dm_row1 = dm.Poly(1, 0, pl);
+  const std::uint64_t* mp = m.Poly(0, 0, pl);
+  for (std::size_t z = 0; z < pl; ++z)
+    dm_row1[z] = Rescale(mp[z], p.pt_modulus, p.modulus);
+  return AddNtt(p, ct, ctx.ToNtt(dm));
+}
+
+PolyMatrixRaw RegevDecrypt(const NttContext& ctx, const PolyMatrixRaw& sk_reg,
+                           const PolyMatrixNTT& ct) {
+  const Params& p = ctx.params();
+  const std::size_t pl = p.poly_len;
+  const std::size_t cc_pl = p.crt_count * pl;
+  PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+  std::copy(ct.Poly(0, 0, cc_pl), ct.Poly(0, 0, cc_pl) + cc_pl,
+            row0.Poly(0, 0, cc_pl));
+  std::copy(ct.Poly(1, 0, cc_pl), ct.Poly(1, 0, cc_pl) + cc_pl,
+            row1.Poly(0, 0, cc_pl));
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk_reg);
+  const PolyMatrixNTT phase_ntt = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+  const PolyMatrixRaw phase = ctx.FromNtt(phase_ntt);
+  PolyMatrixRaw out = ctx.ZeroRaw(1, 1);
+  const std::uint64_t* php = phase.Poly(0, 0, pl);
+  std::uint64_t* op = out.Poly(0, 0, pl);
+  for (std::size_t z = 0; z < pl; ++z)
+    op[z] = Rescale(php[z], p.modulus, p.pt_modulus);
+  return out;
 }
 
 }  // namespace primihub::pir::ypir

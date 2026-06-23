@@ -62,6 +62,20 @@ std::vector<PolyMatrixNTT> RawGenerateExpansionParams(
     const PolyMatrixRaw& sk_reg, std::size_t num_exp, std::size_t m_exp,
     ChaChaRng& rng, ChaChaRng& rng_pub);
 
+// Regev-encrypt a 1x1 raw plaintext m (coeffs in [0, pt_modulus)) under
+// sk_reg: a 2x1 ciphertext = GetRegSample + Delta*m in row 1, where
+// Delta*m[z] = Rescale(m[z], pt_modulus, modulus). Test-and-operator
+// helper (upstream encrypts via the spiral Client; this is the YPIR-local
+// equivalent). Decrypts via RegevDecrypt.
+PolyMatrixNTT RegevEncrypt(const NttContext& ctx, const DiscreteGaussian& dg,
+                           const PolyMatrixRaw& sk_reg, const PolyMatrixRaw& m,
+                           ChaChaRng& rng, ChaChaRng& rng_pub);
+
+// Decrypt a 2x1 Regev ciphertext under sk_reg: phase = ct_row0*sk + ct_row1,
+// then per coeff Rescale(phase, modulus, pt_modulus). Returns 1x1 raw.
+PolyMatrixRaw RegevDecrypt(const NttContext& ctx, const PolyMatrixRaw& sk_reg,
+                           const PolyMatrixNTT& ct);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_REGEV_H_

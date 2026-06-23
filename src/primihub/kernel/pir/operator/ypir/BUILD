@@ -219,6 +219,7 @@ cc_library(
         ":ypir_chacha",
         ":ypir_discrete_gaussian",
         ":ypir_gadget",
+        ":ypir_modulus_switch",
         ":ypir_params",
         ":ypir_poly",
         ":ypir_poly_ops",
