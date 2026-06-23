@@ -73,6 +73,21 @@ std::vector<std::size_t> ProduceTable(std::size_t poly_len,
 std::vector<std::vector<std::size_t>> AutomorphNttTables(
     std::size_t poly_len, std::size_t log2_poly_len);
 
+// out[i] += poly[table[i]] over [0, poly_len): accumulating gather by the
+// precomputed NTT automorphism permutation, selecting table index
+// log2(poly_len/(t-1)). Mirrors apply_automorph_ntt_raw. `tables` is
+// supplied by the caller (server/scheme) -- typically AutomorphNttTables.
+void ApplyAutomorphNttRaw(const Params& p, const std::uint64_t* poly,
+                          std::uint64_t* out, std::size_t t,
+                          const std::vector<std::vector<std::size_t>>& tables);
+
+// Apply ApplyAutomorphNttRaw to each CRT-limb chunk of every poly in `mat`,
+// accumulating into `res` (same shape). Mirrors apply_automorph_ntt.
+void ApplyAutomorphNtt(const Params& p,
+                       const std::vector<std::vector<std::size_t>>& tables,
+                       const PolyMatrixNTT& mat, PolyMatrixNTT& res,
+                       std::size_t t);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_FAST_H_

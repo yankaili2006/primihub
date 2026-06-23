@@ -166,4 +166,38 @@ std::vector<std::vector<std::size_t>> AutomorphNttTables(
   return tables;
 }
 
+void ApplyAutomorphNttRaw(const Params& p, const std::uint64_t* poly,
+                          std::uint64_t* out, std::size_t t,
+                          const std::vector<std::vector<std::size_t>>& tables) {
+  const std::size_t poly_len = p.poly_len;
+  // table_idx = log2(poly_len / (t - 1)); the ratio is a power of two.
+  std::size_t ratio = poly_len / (t - 1);
+  std::size_t table_idx = 0;
+  while (ratio > 1 && (ratio & 1u) == 0) {
+    ratio >>= 1;
+    ++table_idx;
+  }
+  const std::vector<std::size_t>& table = tables[table_idx];
+  for (std::size_t i = 0; i < poly_len; ++i) {
+    out[i] += poly[table[i]];
+  }
+}
+
+void ApplyAutomorphNtt(const Params& p,
+                       const std::vector<std::vector<std::size_t>>& tables,
+                       const PolyMatrixNTT& mat, PolyMatrixNTT& res,
+                       std::size_t t) {
+  const std::size_t pl = p.poly_len;
+  const std::size_t blk = p.crt_count * pl;
+  for (std::size_t i = 0; i < mat.rows; ++i) {
+    for (std::size_t j = 0; j < mat.cols; ++j) {
+      const std::uint64_t* poly = mat.Poly(i, j, blk);
+      std::uint64_t* res_poly = res.Poly(i, j, blk);
+      for (std::size_t c = 0; c < p.crt_count; ++c) {
+        ApplyAutomorphNttRaw(p, poly + c * pl, res_poly + c * pl, t, tables);
+      }
+    }
+  }
+}
+
 }  // namespace primihub::pir::ypir

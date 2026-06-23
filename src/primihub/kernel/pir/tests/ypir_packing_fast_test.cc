@@ -117,5 +117,36 @@ TEST(YpirPackingFastTest, AutomorphNttTables_PerLevel) {
   EXPECT_EQ(tabs[2], (std::vector<std::size_t>{1, 0, 2, 3, 5, 4, 6, 7}));
 }
 
+TEST(YpirPackingFastTest, ApplyAutomorphNttRaw_GathersAndAccumulates) {
+  const auto p = P(8);
+  const auto tables = AutomorphNttTables(8, 3);
+  // t=5 -> ratio 8/4=2 -> table_idx 1 -> {2,3,1,0,4,5,6,7}
+  std::vector<std::uint64_t> poly = {10, 11, 12, 13, 14, 15, 16, 17};
+  std::vector<std::uint64_t> out(8, 100);  // pre-filled: verify accumulation
+  ApplyAutomorphNttRaw(p, poly.data(), out.data(), 5, tables);
+  const std::vector<std::size_t> tbl = {2, 3, 1, 0, 4, 5, 6, 7};
+  for (std::size_t i = 0; i < 8; ++i) EXPECT_EQ(out[i], 100 + poly[tbl[i]]);
+}
+
+TEST(YpirPackingFastTest, ApplyAutomorphNtt_PerLimbPerPoly) {
+  const auto p = P(8);
+  const std::size_t pl = 8, blk = 2 * pl;
+  const auto tables = AutomorphNttTables(8, 3);
+  PolyMatrixNTT mat, res;
+  mat.rows = 1; mat.cols = 2; mat.data.resize(2 * blk);
+  res.rows = 1; res.cols = 2; res.data.assign(2 * blk, 0);
+  std::mt19937_64 rng(7);
+  for (auto& x : mat.data) x = rng() % 1000;
+  ApplyAutomorphNtt(p, tables, mat, res, 9);  // ratio 1 -> idx0 {1,0,3,2,5,4,7,6}
+  const std::vector<std::size_t> tbl = {1, 0, 3, 2, 5, 4, 7, 6};
+  for (std::size_t j = 0; j < 2; ++j) {
+    const std::uint64_t* mp = mat.Poly(0, j, blk);
+    const std::uint64_t* rp = res.Poly(0, j, blk);
+    for (std::size_t c = 0; c < 2; ++c)
+      for (std::size_t i = 0; i < pl; ++i)
+        EXPECT_EQ(rp[c * pl + i], mp[c * pl + tbl[i]]);
+  }
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir
