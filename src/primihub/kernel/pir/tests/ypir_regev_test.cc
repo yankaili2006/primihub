@@ -8,6 +8,7 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -16,6 +17,8 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 
 namespace primihub::pir::ypir {
 namespace {
@@ -68,6 +71,33 @@ TEST(YpirRegevTest, NoiseRaw_MatchesDiscreteGaussianSamples) {
     const std::uint64_t sv = rng_ref.NextU64();
     EXPECT_EQ(e.data[z], dg.Sample(p.modulus, sv));
   }
+}
+
+TEST(YpirRegevTest, GetRegSample_DecryptsToNoiseExactly) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);  // any sk: identity is exact
+  auto rng = ChaChaRng::FromSeed(Seed(2));      // noise stream
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));  // uniform-a stream
+  const PolyMatrixNTT samp = GetRegSample(ctx, dg, sk, rng, rng_pub);
+  ASSERT_EQ(samp.rows, 2u);
+  ASSERT_EQ(samp.cols, 1u);
+  // reproduce e from a parallel noise rng (same seed/order)
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));
+  const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+  // decrypt: phase = p_row0 * sk + p_row1, then FromNtt
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+  std::copy(samp.Poly(0, 0, cc_pl), samp.Poly(0, 0, cc_pl) + cc_pl,
+            row0.Poly(0, 0, cc_pl));
+  std::copy(samp.Poly(1, 0, cc_pl), samp.Poly(1, 0, cc_pl) + cc_pl,
+            row1.Poly(0, 0, cc_pl));
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  const PolyMatrixNTT phase_ntt = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+  const PolyMatrixRaw phase = ctx.FromNtt(phase_ntt);
+  EXPECT_EQ(phase.data, e_ref.data);  // exact: (-a)*s + (s*a + e) = e
 }
 
 }  // namespace

@@ -4,6 +4,8 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
 
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
+
 namespace primihub::pir::ypir {
 
 PolyMatrixRaw RandomRngRaw(const Params& p, std::size_t rows, std::size_t cols,
@@ -39,6 +41,23 @@ PolyMatrixRaw NoiseRaw(const Params& p, std::size_t rows, std::size_t cols,
     }
   }
   return out;
+}
+
+PolyMatrixNTT GetRegSample(const NttContext& ctx, const DiscreteGaussian& dg,
+                           const PolyMatrixRaw& sk_reg, ChaChaRng& rng,
+                           ChaChaRng& rng_pub) {
+  const Params& p = ctx.params();
+  const PolyMatrixRaw a = RandomRngRaw(p, 1, 1, rng_pub);
+  const PolyMatrixRaw e = NoiseRaw(p, 1, 1, dg, rng);
+  const PolyMatrixNTT a_ntt = ctx.ToNtt(a);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk_reg);
+  const PolyMatrixNTT b_p = MultiplyNtt(p, sk_ntt, a_ntt);  // sk*a
+  const PolyMatrixNTT b = AddNtt(p, ctx.ToNtt(e), b_p);     // e + sk*a
+  const PolyMatrixNTT neg_a_ntt = ctx.ToNtt(NegateRaw(p, a));
+  PolyMatrixNTT res = ctx.ZeroNtt(2, 1);
+  CopyIntoNtt(p, res, neg_a_ntt, 0, 0);
+  CopyIntoNtt(p, res, b, 1, 0);
+  return res;
 }
 
 }  // namespace primihub::pir::ypir

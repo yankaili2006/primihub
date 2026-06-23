@@ -18,6 +18,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
 
 namespace primihub::pir::ypir {
@@ -33,6 +34,15 @@ PolyMatrixRaw RandomRngRaw(const Params& p, std::size_t rows, std::size_t cols,
 // PolyMatrixRaw::noise -> DiscreteGaussian::sample_matrix.
 PolyMatrixRaw NoiseRaw(const Params& p, std::size_t rows, std::size_t cols,
                        const DiscreteGaussian& dg, ChaChaRng& rng);
+
+// Fresh Regev/RLWE sample: an encryption of zero under sk_reg. Returns a
+// 2x1 NTT matrix p = [(-a).ntt(); (e + sk*a).ntt()] where a is uniform
+// (rng_pub) and e is gaussian noise (rng). Mirrors client.rs
+// get_reg_sample (dg passed in rather than re-Init per call -- identical).
+// Decrypts as p_row1 + p_row0*sk == e (exact mod q).
+PolyMatrixNTT GetRegSample(const NttContext& ctx, const DiscreteGaussian& dg,
+                           const PolyMatrixRaw& sk_reg, ChaChaRng& rng,
+                           ChaChaRng& rng_pub);
 
 }  // namespace primihub::pir::ypir
 
