@@ -60,4 +60,17 @@ PolyMatrixNTT GetRegSample(const NttContext& ctx, const DiscreteGaussian& dg,
   return res;
 }
 
+PolyMatrixNTT GetFreshRegPublicKey(const NttContext& ctx,
+                                   const DiscreteGaussian& dg,
+                                   const PolyMatrixRaw& sk_reg, std::size_t m,
+                                   ChaChaRng& rng, ChaChaRng& rng_pub) {
+  const Params& p = ctx.params();
+  PolyMatrixNTT res = ctx.ZeroNtt(2, m);
+  for (std::size_t i = 0; i < m; ++i) {
+    const PolyMatrixNTT sample = GetRegSample(ctx, dg, sk_reg, rng, rng_pub);
+    CopyIntoNtt(p, res, sample, 0, i);  // column i
+  }
+  return res;
+}
+
 }  // namespace primihub::pir::ypir

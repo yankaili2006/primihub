@@ -100,5 +100,32 @@ TEST(YpirRegevTest, GetRegSample_DecryptsToNoiseExactly) {
   EXPECT_EQ(phase.data, e_ref.data);  // exact: (-a)*s + (s*a + e) = e
 }
 
+TEST(YpirRegevTest, GetFreshRegPublicKey_EachColumnDecryptsToNoise) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  const std::size_t m = 3;
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const PolyMatrixNTT pk = GetFreshRegPublicKey(ctx, dg, sk, m, rng, rng_pub);
+  ASSERT_EQ(pk.rows, 2u);
+  ASSERT_EQ(pk.cols, m);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));  // parallel noise stream
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  for (std::size_t i = 0; i < m; ++i) {
+    const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+    PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+    std::copy(pk.Poly(0, i, cc_pl), pk.Poly(0, i, cc_pl) + cc_pl,
+              row0.Poly(0, 0, cc_pl));
+    std::copy(pk.Poly(1, i, cc_pl), pk.Poly(1, i, cc_pl) + cc_pl,
+              row1.Poly(0, 0, cc_pl));
+    const PolyMatrixNTT phase = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+    EXPECT_EQ(ctx.FromNtt(phase).data, e_ref.data) << "col " << i;
+  }
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

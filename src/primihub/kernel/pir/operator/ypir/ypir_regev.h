@@ -44,6 +44,14 @@ PolyMatrixNTT GetRegSample(const NttContext& ctx, const DiscreteGaussian& dg,
                            const PolyMatrixRaw& sk_reg, ChaChaRng& rng,
                            ChaChaRng& rng_pub);
 
+// Fresh Regev public key: a 2 x m matrix whose every column is an
+// independent GetRegSample (encryption of zero). Mirrors client.rs
+// get_fresh_reg_public_key.
+PolyMatrixNTT GetFreshRegPublicKey(const NttContext& ctx,
+                                   const DiscreteGaussian& dg,
+                                   const PolyMatrixRaw& sk_reg, std::size_t m,
+                                   ChaChaRng& rng, ChaChaRng& rng_pub);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_REGEV_H_
