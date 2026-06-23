@@ -4,6 +4,10 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_packing_fast.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 #include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
 
 namespace primihub::pir::ypir {
@@ -108,6 +112,58 @@ void FastAddInto(const Params& p, PolyMatrixNTT& res, const PolyMatrixNTT& a) {
 
 void FastAddIntoNoReduce(PolyMatrixNTT& res, const PolyMatrixNTT& a) {
   for (std::size_t i = 0; i < res.data.size(); ++i) res.data[i] += a.data[i];
+}
+
+namespace {
+
+// In-place swap of the two halves of [lo, hi) (mirrors swap_midpoint).
+// The range length must be even (upstream relies on equal halves).
+void SwapMidpoint(std::vector<std::size_t>& cur, std::size_t lo,
+                  std::size_t hi) {
+  const std::size_t half = (hi - lo) / 2;
+  for (std::size_t i = 0; i < half; ++i) {
+    std::swap(cur[lo + i], cur[lo + half + i]);
+  }
+}
+
+}  // namespace
+
+std::vector<std::size_t> ProduceTable(std::size_t poly_len,
+                                      std::size_t chunk_size) {
+  std::vector<std::size_t> cur(poly_len);
+  for (std::size_t i = 0; i < poly_len; ++i) cur[i] = i;
+  const std::size_t outer = poly_len / (chunk_size / 2);
+  bool do_it = true;
+  for (std::size_t os = 0; os < poly_len; os += outer) {
+    if (!do_it) {
+      do_it = true;
+      continue;
+    }
+    do_it = false;
+    const std::size_t oend = std::min(os + outer, poly_len);
+    for (std::size_t cs = os; cs < oend; cs += chunk_size) {
+      const std::size_t clen = std::min(chunk_size, oend - cs);
+      std::size_t offs = 0;
+      std::size_t to_add = std::min(chunk_size / 2, clen / 2);
+      while (to_add > 0) {
+        SwapMidpoint(cur, cs + offs, cs + clen);
+        offs += to_add;
+        to_add /= 2;
+      }
+    }
+  }
+  return cur;
+}
+
+std::vector<std::vector<std::size_t>> AutomorphNttTables(
+    std::size_t poly_len, std::size_t log2_poly_len) {
+  std::vector<std::vector<std::size_t>> tables;
+  tables.reserve(log2_poly_len);
+  for (std::size_t i = 0; i < log2_poly_len; ++i) {
+    const std::size_t chunk_size = static_cast<std::size_t>(1) << i;
+    tables.push_back(ProduceTable(poly_len, 2 * chunk_size));
+  }
+  return tables;
 }
 
 }  // namespace primihub::pir::ypir

@@ -7,8 +7,10 @@
  */
 #include "src/primihub/kernel/pir/operator/ypir/ypir_packing_fast.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <random>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -90,6 +92,29 @@ TEST(YpirPackingFastTest, FastAddNoReduce_Reduce_MatchesAdd) {
   FastAddIntoNoReduce(acc, b);
   FastReduce(p, acc);
   EXPECT_EQ(acc.data, ref.data);
+}
+
+TEST(YpirPackingFastTest, ProduceTable_MatchesUpstream) {
+  EXPECT_EQ(ProduceTable(8, 2),
+            (std::vector<std::size_t>{1, 0, 3, 2, 5, 4, 7, 6}));
+  EXPECT_EQ(ProduceTable(8, 4),
+            (std::vector<std::size_t>{2, 3, 1, 0, 4, 5, 6, 7}));
+  EXPECT_EQ(ProduceTable(8, 8),
+            (std::vector<std::size_t>{1, 0, 2, 3, 5, 4, 6, 7}));
+  EXPECT_EQ(ProduceTable(16, 4),
+            (std::vector<std::size_t>{2, 3, 1, 0, 6, 7, 5, 4, 8, 9, 10, 11,
+                                      12, 13, 14, 15}));
+  std::vector<std::size_t> t = ProduceTable(16, 4);
+  std::sort(t.begin(), t.end());
+  for (std::size_t i = 0; i < t.size(); ++i) EXPECT_EQ(t[i], i);
+}
+
+TEST(YpirPackingFastTest, AutomorphNttTables_PerLevel) {
+  const std::vector<std::vector<std::size_t>> tabs = AutomorphNttTables(8, 3);
+  ASSERT_EQ(tabs.size(), 3u);
+  EXPECT_EQ(tabs[0], (std::vector<std::size_t>{1, 0, 3, 2, 5, 4, 7, 6}));
+  EXPECT_EQ(tabs[1], (std::vector<std::size_t>{2, 3, 1, 0, 4, 5, 6, 7}));
+  EXPECT_EQ(tabs[2], (std::vector<std::size_t>{1, 0, 2, 3, 5, 4, 6, 7}));
 }
 
 }  // namespace

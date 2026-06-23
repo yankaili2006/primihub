@@ -13,7 +13,9 @@
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_FAST_H_
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_FAST_H_
 
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
@@ -57,6 +59,19 @@ void FastAddInto(const Params& p, PolyMatrixNTT& res, const PolyMatrixNTT& a);
 
 // res[i] += a[i] with no reduction at all (mirrors fast_add_into_no_reduce).
 void FastAddIntoNoReduce(PolyMatrixNTT& res, const PolyMatrixNTT& a);
+
+// Bit-reversal-style index permutation used by the NTT-domain
+// automorphism (mirrors produce_table, debug prints stripped). Returns a
+// length-poly_len table (output slot -> source slot) for the given
+// chunk_size. Pure index math; a prerequisite for apply_automorph_ntt.
+std::vector<std::size_t> ProduceTable(std::size_t poly_len,
+                                      std::size_t chunk_size);
+
+// One ProduceTable per automorphism level i in [0, log2_poly_len), each
+// with chunk_size = 2 * 2^i (mirrors automorph_ntt_tables). tables[i] is
+// the level-i permutation.
+std::vector<std::vector<std::size_t>> AutomorphNttTables(
+    std::size_t poly_len, std::size_t log2_poly_len);
 
 }  // namespace primihub::pir::ypir
 
