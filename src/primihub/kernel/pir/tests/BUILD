@@ -803,3 +803,23 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_packing_test",
+    srcs = ["ypir_packing_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_discrete_gaussian",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_gadget",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_modulus_switch",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_packing",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_ops",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_regev",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

@@ -239,3 +239,18 @@ cc_library(
         ":ypir_poly_types",
     ],
 )
+
+cc_library(
+    name = "ypir_packing",
+    srcs = ["ypir_packing.cc"],
+    hdrs = ["ypir_packing.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_params",
+        ":ypir_poly",
+        ":ypir_poly_ops",
+        ":ypir_poly_types",
+        ":ypir_regev",
+        ":ypir_server",
+    ],
+)
