@@ -940,3 +940,22 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_e2e_test",
+    srcs = ["ypir_e2e_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_client",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_discrete_gaussian",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_modulus_switch",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_packing",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_regev",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "medium",
+)
