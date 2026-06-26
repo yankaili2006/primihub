@@ -808,6 +808,7 @@ cc_test(
     name = "ypir_packing_test",
     srcs = ["ypir_packing_test.cc"],
     deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
         "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
         "//src/primihub/kernel/pir/operator/ypir:ypir_discrete_gaussian",
         "//src/primihub/kernel/pir/operator/ypir:ypir_gadget",

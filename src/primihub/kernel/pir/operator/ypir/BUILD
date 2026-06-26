@@ -246,6 +246,8 @@ cc_library(
     hdrs = ["ypir_packing.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":ypir_arith",
+        ":ypir_modulus_switch",
         ":ypir_params",
         ":ypir_poly",
         ":ypir_poly_ops",

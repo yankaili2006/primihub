@@ -19,6 +19,7 @@
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_H_
 
 #include <cstddef>
+#include <cstdint>
 
 #include <vector>
 
@@ -45,6 +46,25 @@ PolyMatrixNTT PackLwesInner(const NttContext& ctx, std::size_t ell,
                             const std::vector<PolyMatrixNTT>& rlwe_cts,
                             const std::vector<PolyMatrixNTT>& pub_params,
                             const YConstants& y_constants);
+
+// Full pack (mirrors packing.rs pack_lwes, recursive path): folds the
+// poly_len RLWE ciphertexts via PackLwesInner, then injects the per-output
+// LWE b-values into the constant (row 1) polynomial -- coefficient z gets
+// += b_values[z] * poly_len (mod modulus, Barrett-reduced), matching the
+// upstream out_raw normalization. Returns a 2x1 NTT ciphertext.
+//
+// (Upstream pack_lwes drives pack_lwes_inner_non_recursive with an optional
+// precomputed-vals fast path; this recursive form produces the identical
+// result -- the precompute optimization + b_values fast path is a later
+// chunk.)
+//
+// Preconditions: rlwe_cts.size() == params.poly_len; b_values.size() ==
+// params.poly_len; pub_params/y_constants as for PackLwesInner.
+PolyMatrixNTT PackLwes(const NttContext& ctx,
+                       const std::vector<std::uint64_t>& b_values,
+                       const std::vector<PolyMatrixNTT>& rlwe_cts,
+                       const std::vector<PolyMatrixNTT>& pub_params,
+                       const YConstants& y_constants);
 
 }  // namespace primihub::pir::ypir
 
