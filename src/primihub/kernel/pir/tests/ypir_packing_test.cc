@@ -30,6 +30,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_server.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_util.h"
 
 namespace primihub::pir::ypir {
 namespace {
@@ -199,6 +200,95 @@ TEST(YpirPackingTest, PackLwes_InjectsBValuesIntoConstantRow) {
   }
 
   EXPECT_EQ(dec.data, expected.data);
+}
+
+// prep_pack_lwes: each output column's a-vector lands in RLWE row 0 in
+// negacyclic order, row 1 zero. Anchored to NegacyclicPermU64Mod + ToNtt.
+TEST(YpirPackingTest, PrepPackLwes_BuildsNegacyclicARows) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  std::vector<std::uint64_t> lwe(p.poly_len * (p.poly_len + 1));
+  for (std::size_t idx = 0; idx < lwe.size(); ++idx)
+    lwe[idx] = (idx * 1234577u + 7u) % p.modulus;
+
+  const std::vector<PolyMatrixNTT> out = PrepPackLwes(ctx, lwe, p.poly_len);
+  ASSERT_EQ(out.size(), p.poly_len);
+  for (std::size_t i = 0; i < p.poly_len; ++i) {
+    std::vector<std::uint64_t> col(p.poly_len);
+    for (std::size_t j = 0; j < p.poly_len; ++j)
+      col[j] = lwe[j * p.poly_len + i];
+    PolyMatrixRaw expect_raw = ctx.ZeroRaw(2, 1);
+    const std::vector<std::uint64_t> nega =
+        NegacyclicPermU64Mod(col, 0, p.modulus);
+    std::uint64_t* r0 = expect_raw.Poly(0, 0, p.poly_len);
+    for (std::size_t j = 0; j < p.poly_len; ++j) r0[j] = nega[j];
+    const PolyMatrixNTT expect = ctx.ToNtt(expect_raw);
+    EXPECT_EQ(out[i].data, expect.data) << "output column " << i;
+  }
+}
+
+// prep_pack_many_lwes: per-output reshard equals PrepPackLwes on the manually
+// gathered column block.
+TEST(YpirPackingTest, PrepPackManyLwes_ReshapesPerOutput) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  const std::size_t num = 3;
+  const std::size_t stride = num * p.poly_len;
+  std::vector<std::uint64_t> lwe((p.poly_len + 1) * stride);
+  for (std::size_t idx = 0; idx < lwe.size(); ++idx)
+    lwe[idx] = (idx * 99991u + 17u) % p.modulus;
+
+  const std::vector<std::vector<PolyMatrixNTT>> out =
+      PrepPackManyLwes(ctx, lwe, num);
+  ASSERT_EQ(out.size(), num);
+  for (std::size_t i = 0; i < num; ++i) {
+    std::vector<std::uint64_t> v;
+    for (std::size_t j = 0; j < p.poly_len + 1; ++j)
+      for (std::size_t k = 0; k < p.poly_len; ++k)
+        v.push_back(lwe[j * stride + i * p.poly_len + k]);
+    const std::vector<PolyMatrixNTT> expect = PrepPackLwes(ctx, v, p.poly_len);
+    ASSERT_EQ(out[i].size(), expect.size());
+    for (std::size_t c = 0; c < expect.size(); ++c)
+      EXPECT_EQ(out[i][c].data, expect[c].data) << "output " << i << " col " << c;
+  }
+}
+
+// pack_many_lwes: output i equals PackLwes over output i's b_values slice and
+// prepared cts (PackLwes itself verified above).
+TEST(YpirPackingTest, PackManyLwes_LoopsPackLwes) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(21));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);
+  auto ep_rng = ChaChaRng::FromSeed(Seed(22));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(23));
+  const std::vector<PolyMatrixNTT> pub_params = RawGenerateExpansionParams(
+      ctx, dg, sk, p.poly_len_log2, p.t_exp_left, ep_rng, ep_rng_pub);
+  const YConstants yc = GenerateYConstants(ctx);
+
+  const std::size_t num = 2;
+  const std::size_t stride = num * p.poly_len;
+  std::vector<std::uint64_t> lwe((p.poly_len + 1) * stride);
+  for (std::size_t idx = 0; idx < lwe.size(); ++idx)
+    lwe[idx] = (idx * 7919u + 3u) % p.modulus;
+  const std::vector<std::vector<PolyMatrixNTT>> prep =
+      PrepPackManyLwes(ctx, lwe, num);
+
+  std::vector<std::uint64_t> b_values(num * p.poly_len);
+  for (std::size_t z = 0; z < b_values.size(); ++z)
+    b_values[z] = (z * 131u + 5u) % p.modulus;
+
+  const std::vector<PolyMatrixNTT> many =
+      PackManyLwes(ctx, prep, b_values, num, pub_params, yc);
+  ASSERT_EQ(many.size(), num);
+  for (std::size_t i = 0; i < num; ++i) {
+    const std::vector<std::uint64_t> bv(
+        b_values.begin() + i * p.poly_len,
+        b_values.begin() + (i + 1) * p.poly_len);
+    const PolyMatrixNTT ref = PackLwes(ctx, bv, prep[i], pub_params, yc);
+    EXPECT_EQ(many[i].data, ref.data) << "output " << i;
+  }
 }
 
 }  // namespace

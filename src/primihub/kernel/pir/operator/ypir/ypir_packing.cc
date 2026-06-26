@@ -8,11 +8,14 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <vector>
+
 #include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_util.h"
 
 namespace primihub::pir::ypir {
 
@@ -89,6 +92,83 @@ PolyMatrixNTT PackLwes(const NttContext& ctx,
   }
 
   return ctx.ToNtt(out_raw);
+}
+
+// Faithful port of packing.rs prep_pack_lwes. Each output column i takes the
+// LWE a-vector lwe_cts[j*poly_len + i] (j over poly_len), maps it to RLWE
+// row 0 via negacyclic_perm(.,0,modulus), leaves row 1 (b) zero, and NTTs.
+std::vector<PolyMatrixNTT> PrepPackLwes(
+    const NttContext& ctx, const std::vector<std::uint64_t>& lwe_cts,
+    std::size_t cols_to_do) {
+  const Params& params = ctx.params();
+  assert(lwe_cts.size() == params.poly_len * (params.poly_len + 1));
+  assert(cols_to_do == params.poly_len);
+
+  std::vector<PolyMatrixNTT> rlwe_cts;
+  rlwe_cts.reserve(cols_to_do);
+  for (std::size_t i = 0; i < cols_to_do; ++i) {
+    PolyMatrixRaw rlwe_ct = ctx.ZeroRaw(2, 1);
+    std::vector<std::uint64_t> poly(params.poly_len);
+    for (std::size_t j = 0; j < params.poly_len; ++j)
+      poly[j] = lwe_cts[j * params.poly_len + i];
+    const std::vector<std::uint64_t> nega =
+        NegacyclicPermU64Mod(poly, 0, params.modulus);
+    std::uint64_t* row0 = rlwe_ct.Poly(0, 0, params.poly_len);
+    for (std::size_t j = 0; j < params.poly_len; ++j) row0[j] = nega[j];
+    rlwe_cts.push_back(ctx.ToNtt(rlwe_ct));
+  }
+  return rlwe_cts;
+}
+
+// Faithful port of packing.rs prep_pack_many_lwes. Reshapes the flat
+// multi-output buffer (row stride = num_rlwe_outputs*poly_len) into per-output
+// (poly_len+1)*poly_len slices, then preps each.
+std::vector<std::vector<PolyMatrixNTT>> PrepPackManyLwes(
+    const NttContext& ctx, const std::vector<std::uint64_t>& lwe_cts,
+    std::size_t num_rlwe_outputs) {
+  const Params& params = ctx.params();
+  const std::size_t row_stride = num_rlwe_outputs * params.poly_len;
+  assert(lwe_cts.size() == (params.poly_len + 1) * row_stride);
+
+  std::vector<std::vector<PolyMatrixNTT>> res;
+  res.reserve(num_rlwe_outputs);
+  for (std::size_t i = 0; i < num_rlwe_outputs; ++i) {
+    std::vector<std::uint64_t> v;
+    v.reserve((params.poly_len + 1) * params.poly_len);
+    for (std::size_t j = 0; j < params.poly_len + 1; ++j) {
+      const std::size_t base = j * row_stride + i * params.poly_len;
+      for (std::size_t k = 0; k < params.poly_len; ++k)
+        v.push_back(lwe_cts[base + k]);
+    }
+    res.push_back(PrepPackLwes(ctx, v, params.poly_len));
+  }
+  return res;
+}
+
+// Recursive equivalent of packing.rs pack_many_lwes: one PackLwes per output
+// over its poly_len-wide b_values slice (upstream uses precompute; identical
+// result).
+std::vector<PolyMatrixNTT> PackManyLwes(
+    const NttContext& ctx,
+    const std::vector<std::vector<PolyMatrixNTT>>& prep_rlwe_cts,
+    const std::vector<std::uint64_t>& b_values, std::size_t num_rlwe_outputs,
+    const std::vector<PolyMatrixNTT>& pub_params,
+    const YConstants& y_constants) {
+  const Params& params = ctx.params();
+  assert(prep_rlwe_cts.size() == num_rlwe_outputs);
+  assert(prep_rlwe_cts[0].size() == params.poly_len);
+  assert(b_values.size() == num_rlwe_outputs * params.poly_len);
+
+  std::vector<PolyMatrixNTT> res;
+  res.reserve(num_rlwe_outputs);
+  for (std::size_t i = 0; i < num_rlwe_outputs; ++i) {
+    const std::vector<std::uint64_t> bv(
+        b_values.begin() + i * params.poly_len,
+        b_values.begin() + (i + 1) * params.poly_len);
+    res.push_back(
+        PackLwes(ctx, bv, prep_rlwe_cts[i], pub_params, y_constants));
+  }
+  return res;
 }
 
 }  // namespace primihub::pir::ypir

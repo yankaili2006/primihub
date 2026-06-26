@@ -66,6 +66,39 @@ PolyMatrixNTT PackLwes(const NttContext& ctx,
                        const std::vector<PolyMatrixNTT>& pub_params,
                        const YConstants& y_constants);
 
+// Build the poly_len "prepared" RLWE ciphertexts for one packed output from
+// a flat LWE buffer (mirrors packing.rs prep_pack_lwes). lwe_cts holds
+// poly_len*(poly_len+1) u64 as (poly_len+1) rows of poly_len; for column i
+// the a-vector (rows 0..poly_len-1) becomes RLWE row 0 in negacyclic order
+// (NegacyclicPermU64Mod shift 0), row 1 (the b) left zero -- b's are injected
+// separately by PackLwes. cols_to_do must equal params.poly_len. Returns
+// poly_len 2x1 NTT ciphertexts.
+std::vector<PolyMatrixNTT> PrepPackLwes(
+    const NttContext& ctx, const std::vector<std::uint64_t>& lwe_cts,
+    std::size_t cols_to_do);
+
+// Reshape a flat multi-output LWE buffer and prep each output (mirrors
+// packing.rs prep_pack_many_lwes). lwe_cts holds (poly_len+1) *
+// (num_rlwe_outputs*poly_len) u64; output i gathers its poly_len-wide column
+// block across all poly_len+1 rows, then PrepPackLwes. Returns
+// num_rlwe_outputs vectors of poly_len ciphertexts each.
+std::vector<std::vector<PolyMatrixNTT>> PrepPackManyLwes(
+    const NttContext& ctx, const std::vector<std::uint64_t>& lwe_cts,
+    std::size_t num_rlwe_outputs);
+
+// Pack many RLWE outputs (recursive path; mirrors packing.rs pack_many_lwes).
+// For output i: PackLwes(b_values[i*poly_len .. (i+1)*poly_len],
+// prep_rlwe_cts[i], pub_params, y_constants). Upstream drives a precomputed
+// (Precomp) fast path; this loops the recursive PackLwes for the identical
+// result (the precompute optimization is a later chunk). b_values.size() ==
+// num_rlwe_outputs*poly_len. Returns num_rlwe_outputs packed 2x1 NTT cts.
+std::vector<PolyMatrixNTT> PackManyLwes(
+    const NttContext& ctx,
+    const std::vector<std::vector<PolyMatrixNTT>>& prep_rlwe_cts,
+    const std::vector<std::uint64_t>& b_values, std::size_t num_rlwe_outputs,
+    const std::vector<PolyMatrixNTT>& pub_params,
+    const YConstants& y_constants);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_PACKING_H_

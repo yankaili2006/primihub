@@ -247,6 +247,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ypir_arith",
+        ":ypir_util",
         ":ypir_modulus_switch",
         ":ypir_params",
         ":ypir_poly",
