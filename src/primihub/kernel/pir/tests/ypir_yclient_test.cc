@@ -149,5 +149,61 @@ TEST(YpirYClientTest, GenerateQueryLweEncodesOneHot) {
   }
 }
 
+// --- query condensing: pack_query + rlwes_to_lwes ---
+
+TEST(YpirYClientTest, PackQueryCondensesCrtLimbs) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const std::uint64_t q0 = p.moduli[0], q1 = p.moduli[1];
+  const std::vector<std::uint64_t> query = {0,         1,   q0, q1,
+                                            123456789, p.modulus - 1};
+  const std::vector<std::uint64_t> packed = PackQuery(p, query);
+  ASSERT_EQ(packed.size(), query.size());
+  for (std::size_t i = 0; i < query.size(); ++i) {
+    EXPECT_EQ(packed[i] & 0xFFFFFFFFull, query[i] % q0) << "i=" << i;
+    EXPECT_EQ(packed[i] >> 32, query[i] % q1) << "i=" << i;
+  }
+}
+
+TEST(YpirYClientTest, RlwesToLwesConcatsLastRows) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  std::vector<PolyMatrixRaw> cts(2);
+  for (std::size_t k = 0; k < 2; ++k) {
+    cts[k].rows = 2;
+    cts[k].cols = 1;
+    cts[k].data.assign(2 * p.poly_len, 0);
+    std::uint64_t* row1 = cts[k].Poly(1, 0, p.poly_len);
+    for (std::size_t z = 0; z < p.poly_len; ++z) row1[z] = k * 100u + z;
+  }
+  const std::vector<std::uint64_t> out = RlwesToLwes(p, cts);
+  ASSERT_EQ(out.size(), 2 * p.poly_len);
+  for (std::size_t k = 0; k < 2; ++k)
+    for (std::size_t z = 0; z < p.poly_len; ++z)
+      EXPECT_EQ(out[k * p.poly_len + z], k * 100u + z);
+}
+
+TEST(YpirYClientTest, GenerateQueryPackedComposition) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  ChaChaRng key = ChaChaRng::FromSeed(Seed(1));
+  const Client client(ctx, 2, key);
+  ChaChaRng lwe_ent = ChaChaRng::FromSeed(Seed(4));
+  const YClient yc(ctx, client, lwe_ent);
+
+  const std::size_t dim_log2 = 1, index = 5;
+  ChaChaRng noise = ChaChaRng::FromSeed(Seed(7));
+  const std::vector<std::uint64_t> packed =
+      yc.GenerateQueryPacked(static_cast<std::uint8_t>(1), dim_log2, index, noise);
+  ASSERT_EQ(packed.size(), (static_cast<std::size_t>(1) << dim_log2) * p.poly_len);
+
+  // Equals PackQuery(RlwesToLwes(GenerateQueryImpl(...))) on a replayed stream.
+  ChaChaRng noise2 = ChaChaRng::FromSeed(Seed(7));
+  const std::vector<PolyMatrixRaw> cts = yc.GenerateQueryImpl(
+      static_cast<std::uint8_t>(1), dim_log2, /*packing=*/true, index, noise2);
+  const std::vector<std::uint64_t> expect = PackQuery(p, RlwesToLwes(p, cts));
+  EXPECT_EQ(packed, expect);
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

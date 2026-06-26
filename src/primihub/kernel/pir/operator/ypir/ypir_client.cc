@@ -37,6 +37,28 @@ std::vector<std::uint32_t> GenerateMatrixRing(ChaChaRng& rng_pub, std::size_t n,
   return out;
 }
 
+std::vector<std::uint64_t> PackQuery(const Params& params,
+                                    const std::vector<std::uint64_t>& query) {
+  std::vector<std::uint64_t> out(query.size());
+  for (std::size_t i = 0; i < query.size(); ++i) {
+    const std::uint64_t crt0 = query[i] % params.moduli[0];
+    const std::uint64_t crt1 = query[i] % params.moduli[1];
+    out[i] = crt0 | (crt1 << 32);
+  }
+  return out;
+}
+
+std::vector<std::uint64_t> RlwesToLwes(const Params& params,
+                                       const std::vector<PolyMatrixRaw>& cts) {
+  std::vector<std::uint64_t> out;
+  out.reserve(cts.size() * params.poly_len);
+  for (const PolyMatrixRaw& ct : cts) {
+    const std::uint64_t* row1 = ct.Poly(1, 0, params.poly_len);
+    out.insert(out.end(), row1, row1 + params.poly_len);
+  }
+  return out;
+}
+
 std::vector<PolyMatrixRaw> YClient::GenerateQueryImpl(
     std::uint8_t public_seed_idx, std::size_t dim_log2, bool packing,
     std::size_t index, ChaChaRng& noise_rng) const {

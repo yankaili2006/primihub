@@ -41,6 +41,17 @@ namespace primihub::pir::ypir {
 std::vector<std::uint32_t> GenerateMatrixRing(ChaChaRng& rng_pub, std::size_t n,
                                               std::size_t rows, std::size_t cols);
 
+// Port of client.rs pack_query: condense each query value into the kernel's
+// lo|hi CRT-limb u64 ( (x % moduli[0]) | ((x % moduli[1]) << 32) ).
+std::vector<std::uint64_t> PackQuery(const Params& params,
+                                     const std::vector<std::uint64_t>& query);
+
+// Port of client.rs rlwes_to_lwes: concatenate the last row (row 1, the LWE
+// 'b') of each 2x1 raw ciphertext (concat_horizontal with a_rows=1). Returns
+// cts.size() * poly_len values.
+std::vector<std::uint64_t> RlwesToLwes(const Params& params,
+                                       const std::vector<PolyMatrixRaw>& cts);
+
 // Port of client.rs YClient — the RLWE query generation + response decoding
 // layer (chunk 12b-3). Wraps a spiral Client (borrowed). GSW / LWE-branch
 // (generate_query SEED_0) paths are later sub-chunks.
@@ -84,6 +95,18 @@ class YClient {
   std::vector<std::uint64_t> GenerateQueryLwe(std::size_t dim_log2,
                                               std::size_t index_row,
                                               ChaChaRng& noise_rng) const;
+
+  // The full SimplePIR online query: generate_query_impl(seed, dim_log2,
+  // packing=true, index) -> rlwes_to_lwes -> pack_query. Returns the condensed
+  // (1<<dim_log2)*poly_len u64 query ready for YServer::AnswerQuery.
+  std::vector<std::uint64_t> GenerateQueryPacked(std::uint8_t public_seed_idx,
+                                                 std::size_t dim_log2,
+                                                 std::size_t index,
+                                                 ChaChaRng& noise_rng) const {
+    const std::vector<PolyMatrixRaw> cts = GenerateQueryImpl(
+        public_seed_idx, dim_log2, /*packing=*/true, index, noise_rng);
+    return PackQuery(ctx_->params(), RlwesToLwes(ctx_->params(), cts));
+  }
 
  private:
   const NttContext* ctx_;
