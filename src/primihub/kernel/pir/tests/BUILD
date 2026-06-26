@@ -991,3 +991,15 @@ cc_test(
     ],
     size = "medium",
 )
+
+cc_test(
+    name = "tiptoe_pir_test",
+    srcs = ["tiptoe_pir_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator:capabilities",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

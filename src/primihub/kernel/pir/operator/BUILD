@@ -112,6 +112,7 @@ cc_library(
         "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
         "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_pir_operator",
     ] + select({
         "//:microsoft-apsi": [":keyword_pir_operator"],
         "//conditions:default": [],
