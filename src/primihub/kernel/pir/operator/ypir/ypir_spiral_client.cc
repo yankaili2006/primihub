@@ -9,6 +9,9 @@
 #include <cstdint>
 #include <utility>
 
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
+
 namespace primihub::pir::ypir {
 
 std::uint64_t MultiplyUintMod(std::uint64_t a, std::uint64_t b,
@@ -88,6 +91,80 @@ void GenTernaryMat(const Params& params, PolyMatrixRaw& mat,
       }
     }
   }
+}
+
+namespace {
+
+// spiral client.rs get_scaled_regev_sample: get_regev_sample with the noise e
+// scaled by `scale` before b = e_scaled + sk*a. RNG order matches GetRegSample
+// (a from rng_pub, e from rng) so the server's public reconstruction lines up.
+PolyMatrixNTT ScaledRegevSample(const NttContext& ctx,
+                                const DiscreteGaussian& dg,
+                                const PolyMatrixRaw& sk_reg, ChaChaRng& rng,
+                                ChaChaRng& rng_pub, std::uint64_t scale) {
+  const Params& p = ctx.params();
+  const PolyMatrixRaw a = RandomRngRaw(p, 1, 1, rng_pub);
+  PolyMatrixRaw e = NoiseRaw(p, 1, 1, dg, rng);
+  for (std::size_t i = 0; i < p.poly_len; ++i)
+    e.data[i] = MultiplyUintMod(e.data[i], scale, p.modulus);
+  const PolyMatrixNTT a_ntt = ctx.ToNtt(a);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk_reg);
+  const PolyMatrixNTT b_p = MultiplyNtt(p, sk_ntt, a_ntt);
+  const PolyMatrixNTT b = AddNtt(p, ctx.ToNtt(e), b_p);
+  const PolyMatrixNTT neg_a_ntt = ctx.ToNtt(NegateRaw(p, a));
+  PolyMatrixNTT res = ctx.ZeroNtt(2, 1);
+  CopyIntoNtt(p, res, neg_a_ntt, 0, 0);
+  CopyIntoNtt(p, res, b, 1, 0);
+  return res;
+}
+
+PolyMatrixNTT FreshScaledRegPublicKey(const NttContext& ctx,
+                                      const DiscreteGaussian& dg,
+                                      const PolyMatrixRaw& sk_reg, std::size_t m,
+                                      ChaChaRng& rng, ChaChaRng& rng_pub,
+                                      std::uint64_t scale) {
+  const Params& p = ctx.params();
+  PolyMatrixNTT res = ctx.ZeroNtt(2, m);
+  for (std::size_t i = 0; i < m; ++i) {
+    const PolyMatrixNTT s =
+        ScaledRegevSample(ctx, dg, sk_reg, rng, rng_pub, scale);
+    CopyIntoNtt(p, res, s, 0, i);  // column i
+  }
+  return res;
+}
+
+}  // namespace
+
+Client::Client(const NttContext& ctx, std::size_t hamming, ChaChaRng& key_rng)
+    : ctx_(&ctx), dg_(DiscreteGaussian::Init(ctx.params().noise_width)) {
+  const Params& p = ctx.params();
+  sk_reg_.rows = 1;
+  sk_reg_.cols = 1;
+  sk_reg_.data.assign(p.poly_len, 0);
+  GenTernaryMat(p, sk_reg_, hamming, key_rng);
+  sk_reg_full_ = MatrixWithIdentity(p, sk_reg_);  // 1x2
+}
+
+PolyMatrixNTT Client::EncryptMatrixReg(const PolyMatrixNTT& a, ChaChaRng& rng,
+                                       ChaChaRng& rng_pub) const {
+  const Params& p = ctx_->params();
+  const PolyMatrixNTT pk =
+      GetFreshRegPublicKey(*ctx_, dg_, sk_reg_, a.cols, rng, rng_pub);
+  return AddNtt(p, pk, PadTopNtt(p, a, 1));
+}
+
+PolyMatrixNTT Client::EncryptMatrixScaledReg(const PolyMatrixNTT& a,
+                                             ChaChaRng& rng, ChaChaRng& rng_pub,
+                                             std::uint64_t scale) const {
+  const Params& p = ctx_->params();
+  const PolyMatrixNTT pk =
+      FreshScaledRegPublicKey(*ctx_, dg_, sk_reg_, a.cols, rng, rng_pub, scale);
+  return AddNtt(p, pk, PadTopNtt(p, a, 1));
+}
+
+PolyMatrixNTT Client::DecryptMatrixReg(const PolyMatrixNTT& ct) const {
+  const Params& p = ctx_->params();
+  return MultiplyNtt(p, ctx_->ToNtt(sk_reg_full_), ct);
 }
 
 }  // namespace primihub::pir::ypir

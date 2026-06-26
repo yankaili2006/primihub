@@ -881,6 +881,8 @@ cc_test(
     srcs = ["ypir_spiral_client_test.cc"],
     deps = [
         "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_modulus_switch",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
         "//src/primihub/kernel/pir/operator/ypir:ypir_params",
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
         "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",

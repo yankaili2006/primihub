@@ -15,7 +15,9 @@
 
 #include "gtest/gtest.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
 
 namespace primihub::pir::ypir {
@@ -125,6 +127,72 @@ TEST(YpirSpiralClientTest, GenTernaryMatCountsAndDeterminism) {
   // Determinism: same seed -> identical secret.
   const PolyMatrixRaw m2 = make(42);
   EXPECT_EQ(m.data, m2.data);
+}
+
+// --- 12b-2: Client (Regev encryption) ---
+
+TEST(YpirSpiralClientTest, ClientEncryptMatrixRegRoundTrip) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  ChaChaRng key_rng = ChaChaRng::FromSeed(Seed(1));
+  const Client client(ctx, /*hamming=*/2, key_rng);
+
+  // Delta-scaled plaintext message (1x1).
+  std::vector<std::uint64_t> msg(p.poly_len);
+  PolyMatrixRaw mraw = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z) {
+    msg[z] = (z * 13u + 7u) % p.pt_modulus;
+    mraw.data[z] = Rescale(msg[z], p.pt_modulus, p.modulus);
+  }
+  const PolyMatrixNTT a = ctx.ToNtt(mraw);
+
+  ChaChaRng enc = ChaChaRng::FromSeed(Seed(2));
+  ChaChaRng pub = ChaChaRng::FromSeed(Seed(3));
+  const PolyMatrixNTT ct = client.EncryptMatrixReg(a, enc, pub);
+  EXPECT_EQ(ct.rows, 2u);
+  EXPECT_EQ(ct.cols, 1u);
+
+  const PolyMatrixRaw dec = ctx.FromNtt(client.DecryptMatrixReg(ct));
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    EXPECT_EQ(Rescale(dec.data[z], p.modulus, p.pt_modulus), msg[z]) << z;
+}
+
+TEST(YpirSpiralClientTest, EncryptMatrixScaledRegScale1MatchesUnscaled) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  ChaChaRng key_rng = ChaChaRng::FromSeed(Seed(1));
+  const Client client(ctx, 2, key_rng);
+
+  PolyMatrixRaw mraw = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    mraw.data[z] = (z * 5u + 1u) % p.modulus;
+  const PolyMatrixNTT a = ctx.ToNtt(mraw);
+
+  ChaChaRng e1 = ChaChaRng::FromSeed(Seed(9)), pb1 = ChaChaRng::FromSeed(Seed(10));
+  ChaChaRng e2 = ChaChaRng::FromSeed(Seed(9)), pb2 = ChaChaRng::FromSeed(Seed(10));
+  const PolyMatrixNTT ct_reg = client.EncryptMatrixReg(a, e1, pb1);
+  const PolyMatrixNTT ct_s1 = client.EncryptMatrixScaledReg(a, e2, pb2, 1);
+  EXPECT_EQ(ct_reg.data, ct_s1.data);  // scale=1 -> identical noise path
+}
+
+TEST(YpirSpiralClientTest, ScaledRegNoiseScalesByFactor) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  ChaChaRng key_rng = ChaChaRng::FromSeed(Seed(1));
+  const Client client(ctx, 2, key_rng);
+
+  const PolyMatrixNTT a0 = ctx.ZeroNtt(1, 1);  // plaintext 0 -> phase is pure noise
+  const std::uint64_t scale = 3;
+
+  ChaChaRng e1 = ChaChaRng::FromSeed(Seed(11)), pb1 = ChaChaRng::FromSeed(Seed(12));
+  ChaChaRng e2 = ChaChaRng::FromSeed(Seed(11)), pb2 = ChaChaRng::FromSeed(Seed(12));
+  const PolyMatrixNTT ct1 = client.EncryptMatrixScaledReg(a0, e1, pb1, 1);
+  const PolyMatrixNTT cts = client.EncryptMatrixScaledReg(a0, e2, pb2, scale);
+
+  const PolyMatrixRaw d1 = ctx.FromNtt(client.DecryptMatrixReg(ct1));  // e
+  const PolyMatrixRaw ds = ctx.FromNtt(client.DecryptMatrixReg(cts));  // e*scale
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    EXPECT_EQ(ds.data[z], MultiplyUintMod(d1.data[z], scale, p.modulus)) << z;
 }
 
 }  // namespace

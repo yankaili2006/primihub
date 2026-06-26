@@ -19,7 +19,9 @@
 #include <cstdint>
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
 
 namespace primihub::pir::ypir {
@@ -55,6 +57,40 @@ PolyMatrixRaw MatrixWithIdentity(const Params& params, const PolyMatrixRaw& in);
 // valid, deterministic permutation -- not byte-identical to rand's shuffle.)
 void GenTernaryMat(const Params& params, PolyMatrixRaw& mat, std::size_t hamming,
                    ChaChaRng& rng);
+
+// spiral_rs client.rs `Client` — the Regev (RLWE) encryption surface YPIR
+// query generation needs (12b-2). Holds a ternary secret `sk_reg` (1x1,
+// Hamming weight `hamming`, generated from `key_rng` via GenTernaryMat) and a
+// DiscreteGaussian. The GSW machinery is omitted (unused by query generation).
+// YPIR's RLWE secret is rank-1, so sk_reg is 1x1 and ciphertexts are 2 x m.
+class Client {
+ public:
+  Client(const NttContext& ctx, std::size_t hamming, ChaChaRng& key_rng);
+
+  const PolyMatrixRaw& SkReg() const { return sk_reg_; }
+
+  // encrypt_matrix_reg(a): GetFreshRegPublicKey(m = a.cols) + a.pad_top(1).
+  // `a` is 1 x m (NTT); result is 2 x m.
+  PolyMatrixNTT EncryptMatrixReg(const PolyMatrixNTT& a, ChaChaRng& rng,
+                                 ChaChaRng& rng_pub) const;
+
+  // encrypt_matrix_scaled_reg(a, scale): like EncryptMatrixReg but each
+  // public-key sample's noise is multiplied by `scale` (mod modulus) before
+  // forming b. Used by YClient query gen with scale = poly_len^{-1}.
+  PolyMatrixNTT EncryptMatrixScaledReg(const PolyMatrixNTT& a, ChaChaRng& rng,
+                                       ChaChaRng& rng_pub,
+                                       std::uint64_t scale) const;
+
+  // decrypt_matrix_reg(ct): [sk_reg | I].ntt() * ct (matrix multiply). For a
+  // 2 x m ciphertext returns the 1 x m phase (message + noise).
+  PolyMatrixNTT DecryptMatrixReg(const PolyMatrixNTT& ct) const;
+
+ private:
+  const NttContext* ctx_;
+  DiscreteGaussian dg_;
+  PolyMatrixRaw sk_reg_;       // 1x1 ternary secret
+  PolyMatrixRaw sk_reg_full_;  // [sk_reg | I_1] = 1x2
+};
 
 }  // namespace primihub::pir::ypir
 
