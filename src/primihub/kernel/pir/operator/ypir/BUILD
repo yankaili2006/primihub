@@ -316,3 +316,14 @@ cc_library(
         ":ypir_regev",
     ],
 )
+
+cc_library(
+    name = "ypir_kernel",
+    srcs = ["ypir_kernel.cc"],
+    hdrs = ["ypir_kernel.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_arith",
+        ":ypir_params",
+    ],
+)

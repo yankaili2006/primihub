@@ -928,3 +928,14 @@ cc_test(
     ],
     size = "medium",
 )
+
+cc_test(
+    name = "ypir_kernel_test",
+    srcs = ["ypir_kernel_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_kernel",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
