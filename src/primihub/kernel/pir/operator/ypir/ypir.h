@@ -18,9 +18,11 @@ namespace primihub::pir {
 // The full SimplePIR query path is now ported (task 7.3): OnExecute drives
 // the offline hint + online answer (AVX512-dispatched packed-db kernel) +
 // recursive ring packing + Regev decrypt, validated end-to-end
-// (ypir_e2e_test). v1 uses the small poly_len=8 binary-gadget preset
-// (single-byte elements); scaling to the paper's poly_len=2048 preset is a
-// tuning follow-up.
+// (ypir_e2e_test). Scaled to the paper's poly_len=2048 expansion preset
+// (ParamsForExpansion, t_exp_left=2, hamming=256) -- ypir_e2e_large_test and
+// ypir_operator_test both retrieve exactly at 2048. The online answer still
+// uses recursive ring packing (precompute_pack + AVX512 packing is the
+// remaining sub-second-per-query speed follow-up).
 class YpirOperator : public BasePirOperator {
  public:
   explicit YpirOperator(const Options& options) : BasePirOperator(options) {}
