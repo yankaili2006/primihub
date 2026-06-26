@@ -28,6 +28,12 @@ cc_library(
     hdrs = ["tiptoe_secret.h"],
 )
 
+# Pure limb-decomposition helpers (chunk 1.1e) — zero-dep, builds + tests on .50.
+cc_library(
+    name = "tiptoe_limb",
+    hdrs = ["tiptoe_limb.h"],
+)
+
 # Toggle for linking the vendored @underhood//:rlwe BFV-on-SimplePIR crypto
 # (over Microsoft SEAL). Off by default so the .50 build (no SEAL toolchain,
 # GFW-blocked) stays green. Turn on for SEAL-available hosts via:
@@ -49,12 +55,23 @@ cc_library(
     }),
 )
 
-# LHE client encrypt-secret core (chunk 1.1d). Header-only; real-mode only
-# (includes tiptoe_params.h -> rlwe). Used by the operator wiring in 1.1f.
+# LHE client encrypt-secret core (chunk 1.1d). Header-only; real-mode only.
 cc_library(
     name = "tiptoe_client",
     hdrs = ["tiptoe_client.h"],
     deps = [
+        ":tiptoe_params",
+        ":tiptoe_secret",
+    ],
+)
+
+# LHE hint decompose/apply/recover (chunk 1.1e). Header-only; real-mode only.
+cc_library(
+    name = "tiptoe_hint",
+    hdrs = ["tiptoe_hint.h"],
+    deps = [
+        ":tiptoe_client",
+        ":tiptoe_limb",
         ":tiptoe_params",
         ":tiptoe_secret",
     ],
@@ -108,6 +125,23 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ] + select({
         ":enable_real": [":tiptoe_client"],
+        "//conditions:default": [],
+    }),
+)
+
+# LHE hint decompose/apply/recover test (chunk 1.1e). manual + gated.
+cc_test(
+    name = "tiptoe_hint_test",
+    srcs = ["tiptoe_hint_test.cc"],
+    tags = ["manual"],
+    defines = select({
+        ":enable_real": ["PIR_TIPTOE_RLWE_VENDORED=1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@com_google_googletest//:gtest_main",
+    ] + select({
+        ":enable_real": [":tiptoe_hint"],
         "//conditions:default": [],
     }),
 )

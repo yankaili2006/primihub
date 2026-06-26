@@ -1013,3 +1013,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "tiptoe_limb_test",
+    srcs = ["tiptoe_limb_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_limb",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
