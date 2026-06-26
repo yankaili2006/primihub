@@ -49,6 +49,17 @@ cc_library(
     }),
 )
 
+# LHE client encrypt-secret core (chunk 1.1d). Header-only; real-mode only
+# (includes tiptoe_params.h -> rlwe). Used by the operator wiring in 1.1f.
+cc_library(
+    name = "tiptoe_client",
+    hdrs = ["tiptoe_client.h"],
+    deps = [
+        ":tiptoe_params",
+        ":tiptoe_secret",
+    ],
+)
+
 # rlwe crypto-core smoke (chunk 1.1b). manual + gated: real mode needs SEAL;
 # without the define it compiles to a single skipped test (no @underhood dep).
 cc_test(
@@ -80,6 +91,23 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ] + select({
         ":enable_real": [":tiptoe_params"],
+        "//conditions:default": [],
+    }),
+)
+
+# LHE client encrypt-secret roundtrip test (chunk 1.1d). manual + gated.
+cc_test(
+    name = "tiptoe_client_test",
+    srcs = ["tiptoe_client_test.cc"],
+    tags = ["manual"],
+    defines = select({
+        ":enable_real": ["PIR_TIPTOE_RLWE_VENDORED=1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@com_google_googletest//:gtest_main",
+    ] + select({
+        ":enable_real": [":tiptoe_client"],
         "//conditions:default": [],
     }),
 )
