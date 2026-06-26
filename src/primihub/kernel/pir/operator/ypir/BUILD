@@ -249,6 +249,8 @@ cc_library(
         ":ypir_convolution_ntt",
         ":ypir_negacyclic",
         ":ypir_scheme",
+        ":ypir_client",
+        ":ypir_spiral_client",
 ],
 )
 

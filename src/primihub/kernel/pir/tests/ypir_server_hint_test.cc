@@ -21,6 +21,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_convolution.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_negacyclic.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_scheme.h"
 
 namespace primihub::pir::ypir {
@@ -93,6 +94,48 @@ TEST(YpirServerHintTest, GenerateHint0RingMatchesNaiveConv) {
   }
 
   EXPECT_EQ(hint, expected);
+}
+
+// --- 10d: generate_pseudorandom_query + answer_hint_ring ---
+
+TEST(YpirServerHintTest, GeneratePseudorandomQueryDeterministicShape) {
+  const Params p = MakeParams(/*db_dim_1=*/1, /*db_dim_2=*/0, /*instances=*/1);
+  NttContext ctx(p);
+  std::vector<std::uint16_t> db(
+      (static_cast<std::size_t>(1) << (p.db_dim_1 + p.poly_len_log2)) *
+      DbCols(p, false));
+  for (std::size_t k = 0; k < db.size(); ++k)
+    db[k] = static_cast<std::uint16_t>(k % 256u);
+  const YServer<std::uint16_t> srv(p, db, false, false, false);
+
+  const std::vector<PolyMatrixNTT> q1 =
+      srv.GeneratePseudorandomQuery(ctx, kSeed1);
+  ASSERT_EQ(q1.size(), static_cast<std::size_t>(1) << p.db_dim_1);  // 2
+  const std::vector<PolyMatrixNTT> q2 =
+      srv.GeneratePseudorandomQuery(ctx, kSeed1);
+  for (std::size_t i = 0; i < q1.size(); ++i)
+    EXPECT_EQ(q1[i].data, q2[i].data) << "block " << i;  // deterministic
+}
+
+TEST(YpirServerHintTest, AnswerHintRingEqualsMultiplyComposition) {
+  const Params p = MakeParams(/*db_dim_1=*/1, /*db_dim_2=*/0, /*instances=*/1);
+  NttContext ctx(p);
+  const std::size_t db_rows = static_cast<std::size_t>(1)
+                              << (p.db_dim_1 + p.poly_len_log2);
+  const std::size_t db_cols = DbCols(p, false);
+  std::vector<std::uint16_t> db(db_rows * db_cols);
+  for (std::size_t k = 0; k < db.size(); ++k)
+    db[k] = static_cast<std::uint16_t>((k * 7u + 1u) % 256u);
+  const YServer<std::uint16_t> srv(p, db, false, false, false);
+
+  for (std::uint8_t seed : {kSeed0, kSeed1}) {
+    const std::vector<PolyMatrixNTT> pre =
+        srv.GeneratePseudorandomQuery(ctx, seed);
+    const std::vector<std::uint64_t> expect =
+        srv.MultiplyWithDbRing(ctx, pre, 0, db_cols, seed);
+    const std::vector<std::uint64_t> got = srv.AnswerHintRing(ctx, seed, db_cols);
+    EXPECT_EQ(got, expect) << "seed=" << static_cast<int>(seed);
+  }
 }
 
 }  // namespace

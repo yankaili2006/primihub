@@ -16,6 +16,7 @@
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_SERVER_H_
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -24,6 +25,7 @@
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_client.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_convolution_ntt.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_negacyclic.h"
@@ -286,6 +288,58 @@ class YServer {
       }
     }
     return hint_0;
+  }
+
+  // Port of server.rs YServer::generate_pseudorandom_query. Builds a throwaway
+  // Client/YClient and runs generate_query_impl(seed, db_dim_1, packing=true,
+  // index=0); for each of the 1<<db_dim_1 ciphertexts it extracts row 0 (the
+  // public -a, which depends only on get_seed(seed) -- the throwaway secret and
+  // noise only touch the discarded row 1), applies negacyclic_perm, and NTTs.
+  // Returns the 1<<db_dim_1 preprocessed query polynomials fed to
+  // MultiplyWithDbRing. (Throwaway client seeds are fixed since they cannot
+  // affect the output.)
+  std::vector<PolyMatrixNTT> GeneratePseudorandomQuery(
+      const NttContext& ctx, std::uint8_t public_seed_idx) const {
+    const Params& p = ctx.params();
+    const std::size_t hamming =
+        std::min<std::size_t>(kHammingWeight, p.poly_len / 2);
+
+    std::array<std::uint8_t, 32> ks{}, ls{}, ns{};
+    ks.fill(0x5A);
+    ls.fill(0x3C);
+    ns.fill(0x71);
+    ChaChaRng key_rng = ChaChaRng::FromSeed(ks);
+    const Client client(ctx, hamming, key_rng);
+    ChaChaRng lwe_entropy = ChaChaRng::FromSeed(ls);
+    const YClient yc(ctx, client, lwe_entropy);
+    ChaChaRng noise_rng = ChaChaRng::FromSeed(ns);
+
+    const std::vector<PolyMatrixRaw> query =
+        yc.GenerateQueryImpl(public_seed_idx, p.db_dim_1, /*packing=*/true,
+                             /*index=*/0, noise_rng);
+
+    std::vector<PolyMatrixNTT> preprocessed;
+    preprocessed.reserve(query.size());
+    for (const PolyMatrixRaw& q : query) {
+      const std::uint64_t* a = q.Poly(0, 0, p.poly_len);  // row 0 ('a')
+      std::vector<std::uint64_t> a_vec(a, a + p.poly_len);
+      const std::vector<std::uint64_t> transformed =
+          NegacyclicPermU64Mod(a_vec, 0, p.modulus);
+      PolyMatrixRaw qt = ctx.ZeroRaw(1, 1);
+      for (std::size_t z = 0; z < p.poly_len; ++z) qt.data[z] = transformed[z];
+      preprocessed.push_back(ctx.ToNtt(qt));
+    }
+    return preprocessed;
+  }
+
+  // Port of server.rs YServer::answer_hint_ring: the ring hint over the first
+  // `cols` columns using the pseudorandom query.
+  std::vector<std::uint64_t> AnswerHintRing(const NttContext& ctx,
+                                            std::uint8_t public_seed_idx,
+                                            std::size_t cols) const {
+    const std::vector<PolyMatrixNTT> preprocessed_query =
+        GeneratePseudorandomQuery(ctx, public_seed_idx);
+    return MultiplyWithDbRing(ctx, preprocessed_query, 0, cols, public_seed_idx);
   }
 
  private:
