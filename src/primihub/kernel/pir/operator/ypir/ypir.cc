@@ -35,14 +35,17 @@ constexpr const char* kInDb = "db_content";
 constexpr const char* kInIndices = "query_indices";
 constexpr const char* kOutRecovered = "recovered";
 
-// spiral DEFAULT_MODULI; YPIR v1 uses the small poly_len=8 binary-gadget preset
-// (t_exp_left=60 -> bits_per=1, tiny key-switch noise) that the end-to-end
-// retrieval test pins. db_cols = instances(1)*poly_len(8) = 8; the db is grown
-// by raising db_dim_1. Elements are single bytes (pt_modulus=256). Scaling to
-// the paper's poly_len=2048 preset is a tuning follow-up.
+// spiral DEFAULT_MODULI; YPIR uses the paper's poly_len=2048 expansion preset
+// (ParamsForExpansion: poly_len=2048, t_exp_left=2, instances=1) -- validated
+// end-to-end at this scale (ypir_e2e_large_test, exact retrieval). db_cols =
+// instances(1)*poly_len(2048) = 2048; the db is grown by raising db_dim_1.
+// Elements are single bytes (pt_modulus=256). NOTE: the online answer uses the
+// recursive ring packing (correct but O(poly_len) automorphs ~ seconds/query);
+// the precompute_pack + AVX512-packing fast path is a speed follow-up.
 constexpr std::uint64_t kQ0 = 268369921ull, kQ1 = 249561089ull;
-constexpr std::size_t kYpirDbCols = 8;        // instances=1 * poly_len=8
-constexpr std::size_t kYpirMaxDbDim1 = 8;     // db_rows <= 2^11 -> <= 16384 elems
+constexpr std::size_t kYpirPolyLenLog2 = 11;  // poly_len = 2048
+constexpr std::size_t kYpirDbCols = 2048;     // instances=1 * poly_len=2048
+constexpr std::size_t kYpirMaxDbDim1 = 4;     // db_rows <= 2^15 -> <= 6.7e7 elems
 
 bool ParseU64(const std::string& s, std::uint64_t* out) {
   if (s.empty()) return false;
@@ -64,8 +67,11 @@ std::array<std::uint8_t, 32> FixedSeed(std::uint8_t b) {
 }
 
 ypir::Params MakeParams(std::size_t db_dim_1) {
-  return ypir::Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 60, 2, 3, true,
-                            db_dim_1, 1, 1, 0, 0);
+  // ParamsForExpansion(nu_1=db_dim_1, nu_2=0, p=256, q2_bits=28, t_exp_left=2):
+  // poly_len=2048, instances=1, the paper's expansion preset.
+  return ypir::ParamsForExpansion(db_dim_1, /*nu_2=*/0, /*p=*/256,
+                                  /*q2_bits=*/28, /*t_exp_left=*/2,
+                                  {kQ0, kQ1});
 }
 
 }  // namespace
@@ -107,18 +113,20 @@ retcode YpirOperator::OnExecute(const PirDataType& input, PirDataType* result) {
   }
 
   // ---- Size params to the db (db_cols fixed, grow db_dim_1) ----
-  std::size_t db_dim_1 = 1;
+  std::size_t db_dim_1 = 0;
   const std::size_t rows_needed = (m + kYpirDbCols - 1) / kYpirDbCols;
-  while ((static_cast<std::size_t>(1) << (db_dim_1 + 3)) < rows_needed)
+  while ((static_cast<std::size_t>(1) << (db_dim_1 + kYpirPolyLenLog2)) <
+         rows_needed)
     ++db_dim_1;
   if (db_dim_1 > kYpirMaxDbDim1) {
     LOG(ERROR) << "YpirOperator: db has " << m << " elements, exceeding the "
-               << "YPIR v1 capacity (" << (kYpirDbCols << (kYpirMaxDbDim1 + 3))
-               << ").";
+               << "YPIR capacity ("
+               << (kYpirDbCols << (kYpirMaxDbDim1 + kYpirPolyLenLog2)) << ").";
     return retcode::FAIL;
   }
   const ypir::Params p = MakeParams(db_dim_1);
-  const std::size_t db_rows = static_cast<std::size_t>(1) << (db_dim_1 + 3);
+  const std::size_t db_rows = static_cast<std::size_t>(1)
+                              << (db_dim_1 + kYpirPolyLenLog2);
   const std::size_t db_cols = kYpirDbCols;
   const std::size_t num_rlwe_outputs = db_cols / p.poly_len;  // = 1
   ypir::NttContext ctx(p);
@@ -132,7 +140,7 @@ retcode YpirOperator::OnExecute(const PirDataType& input, PirDataType* result) {
 
   // ---- Client setup: secret + packing expansion params ----
   ypir::ChaChaRng key = ypir::ChaChaRng::FromSeed(FixedSeed(31));
-  const ypir::Client client(ctx, /*hamming=*/2, key);
+  const ypir::Client client(ctx, /*hamming=*/256, key);
   ypir::ChaChaRng lwe_ent = ypir::ChaChaRng::FromSeed(FixedSeed(32));
   const ypir::YClient yc(ctx, client, lwe_ent);
 
