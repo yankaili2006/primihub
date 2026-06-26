@@ -959,3 +959,16 @@ cc_test(
     ],
     size = "medium",
 )
+
+cc_test(
+    name = "ypir_operator_test",
+    srcs = ["ypir_operator_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator:capabilities",
+        "//src/primihub/kernel/pir/operator:registry",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
+        "@com_github_base64_cpp//:base64_lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "medium",
+)
