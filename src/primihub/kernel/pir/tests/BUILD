@@ -875,3 +875,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_spiral_client_test",
+    srcs = ["ypir_spiral_client_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_types",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

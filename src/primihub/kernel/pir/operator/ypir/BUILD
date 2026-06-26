@@ -282,3 +282,15 @@ cc_library(
         ":ypir_negacyclic",
     ],
 )
+
+cc_library(
+    name = "ypir_spiral_client",
+    srcs = ["ypir_spiral_client.cc"],
+    hdrs = ["ypir_spiral_client.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_chacha",
+        ":ypir_params",
+        ":ypir_poly_types",
+    ],
+)
