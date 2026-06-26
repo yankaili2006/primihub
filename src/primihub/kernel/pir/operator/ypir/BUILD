@@ -261,3 +261,13 @@ cc_library(
         ":ypir_server",
     ],
 )
+
+cc_library(
+    name = "ypir_scheme",
+    srcs = ["ypir_scheme.cc"],
+    hdrs = ["ypir_scheme.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_params",
+    ],
+)

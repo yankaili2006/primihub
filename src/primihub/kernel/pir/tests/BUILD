@@ -852,3 +852,14 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_scheme_test",
+    srcs = ["ypir_scheme_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_scheme",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
