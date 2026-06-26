@@ -235,6 +235,9 @@ cc_library(
     deps = [
         ":ypir_bits",
         ":ypir_lwe_params",
+        ":ypir_poly_ops",
+        ":ypir_transpose",
+        ":ypir_util",
         ":ypir_params",
         ":ypir_poly",
         ":ypir_poly_types",

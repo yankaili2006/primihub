@@ -15,6 +15,7 @@
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_SERVER_H_
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_SERVER_H_
 
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,9 +24,18 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_transpose.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_util.h"
 
 namespace primihub::pir::ypir {
+
+// scheme.rs public-seed indices (scheme.rs is chunk 11; these two trivial
+// constants are needed earlier by multiply_with_db_ring's negacyclic-perm
+// gate and are defined here until scheme lands).
+inline constexpr std::uint8_t kSeed0 = 0;
+inline constexpr std::uint8_t kSeed1 = 1;
 
 // Holds the per-level Y monomial constants used by the ring-packing
 // step. Both vectors have `params.poly_len_log2` entries; entry k (for
@@ -140,6 +150,63 @@ class YServer {
     for (std::size_t col = 0; col < db_cols_; ++col)
       res.push_back(GetElem(row, col));
     return res;
+  }
+
+  // Port of server.rs YServer::multiply_with_db_ring (sub-chunk 10c). For each
+  // column in [col_start, col_end), forms the ring (RLWE) product
+  //   sum_row preprocessed_query[row] * db_poly(col, row)
+  // where db_poly(col,row) is the poly_len-coefficient polynomial at
+  // db[col*db_rows + row*poly_len ..], accumulates in the NTT domain,
+  // inverse-NTTs, applies negacyclic_perm for the SEED_0 (first-mul,
+  // non-simplepir) case, and transposes the col-major result to
+  // poly_len x num_cols. `ctx` supplies the HEXL NTT (upstream carries NTT
+  // tables on Params). preprocessed_query has 1<<db_dim_1 entries (1x1 NTT).
+  //
+  // NOTE: upstream accumulates lazily (add_into_no_reduce except the last
+  // row); here AddNtt reduces every step, yielding the identical sum mod q.
+  std::vector<std::uint64_t> MultiplyWithDbRing(
+      const NttContext& ctx,
+      const std::vector<PolyMatrixNTT>& preprocessed_query,
+      std::size_t col_start, std::size_t col_end,
+      std::uint8_t seed_idx) const {
+    const Params& params = *params_;
+    const std::size_t db_rows_poly = static_cast<std::size_t>(1)
+                                     << params.db_dim_1;
+    const std::size_t db_rows = static_cast<std::size_t>(1)
+                                << (params.db_dim_1 + params.poly_len_log2);
+    assert(preprocessed_query.size() == db_rows_poly);
+
+    const T* db = Db();
+    std::vector<std::uint64_t> result;
+    result.reserve((col_end - col_start) * params.poly_len);
+
+    for (std::size_t col = col_start; col < col_end; ++col) {
+      PolyMatrixNTT sum = ctx.ZeroNtt(1, 1);
+      for (std::size_t row = 0; row < db_rows_poly; ++row) {
+        PolyMatrixRaw db_elem_poly = ctx.ZeroRaw(1, 1);
+        for (std::size_t z = 0; z < params.poly_len; ++z)
+          db_elem_poly.data[z] = static_cast<std::uint64_t>(
+              db[col * db_rows + row * params.poly_len + z]);
+        const PolyMatrixNTT db_elem_ntt = ctx.ToNtt(db_elem_poly);
+        const PolyMatrixNTT prod =
+            MultiplyNtt(params, preprocessed_query[row], db_elem_ntt);
+        sum = AddNtt(params, sum, prod);
+      }
+
+      const PolyMatrixRaw sum_raw = ctx.FromNtt(sum);
+      const std::uint64_t* s = sum_raw.Poly(0, 0, params.poly_len);
+      if (seed_idx == kSeed0 && !is_simplepir_) {
+        std::vector<std::uint64_t> col_poly(s, s + params.poly_len);
+        const std::vector<std::uint64_t> t =
+            NegacyclicPermU64Mod(col_poly, 0, params.modulus);
+        result.insert(result.end(), t.begin(), t.end());
+      } else {
+        result.insert(result.end(), s, s + params.poly_len);
+      }
+    }
+
+    return TransposeGeneric<std::uint64_t>(result, col_end - col_start,
+                                           params.poly_len);
   }
 
  private:

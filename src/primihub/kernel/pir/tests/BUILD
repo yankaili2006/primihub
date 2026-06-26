@@ -837,3 +837,18 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_server_ring_test",
+    srcs = ["ypir_server_ring_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly_ops",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_transpose",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_util",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
