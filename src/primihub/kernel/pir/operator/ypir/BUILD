@@ -271,3 +271,14 @@ cc_library(
         ":ypir_params",
     ],
 )
+
+cc_library(
+    name = "ypir_client",
+    srcs = ["ypir_client.cc"],
+    hdrs = ["ypir_client.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_chacha",
+        ":ypir_negacyclic",
+    ],
+)
