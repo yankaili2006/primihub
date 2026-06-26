@@ -43,6 +43,11 @@ std::uint64_t MultiplyModular(std::uint64_t a, std::uint64_t b,
                               std::uint64_t modulus, std::uint64_t cr0,
                               std::uint64_t cr1, std::size_t crt_count);
 
+// Floor log2 of a (the index of the highest set bit): Log2(1)=0, Log2(2)=1,
+// Log2(255)=7, Log2(256)=8. Log2(0) returns 0. Mirrors spiral-rs log2, used
+// to size the lazy-accumulation max_adds in ring hint generation.
+std::uint64_t Log2(std::uint64_t a);
+
 }  // namespace primihub::pir::ypir
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_ARITH_H_

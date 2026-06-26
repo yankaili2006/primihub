@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+#include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
+
 namespace primihub::pir::ypir {
 
 namespace {
@@ -36,6 +38,17 @@ std::uint64_t ModInverse(std::uint64_t a, std::uint64_t m) {
 Convolution::Convolution(std::size_t n) : n_(n) {
   ntt_[0] = std::make_unique<intel::hexl::NTT>(n, kQ[0]);
   ntt_[1] = std::make_unique<intel::hexl::NTT>(n, kQ[1]);
+  cr1_[0] = GetBarrettCrs(kQ[0]).second;
+  cr1_[1] = GetBarrettCrs(kQ[1]).second;
+}
+
+std::uint64_t Convolution::CrtModulus(std::size_t i) const { return kQ[i]; }
+
+std::uint64_t Convolution::ProductModulus() const { return kQ[0] * kQ[1]; }
+
+std::uint64_t Convolution::BarrettCoeff(std::uint64_t val,
+                                        std::size_t i) const {
+  return BarrettRawU64(val, cr1_[i], kQ[i]);
 }
 
 std::vector<std::uint32_t> Convolution::Ntt(

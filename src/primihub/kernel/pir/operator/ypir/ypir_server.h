@@ -15,17 +15,23 @@
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_SERVER_H_
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_YPIR_YPIR_SERVER_H_
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
+#include "src/primihub/kernel/pir/operator/ypir/ypir_arith.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_convolution_ntt.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_negacyclic.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_scheme.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_transpose.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_util.h"
 
@@ -207,6 +213,79 @@ class YServer {
 
     return TransposeGeneric<std::uint64_t>(result, col_end - col_start,
                                            params.poly_len);
+  }
+
+  // Port of server.rs YServer::generate_hint_0_ring. Computes the offline
+  // hint H0 = A * DB (n x db_cols) where A (n x db_rows) is the block-
+  // negacyclic pseudorandom matrix from get_seed(SEED_0): for each n-row
+  // block, sample n u32, negacyclic_perm_u32 them, and ring-convolve with the
+  // db column slice (CRT NTT). Products are accumulated lazily in the NTT
+  // domain (up to max_adds before a Barrett fold + Raw reconstruction) to
+  // avoid u64 overflow, mirroring upstream. Returns hint_0 (n*db_cols,
+  // row-major), each entry reduced mod 2^32. Uses the LWE n (1024); requires
+  // db_rows a multiple of n. db element values must be < pt_modulus (the noise
+  // budget / no-Q-overflow analysis assumes this).
+  std::vector<std::uint64_t> GenerateHint0Ring() const {
+    const Params& p = *params_;
+    const std::size_t db_rows = static_cast<std::size_t>(1)
+                                << (p.db_dim_1 + p.poly_len_log2);
+    const std::size_t db_cols = db_cols_;
+    const LweParams lwe = LweParams::Default();
+    const std::size_t n = lwe.n;
+    Convolution conv(n);
+    std::vector<std::uint64_t> hint_0(n * db_cols, 0);
+    const std::size_t convd_len = conv.CrtCount() * conv.PolyLen();
+    const std::size_t num_outer = db_rows / n;
+
+    ChaChaRng rng_pub = ChaChaRng::FromSeed(GetSeed(kSeed0));
+    std::vector<std::vector<std::uint32_t>> v_nega_perm_a;
+    v_nega_perm_a.reserve(num_outer);
+    for (std::size_t k = 0; k < num_outer; ++k) {
+      std::vector<std::uint32_t> a(n);
+      for (std::size_t idx = 0; idx < n; ++idx) a[idx] = rng_pub.NextU32();
+      v_nega_perm_a.push_back(conv.Ntt(NegacyclicPermU32(a)));
+    }
+
+    const std::uint64_t log2_conv_output =
+        Log2(lwe.modulus) + Log2(static_cast<std::uint64_t>(lwe.n)) +
+        Log2(lwe.pt_modulus);
+    const std::uint64_t log2_modulus = Log2(conv.ProductModulus());
+    assert(log2_modulus > log2_conv_output + 1);
+    const std::uint64_t log2_max_adds = log2_modulus - log2_conv_output - 1;
+    const std::size_t max_adds = static_cast<std::size_t>(1) << log2_max_adds;
+
+    const T* db = Db();
+    for (std::size_t col = 0; col < db_cols; ++col) {
+      std::vector<std::uint64_t> tmp_col(convd_len, 0);
+      for (std::size_t outer_row = 0; outer_row < num_outer; ++outer_row) {
+        const std::size_t start_idx = col * db_rows_padded_ + outer_row * n;
+        std::vector<std::uint32_t> pt_col_u32(n);
+        for (std::size_t z = 0; z < n; ++z)
+          pt_col_u32[z] = static_cast<std::uint32_t>(
+              static_cast<std::uint64_t>(db[start_idx + z]));
+        const std::vector<std::uint32_t> pt_ntt = conv.Ntt(pt_col_u32);
+        const std::vector<std::uint32_t> convolved =
+            conv.PointwiseMul(v_nega_perm_a[outer_row], pt_ntt);
+        for (std::size_t r = 0; r < convd_len; ++r) tmp_col[r] += convolved[r];
+
+        if (outer_row % max_adds == max_adds - 1 ||
+            outer_row == num_outer - 1) {
+          std::vector<std::uint32_t> col_poly_u32(convd_len, 0);
+          for (std::size_t i = 0; i < conv.CrtCount(); ++i)
+            for (std::size_t j = 0; j < conv.PolyLen(); ++j)
+              col_poly_u32[i * conv.PolyLen() + j] =
+                  static_cast<std::uint32_t>(conv.BarrettCoeff(
+                      tmp_col[i * conv.PolyLen() + j], i));
+          const std::vector<std::uint32_t> col_poly_raw = conv.Raw(col_poly_u32);
+          for (std::size_t i = 0; i < n; ++i) {
+            hint_0[i * db_cols + col] += col_poly_raw[i];
+            hint_0[i * db_cols + col] %= (static_cast<std::uint64_t>(1) << 32);
+          }
+          std::fill(tmp_col.begin(), tmp_col.end(), 0);
+        }
+      }
+    }
+    return hint_0;
   }
 
  private:

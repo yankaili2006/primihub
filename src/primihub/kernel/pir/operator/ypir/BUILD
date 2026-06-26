@@ -154,7 +154,10 @@ cc_library(
     srcs = ["ypir_convolution_ntt.cc"],
     hdrs = ["ypir_convolution_ntt.h"],
     visibility = ["//visibility:public"],
-    deps = ["@hexl//:hexl"],
+    deps = [
+        "@hexl//:hexl",
+        ":ypir_arith",
+    ],
 )
 
 cc_library(
@@ -241,7 +244,12 @@ cc_library(
         ":ypir_params",
         ":ypir_poly",
         ":ypir_poly_types",
-    ],
+            ":ypir_arith",
+        ":ypir_chacha",
+        ":ypir_convolution_ntt",
+        ":ypir_negacyclic",
+        ":ypir_scheme",
+],
 )
 
 cc_library(

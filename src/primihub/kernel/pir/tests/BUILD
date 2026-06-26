@@ -909,3 +909,19 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_server_hint_test",
+    srcs = ["ypir_server_hint_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_convolution",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_negacyclic",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_scheme",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "medium",
+)

@@ -41,6 +41,20 @@ class Convolution {
 
   std::size_t n() const { return n_; }
 
+  // CRT parameters of the convolution NTT (the subset of spiral-rs Params that
+  // generate_hint_0_ring / answer_hint_ring read via conv.params()).
+  // crt_count == 2; poly_len == n; ProductModulus is the product of the two
+  // NTT primes; CrtModulus(i) is the i-th prime.
+  std::size_t CrtCount() const { return 2; }
+  std::size_t PolyLen() const { return n_; }
+  std::uint64_t CrtModulus(std::size_t i) const;
+  std::uint64_t ProductModulus() const;
+
+  // barrett_coeff_u64(params, val, i): reduce val mod the i-th CRT modulus
+  // (single-word Barrett). Folds a lazily-accumulated NTT-domain sum back into
+  // a u32 limb before Raw reconstruction.
+  std::uint64_t BarrettCoeff(std::uint64_t val, std::size_t i) const;
+
   // Forward NTT of `a` (length n) under each modulus; returns crt_count*n
   // = 2*n values (modulus m's transform in [m*n, m*n+n)).
   std::vector<std::uint32_t> Ntt(const std::vector<std::uint32_t>& a) const;
@@ -62,6 +76,7 @@ class Convolution {
  private:
   std::size_t n_;
   std::unique_ptr<intel::hexl::NTT> ntt_[2];
+  std::uint64_t cr1_[2] = {0, 0};  // Barrett cr1 per CRT modulus
 };
 
 }  // namespace primihub::pir::ypir

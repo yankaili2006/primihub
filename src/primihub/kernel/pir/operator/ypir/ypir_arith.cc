@@ -80,4 +80,9 @@ std::uint64_t MultiplyModular(std::uint64_t a, std::uint64_t b,
   return BarrettRawU64(a * b, cr1, modulus);
 }
 
+std::uint64_t Log2(std::uint64_t a) {
+  if (a == 0) return 0;
+  return 63u - static_cast<std::uint64_t>(__builtin_clzll(a));
+}
+
 }  // namespace primihub::pir::ypir
