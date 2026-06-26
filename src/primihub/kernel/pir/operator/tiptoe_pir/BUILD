@@ -22,6 +22,12 @@ cc_library(
     alwayslink = True,
 )
 
+# Pure secret-key helpers (chunk 1.1c) — zero-dep, builds + tests on .50.
+cc_library(
+    name = "tiptoe_secret",
+    hdrs = ["tiptoe_secret.h"],
+)
+
 # Toggle for linking the vendored @underhood//:rlwe BFV-on-SimplePIR crypto
 # (over Microsoft SEAL). Off by default so the .50 build (no SEAL toolchain,
 # GFW-blocked) stays green. Turn on for SEAL-available hosts via:
@@ -30,6 +36,17 @@ cc_library(
 config_setting(
     name = "enable_real",
     define_values = {"enable_tiptoe_real": "1"},
+)
+
+# RAII wrapper over the rlwe BFV context (chunk 1.1c). Header-only; the rlwe
+# dep is real-mode only, so the header is compiled only by gated consumers.
+cc_library(
+    name = "tiptoe_params",
+    hdrs = ["tiptoe_params.h"],
+    deps = select({
+        ":enable_real": ["@underhood//:rlwe"],
+        "//conditions:default": [],
+    }),
 )
 
 # rlwe crypto-core smoke (chunk 1.1b). manual + gated: real mode needs SEAL;
@@ -46,6 +63,23 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ] + select({
         ":enable_real": ["@underhood//:rlwe"],
+        "//conditions:default": [],
+    }),
+)
+
+# rlwe Context RAII wrapper test (chunk 1.1c). manual + gated like rlwe_smoke.
+cc_test(
+    name = "tiptoe_params_test",
+    srcs = ["tiptoe_params_test.cc"],
+    tags = ["manual"],
+    defines = select({
+        ":enable_real": ["PIR_TIPTOE_RLWE_VENDORED=1"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@com_google_googletest//:gtest_main",
+    ] + select({
+        ":enable_real": [":tiptoe_params"],
         "//conditions:default": [],
     }),
 )

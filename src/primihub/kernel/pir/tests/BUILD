@@ -1003,3 +1003,13 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "tiptoe_secret_test",
+    srcs = ["tiptoe_secret_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_secret",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
