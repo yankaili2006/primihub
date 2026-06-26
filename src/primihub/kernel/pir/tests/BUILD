@@ -790,3 +790,16 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_server_test",
+    srcs = ["ypir_server_test.cc"],
+    tags = ["manual"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)

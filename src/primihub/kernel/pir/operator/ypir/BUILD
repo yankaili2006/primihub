@@ -226,3 +226,16 @@ cc_library(
         ":ypir_poly_types",
     ],
 )
+
+cc_library(
+    name = "ypir_server",
+    srcs = ["ypir_server.cc"],
+    hdrs = ["ypir_server.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ypir_bits",
+        ":ypir_params",
+        ":ypir_poly",
+        ":ypir_poly_types",
+    ],
+)
