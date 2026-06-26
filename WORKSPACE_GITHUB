@@ -828,6 +828,20 @@ new_git_repository(
     build_file = "@//thirdparty/pir:BUILD.tiptoe",
 )
 
+# ahenzinger/underhood — BFV-on-SimplePIR (LHE) crypto for the Tiptoe port
+# (task 1.1b). Only the C++ rlwe/ layer is used (rlwe.{cpp,hpp,h}); the Go is
+# cgo bindings primihub does not need. Exposed as @underhood//:rlwe via
+# BUILD.underhood_rlwe. Pulled in only under --define=enable_tiptoe_real=1
+# (needs the SEAL toolchain, GFW-blocked on .50); the default build never
+# references it. SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF.
+new_git_repository(
+    name = "underhood",
+    remote = "https://github.com/ahenzinger/underhood.git",
+    commit = "f053a81c63855e452fe0129302a6644b2d46d3ed",
+    build_file = "@//thirdparty/pir:BUILD.underhood_rlwe",
+)
+
+
 # ---- Intel HEXL (NTT for @spiral_pir//:spiral_lib) + cpu_features dep ----
 # Added 2026-06-22 to unblock the C++ Spiral facade. native-only build.
 http_archive(
