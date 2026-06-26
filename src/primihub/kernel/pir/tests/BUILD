@@ -963,7 +963,6 @@ cc_test(
 cc_test(
     name = "ypir_operator_test",
     srcs = ["ypir_operator_test.cc"],
-    tags = ["manual"],
     deps = [
         "//src/primihub/kernel/pir/operator:capabilities",
         "//src/primihub/kernel/pir/operator:registry",
@@ -977,7 +976,6 @@ cc_test(
 cc_test(
     name = "ypir_e2e_large_test",
     srcs = ["ypir_e2e_large_test.cc"],
-    tags = ["manual"],
     deps = [
         "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
         "//src/primihub/kernel/pir/operator/ypir:ypir_client",
