@@ -44,7 +44,9 @@ RUN --mount=type=cache,target=/root/.cache/bazel \
   && rm -f third_party/python_headers \
   && ln -sf "$(python3-config --includes | awk '{print $1}' | sed 's/^-I//')" third_party/python_headers \
   && test -d third_party/python_headers/ \
-  && sed -i 's|^LINK_PYTHON_OPTS = .*|LINK_PYTHON_OPTS = ["-L/usr/lib -L/usr/lib/python3.8/config-3.8-x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu -lcrypt -ldl -lm"] + ["-lpython3.8"]|' BUILD.bazel \
+  && PYVER="$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')" \
+  && TRIPLET="$(gcc -dumpmachine)" \
+  && sed -i "s|^LINK_PYTHON_OPTS = .*|LINK_PYTHON_OPTS = [\"-L/usr/lib -L/usr/lib/python${PYVER}/config-${PYVER}-${TRIPLET} -L/usr/lib/${TRIPLET} -lcrypt -ldl -lm\"] + [\"-lpython${PYVER}\"]|" BUILD.bazel \
   && make release mysql=y \
   && test -x bazel-bin/node \
   && tar cfh bazel-bin.tar bazel-bin/cli \

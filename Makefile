@@ -6,6 +6,11 @@
 
 BUILD_FLAG ?=
 
+# 构建架构自适应: aarch64/arm64 用 linux_aarch64 config, 否则 linux_x86_64.
+# 可用环境变量覆盖, 例如: make release BUILD_CONFIG=linux_aarch64
+ARCH := $(shell uname -m)
+BUILD_CONFIG ?= $(if $(filter aarch64 arm64,$(ARCH)),linux_aarch64,linux_x86_64)
+
 # 默认构建目标
 TARGET := //:node \
           //:cli \
@@ -118,7 +123,8 @@ release:
 	@echo "构建选项: $(BUILD_FLAG)"
 	@echo "构建目标: $(TARGET)"
 	@echo "================================================"
-	@bazel build --local_ram_resources=12288 --config=linux_x86_64 $(BUILD_FLAG) ${TARGET}
+	@echo "构建架构: $(ARCH) -> --config=$(BUILD_CONFIG)"
+	@bazel build --local_ram_resources=12288 --config=$(BUILD_CONFIG) $(BUILD_FLAG) ${TARGET}
 	@rm -f primihub-cli
 	@ln -s -f bazel-bin/cli primihub-cli
 	@rm -f primihub-node

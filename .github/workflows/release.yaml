@@ -17,7 +17,11 @@ jobs:
         run: |
           # cc_binary
           bash pre_build.sh
-          make mysql=y protos=y
+          make release mysql=y protos=y
+
+          # 断言原生 MPC pybind 库已构建(否则联邦学习 secure 路径会缺 ph_secure_lib)
+          test -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
+            || { echo "ERROR: ph_secure_lib.so 未构建 (检查 LINK_PYTHON_OPTS 架构/python 链接路径)"; exit 1; }
 
           #copy generated py pb to python dir
           cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
@@ -63,7 +67,11 @@ jobs:
         run: |
           # cc_binary
           bash pre_build.sh
-          make protos=y
+          make release protos=y
+
+          # 断言 ARM64 上原生 MPC pybind 库已构建成功(本提交修复了 x86_64 硬编码的链接路径)
+          test -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
+            || { echo "ERROR: ph_secure_lib.so 未在 ARM64 构建出 (检查 BUILD.bazel LINK_PYTHON_OPTS 的 aarch64 select / Makefile --config=linux_aarch64)"; exit 1; }
 
           cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
           cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python
