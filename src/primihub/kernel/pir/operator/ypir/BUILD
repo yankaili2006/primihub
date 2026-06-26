@@ -234,6 +234,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ypir_bits",
+        ":ypir_lwe_params",
         ":ypir_params",
         ":ypir_poly",
         ":ypir_poly_types",

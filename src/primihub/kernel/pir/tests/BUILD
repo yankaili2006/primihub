@@ -825,3 +825,15 @@ cc_test(
     ],
     size = "small",
 )
+
+cc_test(
+    name = "ypir_server_yserver_test",
+    srcs = ["ypir_server_yserver_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/ypir:ypir_lwe_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_params",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_server",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "small",
+)
