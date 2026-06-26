@@ -291,5 +291,50 @@ TEST(YpirPackingTest, PackManyLwes_LoopsPackLwes) {
   }
 }
 
+// The precomputed (fast online) pack must be bit-for-bit identical to the
+// recursive PackManyLwes -- it is a pure factoring of the same computation
+// (offline butterfly + online b_values injection), so any divergence is a bug.
+TEST(YpirPackingTest, PackManyLwesPrecomputed_MatchesRecursive) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(21));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);
+  auto ep_rng = ChaChaRng::FromSeed(Seed(22));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(23));
+  const std::vector<PolyMatrixNTT> pub_params = RawGenerateExpansionParams(
+      ctx, dg, sk, p.poly_len_log2, p.t_exp_left, ep_rng, ep_rng_pub);
+  const YConstants yc = GenerateYConstants(ctx);
+
+  const std::size_t num = 2;
+  const std::size_t stride = num * p.poly_len;
+  std::vector<std::uint64_t> lwe((p.poly_len + 1) * stride);
+  for (std::size_t idx = 0; idx < lwe.size(); ++idx)
+    lwe[idx] = (idx * 7919u + 3u) % p.modulus;
+  const std::vector<std::vector<PolyMatrixNTT>> prep =
+      PrepPackManyLwes(ctx, lwe, num);
+
+  // Precompute the query-independent butterfly once.
+  const std::vector<PolyMatrixRaw> precomp =
+      PrecomputePackManyLwes(ctx, prep, num, pub_params, yc);
+  ASSERT_EQ(precomp.size(), num);
+
+  // Two distinct b_value sets ("queries") reuse the same precomputation.
+  for (std::uint64_t salt : {5u, 9973u}) {
+    std::vector<std::uint64_t> b_values(num * p.poly_len);
+    for (std::size_t z = 0; z < b_values.size(); ++z)
+      b_values[z] = (z * 131u + salt) % p.modulus;
+
+    const std::vector<PolyMatrixNTT> recursive =
+        PackManyLwes(ctx, prep, b_values, num, pub_params, yc);
+    const std::vector<PolyMatrixNTT> fast =
+        PackManyLwesPrecomputed(ctx, precomp, b_values, num);
+    ASSERT_EQ(fast.size(), num);
+    for (std::size_t i = 0; i < num; ++i)
+      EXPECT_EQ(fast[i].data, recursive[i].data)
+          << "salt=" << salt << " output " << i;
+  }
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

@@ -160,6 +160,12 @@ retcode YpirOperator::OnExecute(const PirDataType& input, PirDataType* result) {
   combined.resize(hint_0.size() + db_cols, 0);  // append zero b-row
   const std::vector<std::vector<ypir::PolyMatrixNTT>> prepacked_lwe =
       ypir::PrepPackManyLwes(ctx, combined, num_rlwe_outputs);
+  // Precompute the query-independent packing butterfly once (the dominant
+  // per-query cost otherwise): folds pub_params/y_constants in offline so each
+  // query only injects its b_values + NTTs. See ypir_packing.h.
+  const std::vector<ypir::PolyMatrixRaw> pack_precomp =
+      ypir::PrecomputePackManyLwes(ctx, prepacked_lwe, num_rlwe_outputs,
+                                   pack_pub_params, y_constants);
 
   // ---- Per-index retrieval ----
   std::vector<std::string> recovered;
@@ -186,8 +192,8 @@ retcode YpirOperator::OnExecute(const PirDataType& input, PirDataType* result) {
     const std::vector<std::uint64_t> intermediate =
         srv.AnswerQuery(packed_query);
     const std::vector<ypir::PolyMatrixNTT> packed =
-        ypir::PackManyLwes(ctx, prepacked_lwe, intermediate, num_rlwe_outputs,
-                           pack_pub_params, y_constants);
+        ypir::PackManyLwesPrecomputed(ctx, pack_precomp, intermediate,
+                                      num_rlwe_outputs);
 
     std::vector<std::uint64_t> row_vals;
     row_vals.reserve(db_cols);

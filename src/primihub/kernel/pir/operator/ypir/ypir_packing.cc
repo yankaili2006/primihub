@@ -171,4 +171,60 @@ std::vector<PolyMatrixNTT> PackManyLwes(
   return res;
 }
 
+// Offline half of the precomputed pack: per output, run the (query-independent)
+// PackLwesInner butterfly and keep its result in raw form. This is exactly the
+// prefix of PackLwes up to (and including) the FromNtt -- nothing here depends
+// on b_values, so the result is reusable across all queries.
+std::vector<PolyMatrixRaw> PrecomputePackManyLwes(
+    const NttContext& ctx,
+    const std::vector<std::vector<PolyMatrixNTT>>& prep_rlwe_cts,
+    std::size_t num_rlwe_outputs,
+    const std::vector<PolyMatrixNTT>& pub_params,
+    const YConstants& y_constants) {
+  const Params& params = ctx.params();
+  assert(prep_rlwe_cts.size() == num_rlwe_outputs);
+
+  std::vector<PolyMatrixRaw> res;
+  res.reserve(num_rlwe_outputs);
+  for (std::size_t i = 0; i < num_rlwe_outputs; ++i) {
+    assert(prep_rlwe_cts[i].size() == params.poly_len);
+    const PolyMatrixNTT out =
+        PackLwesInner(ctx, params.poly_len_log2, 0, prep_rlwe_cts[i],
+                      pub_params, y_constants);
+    res.push_back(ctx.FromNtt(out));
+  }
+  return res;
+}
+
+// Online half: copy the precomputed raw result, inject this query's b_values
+// into the constant row, NTT. Byte-for-byte identical to the tail of PackLwes
+// (the out_raw injection loop + ToNtt), so PackManyLwesPrecomputed equals
+// PackManyLwes.
+std::vector<PolyMatrixNTT> PackManyLwesPrecomputed(
+    const NttContext& ctx, const std::vector<PolyMatrixRaw>& precomp,
+    const std::vector<std::uint64_t>& b_values, std::size_t num_rlwe_outputs) {
+  const Params& params = ctx.params();
+  assert(precomp.size() == num_rlwe_outputs);
+  assert(b_values.size() == num_rlwe_outputs * params.poly_len);
+
+  std::vector<PolyMatrixNTT> res;
+  res.reserve(num_rlwe_outputs);
+  for (std::size_t i = 0; i < num_rlwe_outputs; ++i) {
+    PolyMatrixRaw out_raw = precomp[i];  // copy; mutated per query
+    std::uint64_t* row1 = out_raw.Poly(1, 0, params.poly_len);
+    const std::size_t base = i * params.poly_len;
+    for (std::size_t z = 0; z < params.poly_len; ++z) {
+      const std::uint64_t val = BarrettReductionU128Raw(
+          params.modulus, params.barrett_cr_0_modulus,
+          params.barrett_cr_1_modulus,
+          static_cast<__uint128_t>(b_values[base + z]) *
+              static_cast<__uint128_t>(params.poly_len));
+      row1[z] = BarrettRawU64(row1[z] + val, params.barrett_cr_1_modulus,
+                              params.modulus);
+    }
+    res.push_back(ctx.ToNtt(out_raw));
+  }
+  return res;
+}
+
 }  // namespace primihub::pir::ypir

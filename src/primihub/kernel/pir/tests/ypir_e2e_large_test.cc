@@ -9,6 +9,7 @@
  * levels) so it is run explicitly, not in the default suite.
  */
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -103,6 +104,70 @@ TEST(YpirE2ELargeTest, SimplePirRetrievesRowPolyLen2048) {
     EXPECT_EQ(mismatches, 0u) << "target_row=" << target_row << " had "
                               << mismatches << " / " << db_cols << " mismatches";
   }
+}
+
+// Directly compares the recursive PackManyLwes (old per-query path) against the
+// precomputed fast path at poly_len=2048: asserts bit-for-bit identity (a
+// stronger, real-preset version of the P8b equivalence test) and prints the
+// timing so the per-query speedup is documented. The recursive pack is the
+// dominant per-query cost; the precomputed online pack should be orders of
+// magnitude cheaper, with the butterfly paid once offline.
+TEST(YpirE2ELargeTest, PrecomputedPackMatchesAndIsFasterPolyLen2048) {
+  using clk = std::chrono::steady_clock;
+  const Params p = ParamsForExpansion(/*nu_1=*/0, /*nu_2=*/0, /*p=*/256,
+                                      /*q2_bits=*/28, /*t_exp_left=*/2, kModuli);
+  NttContext ctx(p);
+  const std::size_t db_cols = p.instances * p.poly_len;
+  const std::size_t num_rlwe_outputs = db_cols / p.poly_len;
+
+  ChaChaRng key = ChaChaRng::FromSeed(Seed(31));
+  const Client client(ctx, /*hamming=*/256, key);
+  const DiscreteGaussian dg = DiscreteGaussian::Init(p.noise_width);
+  ChaChaRng ep = ChaChaRng::FromSeed(Seed(33));
+  ChaChaRng ep_pub = ChaChaRng::FromSeed(Seed(34));
+  const std::vector<PolyMatrixNTT> pack_pub_params = RawGenerateExpansionParams(
+      ctx, dg, client.SkReg(), p.poly_len_log2, p.t_exp_left, ep, ep_pub);
+  const YConstants y_constants = GenerateYConstants(ctx);
+
+  // Deterministic stand-in for the hint + a b_values "query".
+  const std::size_t stride = num_rlwe_outputs * p.poly_len;
+  std::vector<std::uint64_t> lwe((p.poly_len + 1) * stride);
+  for (std::size_t i = 0; i < lwe.size(); ++i)
+    lwe[i] = (i * 7919u + 3u) % p.modulus;
+  const std::vector<std::vector<PolyMatrixNTT>> prep =
+      PrepPackManyLwes(ctx, lwe, num_rlwe_outputs);
+  std::vector<std::uint64_t> b_values(num_rlwe_outputs * p.poly_len);
+  for (std::size_t z = 0; z < b_values.size(); ++z)
+    b_values[z] = (z * 131u + 5u) % p.modulus;
+
+  // Old path: one recursive pack (the per-query cost before precompute).
+  auto t0 = clk::now();
+  const std::vector<PolyMatrixNTT> recursive =
+      PackManyLwes(ctx, prep, b_values, num_rlwe_outputs, pack_pub_params,
+                   y_constants);
+  auto t1 = clk::now();
+
+  // Offline precompute (paid once, amortized across all queries).
+  const std::vector<PolyMatrixRaw> precomp = PrecomputePackManyLwes(
+      ctx, prep, num_rlwe_outputs, pack_pub_params, y_constants);
+  auto t2 = clk::now();
+
+  // New path: the per-query online pack.
+  const std::vector<PolyMatrixNTT> fast =
+      PackManyLwesPrecomputed(ctx, precomp, b_values, num_rlwe_outputs);
+  auto t3 = clk::now();
+
+  for (std::size_t i = 0; i < num_rlwe_outputs; ++i)
+    EXPECT_EQ(fast[i].data, recursive[i].data) << "output " << i;
+
+  auto ms = [](clk::time_point a, clk::time_point b) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+  };
+  std::printf(
+      "[ packing ] recursive(old per-query)=%lld ms  precompute(offline,once)="
+      "%lld ms  precomputed(new per-query)=%lld ms\n",
+      static_cast<long long>(ms(t0, t1)), static_cast<long long>(ms(t1, t2)),
+      static_cast<long long>(ms(t2, t3)));
 }
 
 }  // namespace
