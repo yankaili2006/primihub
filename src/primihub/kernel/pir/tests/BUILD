@@ -995,12 +995,19 @@ cc_test(
 cc_test(
     name = "tiptoe_pir_test",
     srcs = ["tiptoe_pir_test.cc"],
+    defines = select({
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:enable_real": ["PIR_TIPTOE_RLWE_VENDORED=1"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//src/primihub/kernel/pir/operator:capabilities",
         "//src/primihub/kernel/pir/operator:registry",
         "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_pir_operator",
         "@com_google_googletest//:gtest_main",
-    ],
+    ] + select({
+        "//src/primihub/kernel/pir/operator/tiptoe_pir:enable_real": ["@com_github_base64_cpp//:base64_lib"],
+        "//conditions:default": [],
+    }),
     size = "small",
 )
 

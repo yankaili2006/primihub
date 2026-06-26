@@ -11,27 +11,31 @@ namespace primihub::pir {
 
 // Tiptoe (Henzinger et al., USENIX/SOSP'23) — private nearest-neighbor /
 // semantic search built as BFV-on-SimplePIR. The server holds an offline
-// per-database hint; the online answer is a SimplePIR linear answer plus a
-// BFV homomorphic inner-product, decrypted client-side. Selected for
-// Semantic query types.
+// per-database hint; the online answer is a SimplePIR linear answer minus a
+// BFV-recovered H*s correction, decoded client-side.
 //
-// v1 (openspec change primihub-pir-cuda-tiptoe, task 1.1) ports the core
-// LHE-on-SimplePIR retrieval as a PirOperator. The crypto core is the
-// already-C++ `ahenzinger/underhood` rlwe layer over Microsoft SEAL; the LHE
-// protocol (client/server/hint/params/secret) is ported from underhood's Go;
-// the linear layer reuses primihub's ported SimplePIR core. The search/
-// application layer (embeddings, k-means clustering, the 2-round coordinator)
-// is deferred. See docs/pir/tiptoe-port-plan.md.
+// v1 (openspec change primihub-pir-cuda-tiptoe, task 1.1) implements the core
+// LHE-on-SimplePIR retrieval (tiptoe_lhe_pir.h): a ternary-secret SimplePIR
+// linear layer + the LHE hint machinery (Enc(s) -> Enc(H*s) -> recover) over
+// the vendored underhood/rlwe BFV crypto. The search/ application layer
+// (embeddings, k-means clustering, 2-round coordinator) is deferred. See
+// docs/pir/tiptoe-port-plan.md.
 //
-// SKELETON: OnExecute is not yet implemented (kIsSkeleton=true,
-// caps.is_real=false). The real cryptographic core lands in chunks 1.1b-1.1f.
+// The real query path needs Microsoft SEAL (GFW-blocked on .50), so it is gated
+// behind --define=enable_tiptoe_real=1 (like APSI/keyword_pir). In the default
+// build the operator is a skeleton (OnExecute returns FAIL); with the define it
+// is a real operator validated end-to-end (exact byte retrieval).
 class TiptoePirOperator : public BasePirOperator {
  public:
   explicit TiptoePirOperator(const Options& options)
       : BasePirOperator(options) {}
   ~TiptoePirOperator() override = default;
   retcode OnExecute(const PirDataType& input, PirDataType* result) override;
+#ifdef PIR_TIPTOE_RLWE_VENDORED
+  static constexpr bool kIsSkeleton = false;
+#else
   static constexpr bool kIsSkeleton = true;
+#endif
 };
 
 }  // namespace primihub::pir
