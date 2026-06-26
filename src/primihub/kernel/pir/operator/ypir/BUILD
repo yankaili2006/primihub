@@ -279,6 +279,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ypir_chacha",
+        ":ypir_lwe_client",
+        ":ypir_lwe_params",
         ":ypir_modulus_switch",
         ":ypir_negacyclic",
         ":ypir_params",

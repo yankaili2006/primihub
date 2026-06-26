@@ -21,6 +21,8 @@
 
 #include "gtest/gtest.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_client.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
@@ -49,13 +51,14 @@ TEST(YpirYClientTest, GenerateQueryImplPackingRecoversOneHot) {
   const Params& p = ctx.params();
   ChaChaRng key = ChaChaRng::FromSeed(Seed(1));
   const Client client(ctx, /*hamming=*/2, key);
-  const YClient yc(ctx, client);
+  ChaChaRng lwe_ent = ChaChaRng::FromSeed(Seed(4));
+  const YClient yc(ctx, client, lwe_ent);
 
   const std::size_t dim_log2 = 1;     // 2 blocks
   const std::size_t index = 11;       // block 1, coeff 3 (poly_len=8)
   ChaChaRng noise = ChaChaRng::FromSeed(Seed(7));
   const std::vector<PolyMatrixRaw> q =
-      yc.GenerateQueryImpl(static_cast<std::uint8_t>(1), dim_log2, /*packing=*/true, index, noise);
+      yc.GenerateQueryImpl(static_cast<std::uint8_t>(1),  /* SEED_1 */ dim_log2, /*packing=*/true, index, noise);
   ASSERT_EQ(q.size(), static_cast<std::size_t>(1) << dim_log2);
 
   const std::uint64_t poly_len = p.poly_len;
@@ -79,7 +82,8 @@ TEST(YpirYClientTest, DecodeResponseRecoversLweValues) {
   const Params& p = ctx.params();
   ChaChaRng key = ChaChaRng::FromSeed(Seed(1));
   const Client client(ctx, 2, key);
-  const YClient yc(ctx, client);
+  ChaChaRng lwe_ent = ChaChaRng::FromSeed(Seed(4));
+  const YClient yc(ctx, client, lwe_ent);
 
   const std::uint64_t* sk = client.SkReg().data.data();
   const std::size_t db_cols = 3;
@@ -110,6 +114,39 @@ TEST(YpirYClientTest, DecodeResponseRecoversLweValues) {
   ASSERT_EQ(out.size(), db_cols);
   for (std::size_t col = 0; col < db_cols; ++col)
     EXPECT_EQ(out[col], vals[col]) << "col=" << col;
+}
+
+TEST(YpirYClientTest, GenerateQueryLweEncodesOneHot) {
+  NttContext ctx(P8());  // poly_len=8 (poly_len_log2=3)
+  const Params& p = ctx.params();
+  ChaChaRng key = ChaChaRng::FromSeed(Seed(1));
+  const Client client(ctx, 2, key);
+  ChaChaRng lwe_ent = ChaChaRng::FromSeed(Seed(4));
+  const YClient yc(ctx, client, lwe_ent);
+
+  const LweParams& lp = yc.GetLweClient().params();
+  const std::size_t n = lp.n;                       // 1024
+  const std::size_t dim_log2 = 7;                   // dim = 2^(7+3) = 1024 = n
+  const std::size_t dim = static_cast<std::size_t>(1) << (dim_log2 + p.poly_len_log2);
+  ASSERT_EQ(dim, n);
+  const std::size_t index_row = 500;
+
+  ChaChaRng noise = ChaChaRng::FromSeed(Seed(8));
+  const std::vector<std::uint64_t> lwes =
+      yc.GenerateQueryLwe(dim_log2, index_row, noise);
+  ASSERT_EQ(lwes.size(), (n + 1) * dim);
+
+  // Decrypt each LWE column with the client's LWE secret; the one-hot
+  // scale_k at index_row should rescale to 1, all others to 0.
+  for (std::size_t j = 0; j < dim; ++j) {
+    std::vector<std::uint32_t> ct(n + 1);
+    for (std::size_t r = 0; r < n + 1; ++r)
+      ct[r] = static_cast<std::uint32_t>(lwes[r * dim + j]);
+    const std::uint32_t phase = yc.GetLweClient().Decrypt(ct);
+    const std::uint64_t rec = Rescale(phase, lp.modulus, lp.pt_modulus);
+    const std::uint64_t expect = (j == index_row) ? 1u : 0u;
+    EXPECT_EQ(rec, expect) << "j=" << j;
+  }
 }
 
 }  // namespace

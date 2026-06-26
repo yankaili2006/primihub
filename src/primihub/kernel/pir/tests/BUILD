@@ -897,6 +897,8 @@ cc_test(
     deps = [
         "//src/primihub/kernel/pir/operator/ypir:ypir_chacha",
         "//src/primihub/kernel/pir/operator/ypir:ypir_client",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_lwe_client",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_lwe_params",
         "//src/primihub/kernel/pir/operator/ypir:ypir_modulus_switch",
         "//src/primihub/kernel/pir/operator/ypir:ypir_params",
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly",

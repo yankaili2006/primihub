@@ -82,4 +82,32 @@ std::vector<std::uint64_t> YClient::DecodeResponse(
   return out;
 }
 
+std::vector<std::uint64_t> YClient::GenerateQueryLwe(
+    std::size_t dim_log2, std::size_t index_row, ChaChaRng& noise_rng) const {
+  const Params& p = ctx_->params();
+  const LweParams& lp = lwe_client_.params();
+  const std::size_t n = lp.n;
+  const std::size_t dim = static_cast<std::size_t>(1)
+                          << (dim_log2 + p.poly_len_log2);
+  assert(dim % n == 0);
+
+  std::vector<std::uint64_t> lwes((n + 1) * dim, 0);
+  const std::uint32_t scale_k = static_cast<std::uint32_t>(lp.ScaleK());
+  std::vector<std::uint32_t> vals(dim, 0);
+  vals[index_row] = scale_k;
+
+  ChaChaRng rng_pub = ChaChaRng::FromSeed(GetSeed(/*SEED_0=*/0));
+  for (std::size_t i = 0; i < dim; i += n) {
+    const std::vector<std::uint32_t> chunk(vals.begin() + i,
+                                           vals.begin() + i + n);
+    // (n+1) x n row-major: rows 0..n-1 are 'a', row n is 'b'.
+    const std::vector<std::uint32_t> out =
+        lwe_client_.EncryptMany(rng_pub, noise_rng, chunk);
+    for (std::size_t r = 0; r < n + 1; ++r)
+      for (std::size_t c = 0; c < n; ++c)
+        lwes[r * dim + i + c] = static_cast<std::uint64_t>(out[r * n + c]);
+  }
+  return lwes;
+}
+
 }  // namespace primihub::pir::ypir

@@ -22,6 +22,8 @@
 #include <vector>
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_client.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
@@ -44,8 +46,14 @@ std::vector<std::uint32_t> GenerateMatrixRing(ChaChaRng& rng_pub, std::size_t n,
 // (generate_query SEED_0) paths are later sub-chunks.
 class YClient {
  public:
-  YClient(const NttContext& ctx, const Client& client)
-      : ctx_(&ctx), client_(&client) {}
+  // Mirrors YClient::new: borrows a spiral Client and owns an LweClient
+  // (LWEParams::default, secret generated from `lwe_entropy`).
+  YClient(const NttContext& ctx, const Client& client, ChaChaRng& lwe_entropy)
+      : ctx_(&ctx),
+        client_(&client),
+        lwe_client_(LweClient::New(LweParams::Default(), lwe_entropy)) {}
+
+  const LweClient& GetLweClient() const { return lwe_client_; }
 
   // Port of YClient::generate_query_impl. Produces (1<<dim_log2) raw 2x1
   // ciphertexts: a one-hot selector for `index` (scale_k = modulus/pt_modulus
@@ -68,9 +76,19 @@ class YClient {
   std::vector<std::uint64_t> DecodeResponse(
       const std::vector<std::uint64_t>& response, std::size_t db_cols) const;
 
+  // Port of generate_query's SEED_0 && !packing branch: the SimplePIR-style
+  // LWE query. dim = 1 << (dim_log2 + poly_len_log2) must be a multiple of the
+  // LWE n (1024). Encrypts a one-hot scale_k at index_row across the dim
+  // coefficients via LweClient::EncryptMany (public 'a' from get_seed(SEED_0),
+  // noise from noise_rng). Returns the (n+1) x dim row-major LWE query.
+  std::vector<std::uint64_t> GenerateQueryLwe(std::size_t dim_log2,
+                                              std::size_t index_row,
+                                              ChaChaRng& noise_rng) const;
+
  private:
   const NttContext* ctx_;
   const Client* client_;
+  LweClient lwe_client_;
 };
 
 }  // namespace primihub::pir::ypir
