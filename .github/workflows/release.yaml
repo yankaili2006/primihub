@@ -65,6 +65,7 @@ jobs:
 
   build-on-ubuntu-arm64:
     runs-on: [self-hosted, Linux, ARM64]
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # tag release 用自建 runner; 手动 dispatch 改用 verify-arm64-hosted(GitHub 托管 ARM)
     steps:
       - uses: actions/checkout@v3
       - name: bazel build
@@ -111,6 +112,48 @@ jobs:
         with:
             files: |
               ./primihub-linux-arm64.tar.gz
+
+  # 手动 dispatch 专用: 在 GitHub 托管 ARM64 runner(ubuntu-24.04-arm, 公共仓库免费)上,
+  # 用项目自带 Dockerfile builder 阶段(ubuntu20.04+gcc-8+bazelisk, 含 arch-aware python sed)
+  # 原生构建并断言 ph_secure_lib.so 为 aarch64 ELF —— 验证 ARM64 源码修复真实生效,
+  # 不依赖自建 runner、不发布任何产物。
+  verify-arm64-hosted:
+    runs-on: ubuntu-24.04-arm
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup 2>/dev/null || true
+          docker system prune -af || true
+          df -h /
+      - name: Build ph_secure_lib.so on native ARM64 via Dockerfile builder + assert
+        run: |
+          set -euo pipefail
+          echo "::group::docker build (builder stage, linux/arm64 native)"
+          DOCKER_BUILDKIT=1 docker build --platform linux/arm64 --target builder -t ph-arm-builder -f Dockerfile .
+          echo "::endgroup::"
+          cid=$(docker create ph-arm-builder)
+          docker cp "$cid":/src/bazel-bin.tar.gz ./bazel-bin.tar.gz
+          docker rm "$cid"
+          echo "=== 断言 ph_secure_lib.so 已在 ARM64 构建产出 ==="
+          tar tzf bazel-bin.tar.gz | grep 'task/pybind_wrapper/ph_secure_lib.so' \
+            || { echo "ERROR: ph_secure_lib.so 未在 ARM64 构建产出 (检查 Makefile --config=linux_aarch64 / Dockerfile 动态 python sed)"; exit 1; }
+          mkdir -p _verify
+          tar xzf bazel-bin.tar.gz -C _verify bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so
+          echo "--- file(1) on the produced .so ---"
+          file _verify/bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so
+          file _verify/bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so | grep -qiE 'aarch64|ARM aarch64' \
+            && echo "✅ confirmed aarch64 ELF ph_secure_lib.so —— ARM64 源码构建已验证生效"
+          cp ./bazel-bin.tar.gz ./primihub-linux-arm64-bazelbin.tar.gz
+      - name: Upload arm64 bazel-bin artifact (evidence)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: primihub-linux-arm64-bazelbin
+          path: ./primihub-linux-arm64-bazelbin.tar.gz
+          if-no-files-found: warn
 
   build-on-mac-amd64:
     runs-on: macos-latest
