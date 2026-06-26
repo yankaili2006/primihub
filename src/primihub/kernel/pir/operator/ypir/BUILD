@@ -251,6 +251,7 @@ cc_library(
         ":ypir_scheme",
         ":ypir_client",
         ":ypir_spiral_client",
+        ":ypir_kernel",
 ],
 )
 

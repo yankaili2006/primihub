@@ -27,6 +27,7 @@
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_client.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_convolution_ntt.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_kernel.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_lwe_params.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_negacyclic.h"
 #include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
@@ -340,6 +341,31 @@ class YServer {
     const std::vector<PolyMatrixNTT> preprocessed_query =
         GeneratePseudorandomQuery(ctx, public_seed_idx);
     return MultiplyWithDbRing(ctx, preprocessed_query, 0, cols, public_seed_idx);
+  }
+
+  // Port of server.rs YServer::multiply_batched_with_db_packed (online answer
+  // core): the K-batched dot product of the condensed packed query against the
+  // db, via the (AVX512-dispatched) fast_batched_dot_product kernel.
+  // aligned_query_packed is k_batch * query_rows * db_rows_padded condensed
+  // u64; query_rows must be 1. Returns the k_batch * db_cols answer.
+  std::vector<std::uint64_t> MultiplyBatchedWithDbPacked(
+      std::size_t k_batch, const std::vector<std::uint64_t>& aligned_query_packed,
+      std::size_t query_rows) const {
+    assert(aligned_query_packed.size() ==
+           k_batch * query_rows * db_rows_padded_);
+    assert(query_rows == 1);
+    std::vector<std::uint64_t> result(k_batch * db_cols_, 0);
+    FastBatchedDotProduct<T>(*params_, k_batch, result.data(),
+                             aligned_query_packed.data(), db_rows_padded_, Db(),
+                             db_rows_padded_, db_cols_);
+    return result;
+  }
+
+  // Port of server.rs YServer::answer_query: the single-query (K=1) online
+  // answer over the packed db.
+  std::vector<std::uint64_t> AnswerQuery(
+      const std::vector<std::uint64_t>& aligned_query_packed) const {
+    return MultiplyBatchedWithDbPacked(1, aligned_query_packed, 1);
   }
 
  private:

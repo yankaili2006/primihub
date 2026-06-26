@@ -138,5 +138,44 @@ TEST(YpirServerHintTest, AnswerHintRingEqualsMultiplyComposition) {
   }
 }
 
+// --- 10g: answer_query (online db multiply via the 10e kernel) ---
+
+TEST(YpirServerHintTest, AnswerQueryCrtResidues) {
+  const Params p = MakeParams(/*db_dim_1=*/1, /*db_dim_2=*/0, /*instances=*/1);
+  const std::uint64_t q0 = p.moduli[0], q1 = p.moduli[1];
+  const std::size_t db_rows_padded = static_cast<std::size_t>(1)
+                                     << (p.db_dim_1 + p.poly_len_log2);  // 16
+  const std::size_t db_cols = DbCols(p, false);                         // 8
+
+  std::vector<std::uint16_t> db(db_rows_padded * db_cols);
+  for (std::size_t k = 0; k < db.size(); ++k)
+    db[k] = static_cast<std::uint16_t>((k * 53u + 9u) & 0xFFFFu);
+  const YServer<std::uint16_t> srv(p, db, false, /*inp_transposed=*/false, false);
+
+  // Condensed single query: db_rows_padded u64, each lo|hi CRT limbs.
+  std::vector<std::uint64_t> q(db_rows_padded);
+  for (std::size_t i = 0; i < q.size(); ++i) {
+    const std::uint64_t lo = (i * 7919u + 3u) % q0;
+    const std::uint64_t hi = (i * 104729u + 5u) % q1;
+    q[i] = lo | (hi << 32);
+  }
+
+  const std::vector<std::uint64_t> ans = srv.AnswerQuery(q);
+  ASSERT_EQ(ans.size(), db_cols);
+
+  const std::uint16_t* dbp = srv.Db();
+  for (std::size_t j = 0; j < db_cols; ++j) {
+    __uint128_t tlo = 0, thi = 0;
+    for (std::size_t kk = 0; kk < db_rows_padded; ++kk) {
+      const std::uint64_t av = q[kk];
+      const std::uint64_t bv = dbp[j * db_rows_padded + kk];  // transposed
+      tlo += static_cast<__uint128_t>(av & 0xFFFFFFFFull) * bv;
+      thi += static_cast<__uint128_t>(av >> 32) * bv;
+    }
+    EXPECT_EQ(ans[j] % q0, static_cast<std::uint64_t>(tlo % q0)) << "j=" << j;
+    EXPECT_EQ(ans[j] % q1, static_cast<std::uint64_t>(thi % q1)) << "j=" << j;
+  }
+}
+
 }  // namespace
 }  // namespace primihub::pir::ypir

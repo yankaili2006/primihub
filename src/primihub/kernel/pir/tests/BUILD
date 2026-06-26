@@ -915,6 +915,7 @@ cc_test(
     srcs = ["ypir_server_hint_test.cc"],
     deps = [
         "//src/primihub/kernel/pir/operator/ypir:ypir_arith",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_kernel",
         "//src/primihub/kernel/pir/operator/ypir:ypir_client",
         "//src/primihub/kernel/pir/operator/ypir:ypir_poly",
         "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",
