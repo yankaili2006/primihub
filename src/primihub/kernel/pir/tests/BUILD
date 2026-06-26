@@ -989,5 +989,5 @@ cc_test(
         "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",
         "@com_google_googletest//:gtest_main",
     ],
-    size = "large",
+    size = "medium",
 )
