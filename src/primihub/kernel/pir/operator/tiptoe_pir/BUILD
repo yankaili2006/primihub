@@ -86,7 +86,8 @@ cc_library(
     ],
 )
 
-# Self-contained LHE-on-SimplePIR retrieval (chunk 1.1f). Header-only; real-mode.
+# Self-contained LHE-on-SimplePIR retrieval (chunks 1.1f/1.1g). Header-only;
+# real-mode. @openssl is for the CSPRNG secret + LWE error (RAND_bytes).
 cc_library(
     name = "tiptoe_lhe_pir",
     hdrs = ["tiptoe_lhe_pir.h"],
@@ -94,6 +95,7 @@ cc_library(
         ":tiptoe_client",
         ":tiptoe_hint",
         ":tiptoe_params",
+        "@openssl",
     ],
 )
 

@@ -13,10 +13,13 @@
  *
  * The low bits of H*s dropped by the limb truncation stay below Delta/2, so
  * recovery is exact. SimplePIR p=256 (one byte/entry), q=2^32, Delta=2^24,
- * elem_bits=32 (top 5 of 8 limbs). A and the ternary secret are derived
- * deterministically from a seed (functional, not cryptographically strong --
- * v1; security hardening + reuse of primihub's SimplePIR core::Database for the
- * linear layer is a follow-up). Real mode only (LHE needs SEAL). See
+ * elem_bits=32 (top 5 of 8 limbs). The ternary secret and the per-query LWE
+ * error are sampled from a CSPRNG (OpenSSL RAND_bytes), so the query is IND-CPA
+ * and the retrieved index is hidden (chunk 1.1g). The public matrix A is still
+ * expanded from a seed via splitmix64 -- fine for a public LWE matrix, though a
+ * CSPRNG-expanded public seed would be stronger. Remaining follow-up: reuse
+ * primihub's SimplePIR core::Database for the linear layer (needs extending it
+ * to ternary secrets). Real mode only (LHE needs SEAL). See
  * docs/pir/tiptoe-port-plan.md.
  */
 #ifndef SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_TIPTOE_PIR_TIPTOE_LHE_PIR_H_
@@ -26,6 +29,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+
+#include <openssl/rand.h>
 
 #include "src/primihub/kernel/pir/operator/tiptoe_pir/tiptoe_client.h"
 #include "src/primihub/kernel/pir/operator/tiptoe_pir/tiptoe_hint.h"
@@ -39,7 +44,40 @@ inline constexpr std::uint64_t kSimplePirP = 256;
 inline constexpr std::uint64_t kSimplePirDelta = (std::uint64_t{1} << 32) / kSimplePirP;
 inline constexpr int kSimplePirElemBits = 32;
 
-// One 64-bit step of splitmix64 (deterministic PRG for A and the secret).
+// Bound on each LWE query-error coordinate (chunk 1.1g). Recovery stays exact
+// while |D.e| < Delta/2: max|D[i].e| <= m*(p-1)*kErrorBound, so with p=256 and
+// kErrorBound=16 this holds for m up to ~2000 (Delta/2 = 2^23).
+inline constexpr int kErrorBound = 16;
+
+// One CSPRNG byte (OpenSSL RAND_bytes).
+inline std::uint8_t CsprngByte() {
+  unsigned char b = 0;
+  const int ok = RAND_bytes(&b, 1);
+  assert(ok == 1 && "RAND_bytes failed");
+  (void)ok;
+  return static_cast<std::uint8_t>(b);
+}
+
+// Uniform ternary {0,1,2} via rejection (256 % 3 == 1; reject the top value to
+// avoid bias).
+inline std::uint64_t SampleTernary() {
+  for (;;) {
+    const std::uint8_t b = CsprngByte();
+    if (b < 255) return static_cast<std::uint64_t>(b % 3);
+  }
+}
+
+// Uniform LWE error in [-kErrorBound, kErrorBound] via rejection.
+inline int SampleError() {
+  const int range = 2 * kErrorBound + 1;       // 33
+  const int limit = (256 / range) * range;     // 231
+  for (;;) {
+    const std::uint8_t b = CsprngByte();
+    if (b < limit) return static_cast<int>(b % range) - kErrorBound;
+  }
+}
+
+// One 64-bit step of splitmix64 (deterministic PRG for the PUBLIC matrix A).
 inline std::uint64_t SplitMix64(std::uint64_t x) {
   x += 0x9E3779B97F4A7C15ull;
   x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ull;
@@ -64,10 +102,10 @@ class LheSimplePir {
         a_[j * n_ + k] =
             static_cast<std::uint32_t>(SplitMix64(seed + j * n_ + k));
 
-    // Ternary secret s in {0,1,2}^n.
+    // Ternary secret s in {0,1,2}^n, sampled from a CSPRNG (OpenSSL RAND_bytes),
+    // fresh per client -- with the LWE error below this hides the queried index.
     s_.resize(n_);
-    for (std::uint64_t k = 0; k < n_; ++k)
-      s_[k] = SplitMix64(seed ^ 0xD1B54A32D192ED03ull ^ k) % 3;
+    for (std::uint64_t k = 0; k < n_; ++k) s_[k] = SampleTernary();
 
     // Hint H = D * A  (m x n), mod 2^32.
     h_.assign(m_ * n_, 0);
@@ -96,7 +134,10 @@ class LheSimplePir {
     for (std::uint64_t j = 0; j < m_; ++j) {
       std::uint64_t acc = 0;
       for (std::uint64_t k = 0; k < n_; ++k) acc += a_[j * n_ + k] * s_[k];
-      qu[j] = static_cast<std::uint32_t>(acc);
+      // + fresh bounded LWE error (makes the query IND-CPA); wraps mod 2^32.
+      std::uint32_t qj = static_cast<std::uint32_t>(acc);
+      qj += static_cast<std::uint32_t>(static_cast<std::int32_t>(SampleError()));
+      qu[j] = qj;
     }
     qu[col] = static_cast<std::uint32_t>(qu[col] + kSimplePirDelta);
 
