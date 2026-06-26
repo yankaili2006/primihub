@@ -22,6 +22,10 @@
 #include <vector>
 
 #include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_types.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_spiral_client.h"
 
 namespace primihub::pir::ypir {
 
@@ -34,6 +38,40 @@ namespace primihub::pir::ypir {
 // Requires rows % n == 0 and cols % n == 0.
 std::vector<std::uint32_t> GenerateMatrixRing(ChaChaRng& rng_pub, std::size_t n,
                                               std::size_t rows, std::size_t cols);
+
+// Port of client.rs YClient — the RLWE query generation + response decoding
+// layer (chunk 12b-3). Wraps a spiral Client (borrowed). GSW / LWE-branch
+// (generate_query SEED_0) paths are later sub-chunks.
+class YClient {
+ public:
+  YClient(const NttContext& ctx, const Client& client)
+      : ctx_(&ctx), client_(&client) {}
+
+  // Port of YClient::generate_query_impl. Produces (1<<dim_log2) raw 2x1
+  // ciphertexts: a one-hot selector for `index` (scale_k = modulus/pt_modulus
+  // at coefficient index%poly_len of block index/poly_len), optionally scaled
+  // by poly_len^{-1} (packing), each encrypted via the Client's
+  // encrypt_matrix_scaled_reg with scale = poly_len^{-1} (so the query noise
+  // is e*poly_len^{-1}, cancelled by the *poly_len in downstream packing).
+  // rng_pub is derived from get_seed(public_seed_idx); `noise_rng` supplies
+  // the per-sample Gaussian noise (caller-seeded for determinism; upstream
+  // uses from_entropy).
+  std::vector<PolyMatrixRaw> GenerateQueryImpl(std::uint8_t public_seed_idx,
+                                               std::size_t dim_log2, bool packing,
+                                               std::size_t index,
+                                               ChaChaRng& noise_rng) const;
+
+  // Port of YClient::decode_response. `response` is (poly_len+1) x db_cols
+  // (row-major): the LWE answer. For each column, phase =
+  // sum_i response[i][col]*sk_reg[i] + response[poly_len][col] (mod modulus),
+  // then rescaled modulus->pt_modulus. Returns db_cols values.
+  std::vector<std::uint64_t> DecodeResponse(
+      const std::vector<std::uint64_t>& response, std::size_t db_cols) const;
+
+ private:
+  const NttContext* ctx_;
+  const Client* client_;
+};
 
 }  // namespace primihub::pir::ypir
 

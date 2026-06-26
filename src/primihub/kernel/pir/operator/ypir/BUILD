@@ -279,7 +279,13 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ypir_chacha",
+        ":ypir_modulus_switch",
         ":ypir_negacyclic",
+        ":ypir_params",
+        ":ypir_poly",
+        ":ypir_poly_types",
+        ":ypir_scheme",
+        ":ypir_spiral_client",
     ],
 )
 
