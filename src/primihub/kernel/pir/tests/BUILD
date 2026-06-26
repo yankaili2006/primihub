@@ -927,7 +927,7 @@ cc_test(
         "//src/primihub/kernel/pir/operator/ypir:ypir_server",
         "@com_google_googletest//:gtest_main",
     ],
-    size = "medium",
+    size = "small",
 )
 
 cc_test(
@@ -957,7 +957,7 @@ cc_test(
         "//src/primihub/kernel/pir/operator/ypir:ypir_spiral_client",
         "@com_google_googletest//:gtest_main",
     ],
-    size = "medium",
+    size = "small",
 )
 
 cc_test(
@@ -970,7 +970,7 @@ cc_test(
         "@com_github_base64_cpp//:base64_lib",
         "@com_google_googletest//:gtest_main",
     ],
-    size = "medium",
+    size = "small",
 )
 
 cc_test(
