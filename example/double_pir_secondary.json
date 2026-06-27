@@ -1,0 +1,68 @@
+{
+  "task_type": "PIR_TASK",
+  "task_name": "double_pir_secondary_task",
+  "task_lang": "proto",
+  "task_code": {
+    "code_file_path": "",
+    "code": ""
+  },
+  "params": {
+    "algorithm": {
+      "description": "PIR algorithm registry name (multi-algo framework)",
+      "type": "STRING",
+      "value": "double_pir"
+    },
+    "pirType": {
+      "description": "legacy enum (ignored when params.algorithm is set); kept for proto_compat",
+      "type": "INT32",
+      "value": 0
+    },
+    "preferred_backend": {
+      "description": "cpu | avx2 | cuda | auto",
+      "type": "STRING",
+      "value": "auto"
+    },
+    "assume_non_colluding": {
+      "description": "two-server DoublePIR REQUIRES caller to certify non-collusion",
+      "type": "INT32",
+      "value": 1
+    },
+    "hint_path": {
+      "description": "secondary may also persist the received hint for cold-restart speedup",
+      "type": "STRING",
+      "value": "/var/cache/primihub/double_pir_hint_secondary.bin"
+    },
+    "hint_role": {
+      "description": "secondary ReceiveHint from peer_nodes[0] (the primary) in lieu of HintGen",
+      "type": "STRING",
+      "value": "secondary"
+    },
+    "queryIndices": {
+      "description": "decimal row indices to retrieve from the dataset (same as primary)",
+      "type": "STRING",
+      "value": ["0", "27", "63"]
+    },
+    "outputFullFilename": {
+      "description": "secondary saves its slice; full result reassembled across both peers",
+      "type": "STRING",
+      "value": "data/result/double_pir_secondary_result.csv"
+    }
+  },
+  "party_info": {
+    "FILL_IN_PRIMARY_NODE_ID": {
+      "ip": "FILL_IN_PRIMARY_IP",
+      "port": 50051,
+      "use_tls": true
+    },
+    "FILL_IN_SECONDARY_NODE_ID": {
+      "ip": "FILL_IN_SECONDARY_IP",
+      "port": 50052,
+      "use_tls": true
+    }
+  },
+  "party_datasets": {
+    "SERVER": {
+      "SERVER": "FILL_IN_DATASET_ID"
+    }
+  }
+}

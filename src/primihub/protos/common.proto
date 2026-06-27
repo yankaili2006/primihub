@@ -51,9 +51,46 @@ enum PsiTag {
   TEE = 2;
 }
 
+// PirType is the legacy wire selector for PIR algorithms.
+//
+// NEW CALLERS SHOULD prefer the Params-map conventions documented below;
+// this enum is retained so that pre-multi-algo clients continue to route
+// without recompilation. Values 0/1 MUST NOT be renumbered or repurposed.
+//
+// Standard PIR Params keys (in Task.params.param_map) recognised by
+// primihub-node >= 2026-06 (multi-algo framework):
+//
+//   "algorithm"            STRING  Registered algorithm name. Takes
+//                                  precedence over "pirType" when present.
+//                                  See `pir_inspect list` for the live set
+//                                  on a given build (e.g. "seal_pir",
+//                                  "apsi", "spiral", "double_pir",
+//                                  "simple_pir", "frodo_pir", "ypir", ...).
+//   "latency_budget"       STRING  One of: "any" | "seconds" |
+//                                  "sub-second" | "ms". Hint for the
+//                                  selector; the chosen operator MAY
+//                                  ignore it.
+//   "preferred_backend"    STRING  One of: "auto" | "cpu" | "avx2" |
+//                                  "cuda". Operator falls back to the
+//                                  next available backend when the
+//                                  preferred one is not built / present.
+//   "assume_non_colluding" INT32   0|1. Required to be 1 before the
+//                                  selector / operator will accept a
+//                                  two-server scheme (e.g. DoublePIR)
+//                                  whose security relies on the
+//                                  servers being non-colluding.
+//   "hint_path"            STRING  Filesystem path to a pre-generated
+//                                  hint file for algorithms that
+//                                  require client-side cached hints
+//                                  (e.g. SimplePIR / FrodoPIR / YPIR).
+//
+// Server-side fallback: when "algorithm" is missing or empty, the node
+// uses LegacyNameFor(static_cast<PirType>(pirType)) to pick the operator
+// — i.e. 0 -> "id_pir" (SealPIR) and 1 -> "apsi". This keeps every old
+// client working against a multi-algo build.
 enum PirType {
-  ID_PIR = 0;
-  KEY_PIR = 1;
+  ID_PIR = 0;    // legacy: equivalent to algorithm="id_pir" (SealPIR)
+  KEY_PIR = 1;   // legacy: equivalent to algorithm="apsi"
 }
 
 message int32_array {

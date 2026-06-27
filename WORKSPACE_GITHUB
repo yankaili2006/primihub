@@ -726,3 +726,138 @@ git_repository(
   commit = "84108f9340ee177617950b08c97062590381c66b",
   remote = "https://github.com/primihub/communication.git",
 )
+
+# ---------------------------------------------------------------------------
+# Multi-algo PIR — external algorithm vendoring (openspec primihub-pir-multi-algo)
+# ---------------------------------------------------------------------------
+# Each new_git_repository entry below pins an upstream PIR algorithm impl
+# and points at a primihub-maintained BUILD wrapper under thirdparty/pir/.
+# The corresponding kernel/pir/operator/<algo>_pir/ wraps it in a
+# BasePirOperator and self-registers via PirRegistrar.
+
+# SpiralPIR (Menon & Wu, USENIX'22). Pinned at last upstream commit
+# (repo dormant since 2022-05-02). Wrapper at //thirdparty/pir:BUILD.spiral.
+# Depends on Intel HExL — must be added separately when activating this
+# WORKSPACE entry. Currently DECLARED but not yet referenced by any
+# cc_library deps, so bazel does not fetch it. Activate by adding
+# "@spiral_pir//:spiral_lib" to src/primihub/kernel/pir/operator/spiral_pir
+# BUILD when implementing OnExecute.
+new_git_repository(
+    name = "spiral_pir",
+    remote = "https://github.com/menonsamir/spiral.git",
+    commit = "361ee47f92214d4fcd03c4205c9c2729e8369afb",
+    shallow_since = "1651472347 +0000",
+    build_file = "@//thirdparty/pir:BUILD.spiral",
+    # Rename upstream main so spiral.cpp can be compiled into spiral_lib
+    # without conflicting with primihub-node main; spiral_main_disabled is
+    # never called at runtime — see
+    # src/primihub/kernel/pir/operator/spiral_pir/spiral_runtime.cc for
+    # the testHighRate stub that satisfies link-time references.
+    patches = ["@//thirdparty/pir:spiral_avx2_fix.patch"],
+    patch_args = ["-p1"],
+    patch_cmds = [
+        "sed -i \"s|^int main(int argc, char \\\\*argv\\\\[\\\\])|int spiral_main_disabled(int argc, char *argv[])|\" src/spiral.cpp",
+    ],
+)
+
+# SimplePIR + DoublePIR (Henzinger et al., USENIX Security 2023).
+# Upstream is Go + a tiny C kernel (pir/pir.c, pir/pir.h). The wrapper
+# at //thirdparty/pir:BUILD.simplepir exposes ONLY the C matrix
+# multiplication kernels as :simplepir_c_kernels; the Go algorithmic
+# core is intentionally left to be ported into C++ by the primihub
+# DoublePirOperator (see openspec/changes/primihub-pir-multi-algo
+# task 5.5). See BUILD.simplepir for the architectural rationale and
+# the rejected alternatives (rules_go + cgo, host-go genrule, Rust
+# port). DECLARED but not yet referenced — bazel will not fetch
+# until the DoublePIR operator adds the dep.
+new_git_repository(
+    name = "simplepir",
+    remote = "https://github.com/ahenzinger/simplepir.git",
+    commit = "e9020b03bf2872c75b8954e749e32408b5db87ed",
+    shallow_since = "1673650769 -0500",
+    build_file = "@//thirdparty/pir:BUILD.simplepir",
+)
+
+# YPIR (Menon & Wu, USENIX Security 2024). Rust crate with hand-tuned
+# C++ matrix kernels (src/matmul.cpp). The wrapper at
+# //thirdparty/pir:BUILD.ypir exposes ONLY the C++ matmul kernels as
+# :ypir_matmul_kernels; the Rust algorithmic core is intentionally left
+# for the C++ port in primihub YpirOperator (task 7.3 cc). DECLARED but
+# not yet referenced by any cc_library deps, so bazel does not fetch.
+new_git_repository(
+    name = "ypir",
+    remote = "https://github.com/menonsamir/ypir.git",
+    commit = "a73e550a469605c2fa23945a4d96c20fb2f4a839",
+    shallow_since = "1743542300 -0700",
+    build_file = "@//thirdparty/pir:BUILD.ypir",
+)
+
+# FrodoPIR (Davidson, Pestana, Celi, PETS 2023). Pure-Rust crate
+# brave-experiments/frodo-pir. No C/C++ surface to wrap; the
+# //thirdparty/pir:BUILD.frodo_pir wrapper is documentation-only,
+# exposing test-vector data for future C++ port correctness checks.
+# DECLARED but not yet referenced by any cc_library deps.
+new_git_repository(
+    name = "frodo_pir",
+    remote = "https://github.com/brave-experiments/frodo-pir.git",
+    commit = "1557396058e2bf89a5aad8fc82adccb0d7141454",
+    shallow_since = "1704897297 +0100",
+    build_file = "@//thirdparty/pir:BUILD.frodo_pir",
+)
+
+# Tiptoe (Henzinger et al., SOSP 2023). 100% Go, no C/C++ surface.
+# Pulls in github.com/ahenzinger/underhood (BFV-on-SimplePIR via cgo
+# Microsoft SEAL) and a SimplePIR fork (henrycg/simplepir). The
+# //thirdparty/pir:BUILD.tiptoe wrapper is documentation-only and
+# exposes an empty placeholder cc_library only — actual integration
+# requires a full Go->C++ port of the protocol layer on top of
+# task 5.5 (SimplePIR core) plus a BFV transformation atop primihubs
+
+# Tiptoe (Henzinger et al., SOSP 2023). 100% Go, no C/C++ surface.
+# Pulls in github.com/ahenzinger/underhood (BFV-on-SimplePIR via cgo
+# Microsoft SEAL) and a SimplePIR fork (henrycg/simplepir). The
+# //thirdparty/pir:BUILD.tiptoe wrapper is documentation-only and
+# exposes an empty placeholder cc_library only — actual integration
+# requires a full Go->C++ port of the protocol layer on top of
+# task 5.5 (SimplePIR core) plus a BFV transformation atop primihub's
+# existing SEAL toolchain. DECLARED but not yet referenced by any
+# cc_library deps.
+new_git_repository(
+    name = "tiptoe",
+    remote = "https://github.com/ahenzinger/tiptoe.git",
+    commit = "ba7cae43ab8686328897aabd3b7f861622d8ac8a",
+    shallow_since = "1696180302 -0400",
+    build_file = "@//thirdparty/pir:BUILD.tiptoe",
+)
+
+# ahenzinger/underhood — BFV-on-SimplePIR (LHE) crypto for the Tiptoe port
+# (task 1.1b). Only the C++ rlwe/ layer is used (rlwe.{cpp,hpp,h}); the Go is
+# cgo bindings primihub does not need. Exposed as @underhood//:rlwe via
+# BUILD.underhood_rlwe. Pulled in only under --define=enable_tiptoe_real=1
+# (needs the SEAL toolchain, GFW-blocked on .50); the default build never
+# references it. SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF.
+new_git_repository(
+    name = "underhood",
+    remote = "https://github.com/ahenzinger/underhood.git",
+    commit = "f053a81c63855e452fe0129302a6644b2d46d3ed",
+    build_file = "@//thirdparty/pir:BUILD.underhood_rlwe",
+)
+
+
+# ---- Intel HEXL (NTT for @spiral_pir//:spiral_lib) + cpu_features dep ----
+# Added 2026-06-22 to unblock the C++ Spiral facade. native-only build.
+http_archive(
+    name = "cpu_features",
+    sha256 = "bdb3484de8297c49b59955c3b22dba834401bc2df984ef5cfc17acbe69c5018e",
+    strip_prefix = "cpu_features-0.9.0",
+    urls = ["https://github.com/google/cpu_features/archive/refs/tags/v0.9.0.tar.gz"],
+)
+
+http_archive(
+    name = "hexl",
+    build_file = "//thirdparty/pir:BUILD.hexl",
+    patch_cmds = ["printf '#pragma once\\n#define HEXL_USE_GNU\\n#define HEXL_UNUSED(x) (void)(x)\\n' > hexl/include/hexl/util/defines.hpp"],
+    sha256 = "3692e6e6183dbc49253e51e86c3e52e7affcac925f57db0949dbb4d34b558a9a",
+    strip_prefix = "hexl-1.2.5",
+    urls = ["https://github.com/intel/hexl/archive/refs/tags/v1.2.5.tar.gz"],
+)

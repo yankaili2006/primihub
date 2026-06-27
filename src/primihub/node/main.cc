@@ -31,6 +31,7 @@
 #include "src/primihub/common/config/server_config.h"
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/service/dataset/meta_service/factory.h"
+#include "src/primihub/kernel/pir/operator/registry.h"
 #ifdef SGX
 #include "sgx/ra/service.h"
 #endif
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
     });
 
     google::InitGoogleLogging(argv[0]);
+    primihub::pir::PirRegistry::EnsureRegistered();
     FLAGS_colorlogtostderr = true;
     FLAGS_alsologtostderr = true;
     FLAGS_log_dir = "./log";
