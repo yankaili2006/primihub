@@ -53,11 +53,11 @@ different algorithms, not SIMD-width variants of one:
 
 ## Fix status
 
-**Fix (1) IMPLEMENTED** (primihub ): 
-now guards on  and returns FAIL with a
-clear message on AVX2-only hosts, rather than returning incorrect results.
-Verified on .50: real-mode  passes (OnExecute FAILs on the
-Broadwell host as intended); on AVX512 hosts SpiralPIR runs correctly.
+**Fix (1) IMPLEMENTED** (primihub `1c8dd886`): `SpiralPirOperator::OnExecute`
+now guards on `__builtin_cpu_supports("avx512f")` and returns FAIL with a clear
+message on AVX2-only hosts, rather than returning incorrect results. Verified on
+.50: real-mode `spiral_pir_test` passes (OnExecute FAILs on the Broadwell host
+as intended); on AVX512 hosts SpiralPIR runs correctly.
 
 ## Fix options
 
