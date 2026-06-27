@@ -42,6 +42,42 @@ __global__ void MatMulMod2Pow32Kernel(std::uint32_t* c, const std::uint32_t* a,
   if (row < rows && col < cols) c[row * cols + col] = acc;
 }
 
+// Specialized matrix-vector path (cols == 1): the DoublePIR Answer hot path.
+// Warp-per-row + coalesced uint4 loads + grid-stride + warp shuffle-reduce —
+// far higher memory throughput than the generic tiled matmul for a single
+// column (which wastes a 16x16 tile on one output element per row). Mirrors the
+// bench kernel in bench/cuda_vs_avx2_bench.cu. b is the length-`inner` vector.
+__global__ void MatVecMod2Pow32Kernel(std::uint32_t* c, const std::uint32_t* a,
+                                      const std::uint32_t* b, std::size_t rows,
+                                      std::size_t inner) {
+  const unsigned lane = threadIdx.x & 31u;
+  const std::size_t warps_per_block = blockDim.x >> 5;
+  const std::size_t warp_id =
+      static_cast<std::size_t>(blockIdx.x) * warps_per_block + (threadIdx.x >> 5);
+  const std::size_t total_warps =
+      static_cast<std::size_t>(gridDim.x) * warps_per_block;
+  const bool vec_ok = (inner % 4u == 0u);
+
+  for (std::size_t row = warp_id; row < rows; row += total_warps) {
+    const std::uint32_t* arow = a + row * inner;
+    std::uint32_t acc = 0;
+    if (vec_ok) {
+      const uint4* a4 = reinterpret_cast<const uint4*>(arow);
+      const uint4* b4 = reinterpret_cast<const uint4*>(b);
+      const std::size_t n4 = inner >> 2;
+      for (std::size_t j = lane; j < n4; j += 32) {
+        uint4 av = a4[j], bv = b4[j];
+        acc += av.x * bv.x + av.y * bv.y + av.z * bv.z + av.w * bv.w;
+      }
+    } else {
+      for (std::size_t k = lane; k < inner; k += 32) acc += arow[k] * b[k];
+    }
+    for (int off = 16; off > 0; off >>= 1)
+      acc += __shfl_down_sync(0xffffffffu, acc, off);
+    if (lane == 0) c[row] = acc;
+  }
+}
+
 }  // namespace
 
 bool CudaAvailable() {
@@ -60,12 +96,20 @@ void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
   cudaMemcpy(d_a, a, a_n * sizeof(std::uint32_t), cudaMemcpyHostToDevice);
   cudaMemcpy(d_b, b, b_n * sizeof(std::uint32_t), cudaMemcpyHostToDevice);
 
-  const dim3 threads(kTile, kTile);
-  const dim3 blocks((cols + kTile - 1) / kTile, (rows + kTile - 1) / kTile);
-  MatMulMod2Pow32Kernel<<<blocks, threads>>>(d_c, d_a, d_b,
-                                             static_cast<int>(rows),
-                                             static_cast<int>(inner),
-                                             static_cast<int>(cols));
+  if (cols == 1) {
+    // Answer hot path: dispatch the tuned warp-per-row matvec.
+    const int t = 256, wpb = t / 32;
+    long want = long((rows + wpb - 1) / wpb);
+    const int b = int(want > 65535 ? 65535 : want);
+    MatVecMod2Pow32Kernel<<<b, t>>>(d_c, d_a, d_b, rows, inner);
+  } else {
+    const dim3 threads(kTile, kTile);
+    const dim3 blocks((cols + kTile - 1) / kTile, (rows + kTile - 1) / kTile);
+    MatMulMod2Pow32Kernel<<<blocks, threads>>>(d_c, d_a, d_b,
+                                               static_cast<int>(rows),
+                                               static_cast<int>(inner),
+                                               static_cast<int>(cols));
+  }
   cudaDeviceSynchronize();
 
   cudaMemcpy(c, d_c, c_n * sizeof(std::uint32_t), cudaMemcpyDeviceToHost);

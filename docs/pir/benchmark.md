@@ -227,49 +227,75 @@ measurable there.
 
 ```bash
 bench/cuda_vs_avx2.sh [out.json]      # 1e8 default; needs nvcc + a GPU (RTX 5070 Ti)
-# Dims are argv-overridable on the cc directly for billion scale:
-nvcc -O3 -std=c++17 bench/cuda_vs_avx2_bench.cu -o /tmp/b && /tmp/b 125000 8000  # 1e9
+# Dims + resident-query count K are argv-overridable on the cc directly:
+nvcc -O3 -std=c++17 -arch=sm_120 bench/cuda_vs_avx2_bench.cu -o /tmp/b
+/tmp/b 125000 8000 32   # 1e9 DB, 32 distinct resident queries
 ```
 
-#### Baseline on local RTX 5070 Ti (2026-06-27, CUDA 13.2)
+#### Tuned kernel on local RTX 5070 Ti (2026-06-27, CUDA 13.2, sm_120)
 
-DB at 1e8 (12500 × 8000 uint32, 400 MB) and 1e9 (125000 × 8000 uint32, 4 GB):
+DB at 1e8 (12500 × 8000 uint32, 400 MB) and 1e9 (125000 × 8000 uint32, 4 GB),
+K=32 resident queries. The matvec kernel is now **warp-per-row + uint4
+(128-bit) vectorized loads + grid-stride** (was a thread-per-row tiled kernel):
 
-| scale | backend         | per-answer ms | GMAC/s | vs scalar | correct |
-|-------|-----------------|---------------|--------|-----------|---------|
-| 1e8   | scalar          | 34.34         | 2.91   | 1.0×      | ref     |
-| 1e8   | avx2            | 30.42         | 3.29   | 1.1×      | ok      |
-| 1e8   | **cuda (warm)** | **1.71**      | 58.48  | **20.1×** | ok      |
-| 1e8   | cuda (cold+DB)  | 51.19         | 1.95   | 0.7×      | —       |
-| **1e9** | scalar        | 374.17        | 2.67   | 1.0×      | ref     |
-| **1e9** | avx2          | 301.88        | 3.31   | 1.2×      | ok      |
-| **1e9** | **cuda (warm)** | **15.14**   | 66.06  | **24.7×** | ok      |
-| **1e9** | cuda (cold+DB)| 513.78        | 1.95   | 0.7×      | —       |
+| scale | backend                  | per-answer ms | GMAC/s | vs scalar | correct |
+|-------|--------------------------|---------------|--------|-----------|---------|
+| 1e8   | scalar                   | 47.37         | 2.11   | 1.0×      | ref     |
+| 1e8   | avx2                     | 32.34         | 3.09   | 1.5×      | ok      |
+| 1e8   | **cuda (warm)**          | **0.50**      | 200.34 | **94.9×** | ok      |
+| 1e8   | cuda (resident, K=32)    | 0.50          | 199.47 | 94.5×     | ok      |
+| 1e8   | cuda (kernel-only)       | 0.48          | 210.19 | 99.6×     | —       |
+| 1e8   | cuda (cold+DB)           | 54.83         | 1.82   | 0.9×      | —       |
+| **1e9** | scalar                 | 345.25        | 2.90   | 1.0×      | ref     |
+| **1e9** | avx2                   | 285.98        | 3.50   | 1.2×      | ok      |
+| **1e9** | **cuda (warm)**        | **4.84**      | 206.51 | **71.3×** | ok      |
+| **1e9** | cuda (resident, K=32)  | 4.83          | 206.85 | 71.4×     | ok      |
+| **1e9** | cuda (kernel-only)     | 4.73          | 211.23 | 72.9×     | —       |
+| **1e9** | cuda (cold+DB)         | 486.52        | 2.06   | 0.7×      | —       |
 
-One-time DB upload (PCIe H2D): **49.48 ms** at 1e8, **498.64 ms** at 1e9 (linear
-in DB bytes). The 1e9 DB (4 GB uint32) fits comfortably in the 16 GB card.
+**Before → after** (warm, same session, git-HEAD tiled kernel vs tuned
+warp-per-row, so thermal/driver state is identical):
+
+| scale | before (tiled) | after (tuned)  | speedup |
+|-------|----------------|----------------|---------|
+| 1e8   | 0.97 ms / 103.6 GMAC/s | **0.50 ms / 200.3 GMAC/s** | **1.9×** |
+| 1e9   | 14.68 ms / 68.1 GMAC/s | **4.84 ms / 206.5 GMAC/s** | **3.0×** |
+
+One-time DB upload (PCIe H2D): ~54 ms at 1e8, ~482 ms at 1e9 (linear in DB
+bytes). The 1e9 DB (4 GB uint32) fits comfortably in the 16 GB card.
 
 Observations:
-* **GPU wins ~20–25× once the DB is resident** (warm 1.71 ms @1e8, 15.1 ms @1e9
-  vs scalar 34 / 374 ms). The kernel is a plain tiled matvec — correctness-first,
-  untuned — so this is a floor, not a ceiling.
-* **Warm GPU throughput *rises* with scale** — 58 → 66 GMAC/s from 1e8 to 1e9 —
-  because more rows give the SM scheduler more parallelism to hide memory
-  latency. CPU GMAC/s is flat (~3, memory-bound) at both scales.
-* **Cold per-query loses to CPU** (0.7×) because it pays the one-time PCIe upload
-  every call. GPU only pays off when the database stays device-resident across
-  many queries — the realistic Answer-server pattern (hint/DB built once, queried
-  repeatedly). At 1e9 the ~0.5 s upload is amortised after ~1 query vs the warm
-  GPU, and dwarfed over a real query stream.
-* AVX2 is only ~1.1–1.2× over scalar: the working set blows past L3 at both
+* **The tuned kernel is at the memory-bandwidth bound.** Kernel-only achieves
+  **841 GB/s @1e8 / 845 GB/s @1e9**, i.e. **~94% of the card's ~896 GB/s** peak
+  HBM bandwidth. This matvec reads the whole DB once per answer and does one
+  MAC per element, so it is fundamentally bandwidth-bound — 94% of peak is
+  essentially the ceiling, not a floor. The earlier note that throughput "rises
+  with scale" was an artifact of the uncoalesced thread-per-row kernel; with
+  coalesced warp-per-row loads, both scales now sit at ~205 GMAC/s.
+* **GPU wins ~70–95× once the DB is resident** (warm 0.50 ms @1e8, 4.84 ms @1e9
+  vs scalar 47 / 345 ms). The `resident, K=32` row confirms the warm number
+  holds across distinct queries (DB uploaded once, 32 distinct `q` looped):
+  per-query cost is unchanged, so there is no hidden per-query setup.
+* **kernel-only ≈ warm**: the gap between kernel-only (no PCIe) and warm is
+  <0.1 ms even at 1e9, so the H2D copy of `q` (32 KB) and the D2H copy of the
+  answer are negligible — the warm number is honestly the compute.
+* **Cold per-query loses to CPU** (0.7–0.9×) because it pays the one-time PCIe
+  upload every call. GPU only pays off when the DB stays device-resident across
+  many queries — the realistic Answer-server pattern (hint/DB built once,
+  queried repeatedly). At 1e9 the ~0.48 s upload is amortised after ~1 query.
+* AVX2 is only ~1.2–1.5× over scalar: the working set blows past L3 at both
   scales, so this matvec is memory-bound on CPU and SIMD width barely helps —
   exactly the regime where moving the DB to GPU HBM pays.
-* `bench/cuda_vs_avx2_bench.cu main()` takes optional `rows inner` args (default
-  12500 8000 = 1e8); pass `125000 8000` for 1e9. Result JSONs are gitignored
-  (local-only).
+* `bench/cuda_vs_avx2_bench.cu main()` takes optional `rows inner K` args
+  (default 12500 8000 32 = 1e8, 32 resident queries); pass `125000 8000 32` for
+  1e9. Result JSONs are gitignored (local-only).
 
-Follow-up: reuse `pir-acc/SIGMA`'s tuned CUDA NTT + device-resident data to lift
-the warm number further (the current kernels are correctness-first).
+Follow-up: the matvec kernel is now bandwidth-bound (done). The SpiralPIR CUDA
+kernel now carries a **self-contained Barrett negacyclic NTT** (forward+inverse,
+`spiral_pir/cuda/ntt_device.cuh`, no SIGMA link) verified by round-trip + CPU
+negacyclic-convolution tests — so it does the real transform rather than
+assuming pre-NTT'd inputs. Remaining lever for SpiralPIR is NTT throughput
+tuning (radix-4 / vectorized twiddles), tracked separately.
 
 ## Result file shapes
 

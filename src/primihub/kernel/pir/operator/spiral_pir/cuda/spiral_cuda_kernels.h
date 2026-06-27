@@ -49,6 +49,17 @@ void ApplyGaloisNtt(std::uint64_t* out, const std::uint64_t* in,
                     const std::size_t* table, std::size_t crt_count,
                     std::size_t poly_len);
 
+// Forward / inverse negacyclic NTT (mod x^poly_len + 1) over data[crt_count]
+// [poly_len], each residue reduced mod moduli[c]. In place on the host buffer.
+// Self-contained (Barrett reused from SIGMA, no SIGMA link); see ntt_device.cuh.
+// Forward(a) (x) Forward(b) pointwise, then Inverse, equals the negacyclic
+// product a*b mod (x^N+1). poly_len must be a power of two with 2*poly_len |
+// (moduli[c]-1) (the spiral DEFAULT_MODULI satisfy this for poly_len=2048).
+void ForwardNttCrt(std::uint64_t* data, const std::uint64_t* moduli,
+                   std::size_t crt_count, std::size_t poly_len);
+void InverseNttCrt(std::uint64_t* data, const std::uint64_t* moduli,
+                   std::size_t crt_count, std::size_t poly_len);
+
 }  // namespace primihub::pir::spiral::cuda
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_SPIRAL_PIR_CUDA_SPIRAL_CUDA_KERNELS_H_

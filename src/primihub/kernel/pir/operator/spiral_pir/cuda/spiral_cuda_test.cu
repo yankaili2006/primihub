@@ -68,5 +68,59 @@ int main() {
   std::printf("Galois automorphism (poly_len=%zu, crt=%zu): %zu mismatches -> %s\n",
               pl, crt, gmis, gmis == 0 ? "PASS" : "FAIL");
 
-  return (mismatch == 0 && gmis == 0) ? 0 : 1;
+  // --- NTT round-trip: Forward then Inverse must recover the input exactly ---
+  std::vector<std::uint64_t> poly(crt * pl), orig(crt * pl);
+  for (std::size_t c = 0; c < crt; ++c)
+    for (std::size_t i = 0; i < pl; ++i) {
+      s = rnd(s + 1);
+      orig[c * pl + i] = poly[c * pl + i] = s % moduli[c];
+    }
+  ForwardNttCrt(poly.data(), moduli, crt, pl);
+  InverseNttCrt(poly.data(), moduli, crt, pl);
+  std::size_t rtmis = 0;
+  for (std::size_t i = 0; i < poly.size(); ++i)
+    if (poly[i] != orig[i]) ++rtmis;
+  std::printf("NTT round-trip (poly_len=%zu, crt=%zu): %zu mismatches -> %s\n",
+              pl, crt, rtmis, rtmis == 0 ? "PASS" : "FAIL");
+
+  // --- Full negacyclic product: Forward(a) (x) Forward(b) -> Inverse must equal
+  //     the schoolbook negacyclic convolution a*b mod (x^pl + 1) per residue. ---
+  std::vector<std::uint64_t> pa(crt * pl), pb(crt * pl);
+  for (std::size_t c = 0; c < crt; ++c)
+    for (std::size_t i = 0; i < pl; ++i) {
+      s = rnd(s + 1); pa[c * pl + i] = s % moduli[c];
+      s = rnd(s + 1); pb[c * pl + i] = s % moduli[c];
+    }
+  // CPU reference: negacyclic conv  c[n] = sum_{i+j=n} a_i b_j - sum_{i+j=n+pl} a_i b_j.
+  std::vector<std::uint64_t> cref(crt * pl, 0);
+  for (std::size_t c = 0; c < crt; ++c) {
+    const unsigned __int128 q = moduli[c];
+    for (std::size_t n = 0; n < pl; ++n) {
+      __int128 acc = 0;
+      for (std::size_t i = 0; i <= n; ++i)
+        acc += (unsigned __int128)pa[c * pl + i] * pb[c * pl + (n - i)];
+      for (std::size_t i = n + 1; i < pl; ++i)
+        acc -= (__int128)((unsigned __int128)pa[c * pl + i] * pb[c * pl + (pl + n - i)]);
+      __int128 m = acc % (__int128)q;
+      if (m < 0) m += (__int128)q;
+      cref[c * pl + n] = (std::uint64_t)m;
+    }
+  }
+  // GPU: transform both, pointwise-multiply per residue (host), inverse.
+  std::vector<std::uint64_t> ga = pa, gb = pb;
+  ForwardNttCrt(ga.data(), moduli, crt, pl);
+  ForwardNttCrt(gb.data(), moduli, crt, pl);
+  std::vector<std::uint64_t> gc(crt * pl);
+  for (std::size_t c = 0; c < crt; ++c)
+    for (std::size_t i = 0; i < pl; ++i)
+      gc[c * pl + i] = (std::uint64_t)((unsigned __int128)ga[c * pl + i] *
+                                       gb[c * pl + i] % moduli[c]);
+  InverseNttCrt(gc.data(), moduli, crt, pl);
+  std::size_t cmis = 0;
+  for (std::size_t i = 0; i < gc.size(); ++i)
+    if (gc[i] != cref[i]) ++cmis;
+  std::printf("Negacyclic product via NTT (poly_len=%zu, crt=%zu): %zu mismatches -> %s\n",
+              pl, crt, cmis, cmis == 0 ? "PASS" : "FAIL");
+
+  return (mismatch == 0 && gmis == 0 && rtmis == 0 && cmis == 0) ? 0 : 1;
 }
