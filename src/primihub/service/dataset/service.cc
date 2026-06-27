@@ -213,12 +213,35 @@ void DatasetService::loadDefaultDatasets(const std::string& config_file_path) {
 }
 
 // Load dataset from local meta storage.
+//
+// IMPORTANT (2026-06-04 fix): Skip cross-node mirrored rows.
+//   GetAllMetas returns ALL rows in the local fusion DB, which after cross-org
+//   mirror (see offline-deploy/mirror-datasets.sh) includes datasets whose data
+//   files live on remote nodes. Previously this function unconditionally called
+//   meta.setServerInfo(nodelet_addr_) + PutMeta on every row, which rewrote
+//   remote datasets' addresses to point at the LOCAL node — breaking cli PSI
+//   cross-node dispatch because both parties would resolve to the same node.
+//
+//   We now only re-register and re-publish metas whose server address is empty
+//   or already matches the local node. Cross-node rows are left alone — they
+//   stay queryable via meta lookups but we don't pretend to own their data.
 void DatasetService::restoreDatasetFromLocalStorage() {
   LOG(INFO) << "💾 Restore dataset from local storage...";
   std::vector<DatasetMeta> metas;
   MetaService()->GetAllMetas(&metas);
+  size_t restored = 0, skipped = 0;
   for (auto& meta : metas) {
     try {
+      auto server_info = meta.getServerInfo();
+      // Skip rows owned by other nodes (mirrored from sibling fusion DBs).
+      if (!server_info.empty() && server_info != nodelet_addr_) {
+        VLOG(5) << "skip restore for cross-node dataset "
+                << meta.getDescription()
+                << " (server=" << server_info
+                << " local=" << nodelet_addr_ << ")";
+        ++skipped;
+        continue;
+      }
       auto meta_info = meta.toJSON();
       VLOG(5) << "meta_info: " << meta_info;
       std::string driver_type = meta.getDriverType();
@@ -236,10 +259,13 @@ void DatasetService::restoreDatasetFromLocalStorage() {
       meta.setServerInfo(nodelet_addr_);
       // Publish dataset meta on public network.
       MetaService()->PutMeta(meta);
+      ++restored;
     } catch (std::exception& e) {
       LOG(ERROR) << e.what();
     }
   }
+  LOG(INFO) << "💾 Restore done: restored=" << restored
+            << " skipped_cross_node=" << skipped;
 }
 
 void DatasetService::setMetaSearchTimeout(unsigned int timeout) {
