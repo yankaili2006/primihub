@@ -32,7 +32,7 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
   // docs/pir/spiral-calibration-notes.md). Fail loudly on AVX2-only hosts
   // (e.g. Broadwell .50) rather than silently return incorrect results.
   __builtin_cpu_init();
-  if (!__builtin_cpu_supports("avx512f")) {
+  if (!__builtin_cpu_supports("avx2")) {
     LOG(ERROR) << "SpiralPirOperator: requires an AVX512F-capable CPU; "
                   "this host lacks it. Upstream spiral's non-AVX512 path "
                   "decodes incorrectly -- refusing to return wrong data. "
@@ -60,13 +60,12 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
     return retcode::FAIL;
   }
 
-  // KNOWN ISSUE ("Is correct?: 0" on .50): ROOT-CAUSED to upstream spiral's
-  // BROKEN non-AVX512 fallback in multiplyQueryByDatabase (spiral.cpp #else
-  // L932-997). SpiralPIR decodes correctly ONLY with __AVX512F__; .50 is
-  // Broadwell (AVX2) so the broken scalar path runs. NOT a primihub param
-  // bug (proven by controlled standalone build). Fix: require AVX512 for
-  // SpiralPIR, or port the scalar fallback. See
-  // docs/pir/spiral-calibration-notes.md.
+  // FIXED ("Is correct?: 0" on .50): upstream spiral's AVX2 multiplyQueryByDatabase
+  // path had two bugs vs the AVX512 path (random_data index zeroing + a missing
+  // small-dim0 guard); patched via thirdparty/pir/spiral_avx2_fix.patch. SpiralPIR
+  // now decodes correctly on AVX2 (verified real-mode on Broadwell .50). The
+  // guard below requires AVX2 (the no-SIMD scalar #else remains unverified).
+  // See docs/pir/spiral-calibration-notes.md.
   // Pick params from the requested index + a small default record size.
   // v1 limitation: SmokeTest's load_db ignores caller-supplied records;
   // the DB is constant-valued. Record size is informational only.

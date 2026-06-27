@@ -753,6 +753,8 @@ new_git_repository(
     # never called at runtime — see
     # src/primihub/kernel/pir/operator/spiral_pir/spiral_runtime.cc for
     # the testHighRate stub that satisfies link-time references.
+    patches = ["@//thirdparty/pir:spiral_avx2_fix.patch"],
+    patch_args = ["-p1"],
     patch_cmds = [
         "sed -i \"s|^int main(int argc, char \\\\*argv\\\\[\\\\])|int spiral_main_disabled(int argc, char *argv[])|\" src/spiral.cpp",
     ],
