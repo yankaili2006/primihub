@@ -53,6 +53,20 @@ different algorithms, not SIMD-width variants of one:
 
 ## Fix status
 
+**RESOLVED — fix (2) implemented** (primihub `12cdc504`+`f725d2c6`): patched
+the AVX2 path in `multiplyQueryByDatabase` to match the AVX512 path
+(`thirdparty/pir/spiral_avx2_fix.patch`, wired via the `@spiral_pir` pin
+`patches=`). Two AVX2 bugs vs AVX512: (a) `random_data` mode zeroed
+`idx_a_base`/`idx_b_base` (benchmark hack) -> every coefficient read the z=0
+block; (b) missing the small-`dim0` guard -> `outer_limit=0` for small nu.
+(Bonus: the scalar `#else` `rand()`->`z%` fix too.) **SpiralPIR now decodes
+correctly on AVX2** -- verified standalone on Broadwell for every nu tested
+AND primihub real-mode `spiral_runtime_test` on .50 prints `Is correct?: 1`;
+full PIR regression 69/69. The runtime guard was relaxed avx512f -> avx2 (the
+no-SIMD scalar `#else` is the only remaining unverified path; irrelevant on
+any AVX2+ host).
+
+
 **Fix (1) IMPLEMENTED** (primihub `1c8dd886`): `SpiralPirOperator::OnExecute`
 now guards on `__builtin_cpu_supports("avx512f")` and returns FAIL with a clear
 message on AVX2-only hosts, rather than returning incorrect results. Verified on
