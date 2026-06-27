@@ -291,11 +291,48 @@ Observations:
   1e9. Result JSONs are gitignored (local-only).
 
 Follow-up: the matvec kernel is now bandwidth-bound (done). The SpiralPIR CUDA
-kernel now carries a **self-contained Barrett negacyclic NTT** (forward+inverse,
+kernel carries a **self-contained Barrett negacyclic NTT** (forward+inverse,
 `spiral_pir/cuda/ntt_device.cuh`, no SIGMA link) verified by round-trip + CPU
-negacyclic-convolution tests — so it does the real transform rather than
-assuming pre-NTT'd inputs. Remaining lever for SpiralPIR is NTT throughput
-tuning (radix-4 / vectorized twiddles), tracked separately.
+negacyclic-convolution tests.
+
+### SpiralPIR NTT: radix-4 + batched device-resident path (2026-06-27, RTX 5070 Ti, sm_120)
+
+The NTT (SpiralPIR query-expansion / GSW path, **not** the billion-scale matvec)
+got two changes, measured by `spiral_pir/cuda/spiral_ntt_bench.cu` at spiral's
+real params (poly_len=2048, crt=2, the two ~28-bit DEFAULT_MODULI):
+
+1. **radix-4 butterfly** — fuses two consecutive radix-2 DIT stages in registers
+   (same `bitrev`/`w[]` tables, indices stay < N/2), halving `__syncthreads()`
+   and shared-memory round trips (11 → 6 stages). Kernel-only forward+inverse:
+
+   | polys | radix-2 ms | radix-4 ms | speedup |
+   |-------|-----------|-----------|---------|
+   | 1     | 0.0274    | 0.0251    | 1.09×   |
+   | 256   | 0.1479    | 0.1394    | 1.06×   |
+   | 4096  | 2.344     | 2.321     | 1.01×   |
+
+   The win is modest and shrinks with batch: the kernel is **Barrett-multiply-
+   bound** (radix-4 keeps the same modular-mul count, only cutting syncs and
+   shared-memory traffic), so barrier savings only help where launch latency
+   dominates.
+
+2. **batched device-resident host path** — replaces the original per-residue
+   `cudaMalloc`/4×memcpy/free + host table rebuild + single-block `<<<1,…>>>`
+   launch with one grid over all (poly, residue) instances and tables uploaded
+   once. End-to-end (incl. H2D/D2H + alloc), forward+inverse:
+
+   | polys | original ms | batched ms | speedup |
+   |-------|------------|-----------|---------|
+   | 64    | 66.1       | 2.28      | 29×     |
+   | 256   | 266.8      | 5.61      | 48×     |
+   | 1024  | 1081.8     | 34.7      | 31×     |
+
+   This is the dominant win — the original path was launch/alloc-bound, not
+   compute-bound. radix-4 is the production default; the radix-2 kernel is
+   retained behind `-DSPIRAL_NTT_BENCH` for comparison.
+
+Further NTT levers (cheaper modular mul via Montgomery, vectorized twiddles)
+would target the Barrett-mul bound but are out of scope here.
 
 ## Result file shapes
 

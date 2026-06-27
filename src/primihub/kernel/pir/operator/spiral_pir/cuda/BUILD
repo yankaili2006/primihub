@@ -14,8 +14,15 @@ package(default_visibility = ["//visibility:public"])
 #
 # Standalone build + validation (RTX 5070 Ti / CUDA 13.2 -- both kernels exact
 # vs a CPU reference at poly_len=2048, crt=2):
-#   nvcc -O2 -std=c++17 spiral_cuda_kernels.cu spiral_cuda_test.cu -I. \
-#        -o spiral_cuda_test && ./spiral_cuda_test
+#   nvcc -arch=sm_120 --expt-relaxed-constexpr -O3 \
+#        spiral_cuda_kernels.cu spiral_cuda_test.cu -I. -o spiral_cuda_test \
+#        && ./spiral_cuda_test
+# NTT perf microbench (radix-2 vs radix-4 kernel + batched-vs-original host path):
+#   nvcc -arch=sm_120 --expt-relaxed-constexpr -O3 -DSPIRAL_NTT_BENCH \
+#        spiral_cuda_kernels.cu spiral_ntt_bench.cu -I. -o spiral_ntt_bench \
+#        && ./spiral_ntt_bench
+# The bench-only timing entry points in spiral_cuda_kernels.cu are compiled out
+# unless -DSPIRAL_NTT_BENCH is set, so the library carries no bench code.
 # NOTE: the bazel enable_cuda path below is the integration structure; it
 # requires nvcc in PATH on a GPU host and is NOT exercised in CI.
 filegroup(
@@ -24,6 +31,7 @@ filegroup(
         "spiral_cuda_kernels.cu",
         "spiral_cuda_kernels.h",
         "spiral_cuda_test.cu",
+        "spiral_ntt_bench.cu",
     ],
 )
 
