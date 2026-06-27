@@ -75,18 +75,19 @@ the agreed contract; these tasks make it real, so flip its `## Purpose`
 ## Out-of-band (not infra-gated — do anytime)
 
 - [ ] **Rotate the exposed GitHub PAT.** A classic PAT (account `yankaili2006`,
-      `repo` scope) was exposed and over-scoped. As of 2026-06-27 the stored token
-      already returns **HTTP 401** (expired or revoked) — so it is no longer
-      exploitable, but Vault `secret/pcloud/github` now holds a DEAD credential and
-      must be replaced. Helper scripts (run ON the Vault host .50; GitHub removed
-      the PAT-creation API, so token creation/revocation stay manual in browser):
+      `repo` scope) was exposed. As of 2026-06-27 the stored token already returns
+      **HTTP 401** (expired/revoked) — no longer exploitable, but Vault
+      `secret/pcloud/github` holds a dead credential to replace. Rotation now runs
+      through the **vault skill** (paste-safe input + pre-write GitHub validation +
+      in-Vault audit log), not ad-hoc scripts:
       1. Browser: https://github.com/settings/tokens -> Generate new token
-         (classic) -> tick ONLY `repo` -> copy.
-      2. `docs/pir/rotate-github-pat.sh` — paste-safe; validates identity + scopes
-         against the GitHub API BEFORE writing, then `vault kv patch`es it in.
+         (classic) -> tick ONLY `repo` -> copy. (GitHub has no PAT-creation API.)
+      2. `cd <pcloud>/skills/vault && python3 skill.py rotate pcloud/github \
+            --field token --validate github --expect-user yankaili2006 \
+            --note "classic PAT repo scope (rotated <date>)"`  (paste when prompted)
       3. Browser: revoke the old token.
-      4. `docs/pir/verify-github-pat.sh --check-old` — confirms the new token works
-         (identity / repo read / not over-scoped) and the old one is revoked (401).
+      4. `python3 skill.py rotation-log pcloud/github` to confirm the audit entry;
+         re-run any consumer to confirm the new token works.
 
 ## Optional follow-ups (perf, non-blocking)
 
