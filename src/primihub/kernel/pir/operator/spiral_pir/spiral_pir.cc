@@ -26,6 +26,20 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
     return retcode::FAIL;
   }
 
+  // SpiralPIR is correct ONLY with AVX512: upstream's non-AVX512
+  // multiplyQueryByDatabase fallback is broken and decodes garbage
+  // (root-caused via a controlled standalone build -- see
+  // docs/pir/spiral-calibration-notes.md). Fail loudly on AVX2-only hosts
+  // (e.g. Broadwell .50) rather than silently return incorrect results.
+  __builtin_cpu_init();
+  if (!__builtin_cpu_supports("avx512f")) {
+    LOG(ERROR) << "SpiralPirOperator: requires an AVX512F-capable CPU; "
+                  "this host lacks it. Upstream spiral's non-AVX512 path "
+                  "decodes incorrectly -- refusing to return wrong data. "
+                  "See docs/pir/spiral-calibration-notes.md.";
+    return retcode::FAIL;
+  }
+
   // v1 same-process simulation contract: input is one entry whose key is
   // a stringified PIR index ("0", "1", ...). All other keys are ignored
   // (caller may pass a multi-key map but only the first is queried). The
