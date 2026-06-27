@@ -74,9 +74,12 @@ __global__ void MatVecKernel(const std::uint32_t* a, const std::uint32_t* q,
   out[i] = acc;
 }
 
-int main() {
-  const std::size_t rows = 12500, inner = 8000;  // ~1e8 DB entries
-  const std::size_t n = rows * inner;
+int main(int argc, char** argv) {
+  // Dimensions are argv-overridable so the same bench runs at 1e8 (default) or
+  // billion scale:  ./bench [rows] [inner]   e.g. 125000 8000 = 1e9 uint32.
+  const std::size_t rows = (argc > 1) ? std::strtoull(argv[1], nullptr, 10) : 12500;
+  const std::size_t inner = (argc > 2) ? std::strtoull(argv[2], nullptr, 10) : 8000;
+  const std::size_t n = rows * inner;  // ~1e8 DB entries by default
   std::printf("DB = %zu x %zu = %.2e uint32 (%.0f MB); answer = %zu\n", rows,
               inner, double(n), double(n) * 4 / 1e6, rows);
 

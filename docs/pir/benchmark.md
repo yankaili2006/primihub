@@ -226,35 +226,47 @@ checked against the scalar reference (`correct` column). On a CPU-only host
 measurable there.
 
 ```bash
-bench/cuda_vs_avx2.sh [out.json]   # needs nvcc + a GPU (e.g. local RTX 5070 Ti)
+bench/cuda_vs_avx2.sh [out.json]      # 1e8 default; needs nvcc + a GPU (RTX 5070 Ti)
+# Dims are argv-overridable on the cc directly for billion scale:
+nvcc -O3 -std=c++17 bench/cuda_vs_avx2_bench.cu -o /tmp/b && /tmp/b 125000 8000  # 1e9
 ```
 
 #### Baseline on local RTX 5070 Ti (2026-06-27, CUDA 13.2)
 
-DB = 12500 × 8000 = 1.00e8 uint32 (400 MB); answer length 12500.
+DB at 1e8 (12500 × 8000 uint32, 400 MB) and 1e9 (125000 × 8000 uint32, 4 GB):
 
-| backend          | per-answer ms | GMAC/s | vs scalar | correct |
-|------------------|---------------|--------|-----------|---------|
-| scalar           | 34.34         | 2.91   | 1.0×      | ref     |
-| avx2             | 30.42         | 3.29   | 1.1×      | ok      |
-| **cuda (warm)**  | **1.71**      | 58.48  | **20.1×** | ok      |
-| cuda (cold+DB)   | 51.19         | 1.95   | 0.7×      | —       |
+| scale | backend         | per-answer ms | GMAC/s | vs scalar | correct |
+|-------|-----------------|---------------|--------|-----------|---------|
+| 1e8   | scalar          | 34.34         | 2.91   | 1.0×      | ref     |
+| 1e8   | avx2            | 30.42         | 3.29   | 1.1×      | ok      |
+| 1e8   | **cuda (warm)** | **1.71**      | 58.48  | **20.1×** | ok      |
+| 1e8   | cuda (cold+DB)  | 51.19         | 1.95   | 0.7×      | —       |
+| **1e9** | scalar        | 374.17        | 2.67   | 1.0×      | ref     |
+| **1e9** | avx2          | 301.88        | 3.31   | 1.2×      | ok      |
+| **1e9** | **cuda (warm)** | **15.14**   | 66.06  | **24.7×** | ok      |
+| **1e9** | cuda (cold+DB)| 513.78        | 1.95   | 0.7×      | —       |
 
-One-time DB upload: **49.48 ms** (PCIe H2D of the 400 MB matrix).
+One-time DB upload (PCIe H2D): **49.48 ms** at 1e8, **498.64 ms** at 1e9 (linear
+in DB bytes). The 1e9 DB (4 GB uint32) fits comfortably in the 16 GB card.
 
 Observations:
-* **GPU wins ~20× once the DB is resident** (warm 1.71 ms vs scalar 34.3 / AVX2
-  30.4 ms). The kernel is a plain tiled matvec — correctness-first, untuned — so
-  this is a floor, not a ceiling.
-* **Cold per-query loses to CPU** (51.2 ms) because it pays the ~49 ms PCIe
-  upload every call. GPU only pays off when the database stays device-resident
-  across many queries — which is the realistic Answer-server pattern (hint/DB
-  built once, queried repeatedly).
-* AVX2 is only ~1.1× over scalar here: at 1e8 the working set blows past L3, so
-  this matvec is memory-bound on CPU and SIMD width barely helps — exactly the
-  regime where moving the DB to GPU HBM pays.
-* Result JSON (gitignored, local-only):
-  `bench/results/cuda_vs_avx2_local_2026-06-27.json`.
+* **GPU wins ~20–25× once the DB is resident** (warm 1.71 ms @1e8, 15.1 ms @1e9
+  vs scalar 34 / 374 ms). The kernel is a plain tiled matvec — correctness-first,
+  untuned — so this is a floor, not a ceiling.
+* **Warm GPU throughput *rises* with scale** — 58 → 66 GMAC/s from 1e8 to 1e9 —
+  because more rows give the SM scheduler more parallelism to hide memory
+  latency. CPU GMAC/s is flat (~3, memory-bound) at both scales.
+* **Cold per-query loses to CPU** (0.7×) because it pays the one-time PCIe upload
+  every call. GPU only pays off when the database stays device-resident across
+  many queries — the realistic Answer-server pattern (hint/DB built once, queried
+  repeatedly). At 1e9 the ~0.5 s upload is amortised after ~1 query vs the warm
+  GPU, and dwarfed over a real query stream.
+* AVX2 is only ~1.1–1.2× over scalar: the working set blows past L3 at both
+  scales, so this matvec is memory-bound on CPU and SIMD width barely helps —
+  exactly the regime where moving the DB to GPU HBM pays.
+* `bench/cuda_vs_avx2_bench.cu main()` takes optional `rows inner` args (default
+  12500 8000 = 1e8); pass `125000 8000` for 1e9. Result JSONs are gitignored
+  (local-only).
 
 Follow-up: reuse `pir-acc/SIGMA`'s tuned CUDA NTT + device-resident data to lift
 the warm number further (the current kernels are correctness-first).
