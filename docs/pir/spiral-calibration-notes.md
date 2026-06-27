@@ -1,95 +1,87 @@
-# SpiralPIR "Is correct?: 0" — root-cause diagnosis (2026-06-27)
+# SpiralPIR "Is correct?: 0" — ROOT CAUSE FOUND (2026-06-27)
 
-Status: **root cause identified; fix requires a buildable host to verify**
-(`.50` cannot build spiral real-mode — the `menonsamir/spiral` clone is
-GFW-blocked there, same as APSI/SEAL).
+**Resolved by a controlled standalone build on a GPU/AVX512 box.** The bug is an
+**upstream correctness bug in spiral's non-AVX512 fallback**, NOT a primihub
+calibration/param issue. (An earlier revision of this note guessed a
+defines↔(nu_1,nu_2) mismatch — that hypothesis was **disproved**; see below.)
 
-## Symptom
+## The finding (one line)
 
-`SpiralRuntime::SmokeTest` drives upstream `load_db()` + `do_test()` in-process.
-`do_test()` (upstream `src/spiral.cpp` L2408) is upstream's *own* self-test:
-generate_setup_and_query → process_crtd_query → (modswitch) → `check_final`,
-which prints `Is correct?: <is_eq(pt_real, M_result)>` (L1494). We get `0`.
+`menonsamir/spiral` only decodes correctly when compiled with **AVX512**
+(`__AVX512F__`). Its scalar/AVX2 fallback in `multiplyQueryByDatabase`
+(`src/spiral.cpp` `#else` at L932–997, vs the AVX512 `#if` at L640–931) is a
+stale, **incorrect** reimplementation. `.50` is Broadwell (AVX2 only) →
+`-march=native` defines no `__AVX512F__` → the broken fallback runs →
+`Is correct?: 0`.
 
-## What is NOT the cause (ruled out by reading upstream main())
+## Controlled experiment (same source, same SPIRAL_DEFINES, same HEXL .a)
 
-Our `EnsureInitialized` + `SmokeTest` faithfully mirror upstream `main()`
-(L1228–1344):
-- start sequence (`omp_set_num_threads(1)`, `build_table()`, `scratch` malloc,
-  `ntt_qprime = new NTT(2048, arb_qprime)`) — **matches**.
-- `IDX_DIM0 = IDX_TARGET / (1<<further_dims)` — **matches**.
-- `dummyWorkingSet = min((1<<25)/total_n, poly_len)` — **matches**.
-- `do_MatPol_test()` — we skip it, but it's a side-effect-free NTT round-trip
-  self-test (L1181) → harmless.
-- `max_trials` — `do_test()` uses a **local** `num_trials = 1` (L2433), so the
-  global is a no-op.
-- `checking_for_debug` — `do_test()` sets it `true` itself (L2434).
+Built upstream spiral standalone on the local RTX-5070-Ti box (HEXL 1.2.5 + the
+cpu_features objects pulled from .50), `./spiral nu1 nu2 idx a --random-data`:
 
-So the in-process *driving* is correct. The fault is in the **parameters**.
+| build flags | `Is correct?` |
+|---|---|
+| `-O3 -march=native` (AVX512 present) | **1** for every nu: (8,2)(9,4)(10,10)(4,4)(5,5)(8,6) |
+| `-O3 -march=native -mno-avx512f`     | **0** |
+| `-O3 -march=broadwell`               | **0** |
 
-## Root cause: compile-time defines and runtime (nu_1, nu_2) are decoupled
+The primihub `EnsureInitialized`+`SmokeTest` driving sequence, replicated
+verbatim in a standalone `main`, also prints **1** under AVX512 — so the
+in-process driving and params are correct. And building primihub's *actual*
+`spiral_runtime_test` real-mode ON .50 (via `--override_repository=spiral_pir=`
+my local source) reproduced **`Is correct?: 0`** — confirming it's the .50
+(Broadwell) build, not the logic.
 
-Upstream selects the crypto parameters as **one matched bundle** via
-`select_params.py`:
-- `param_f` (L337) emits exactly our define names:
-  `TEXP TEXPRIGHT TCONV TGSW QPBITS PVALUE QNUMFIRST QNUMREST OUTN`.
-- the optimized param vector (`all_ks`, L288) is
-  `['p','q_prime_bits','nu_1','nu_2','t_GSW','t_conv','t_exp','t_exp_right']`
-  — i.e. **`nu_1`/`nu_2` are co-optimized with the gadget dims + modulus**, and
-  `pred()` only accepts `(nu_1,nu_2)` present in `exp_lut`/`fdim_lut`.
-- upstream `CMakeLists.txt` substitutes `-D$(TEXP)…` from that single run.
+→ The discriminator is **exactly `__AVX512F__`**.
 
-primihub decoupled the two halves:
-1. `thirdparty/pir/BUILD.spiral` **hardcodes one define set** —
-   `TEXP=8 TEXPRIGHT=56 TCONV=4 TGSW=10 QPBITS=22 PVALUE=256 QNUMFIRST=1
-   QNUMREST=0 OUTN=2` — for the "wiki" 1M-record / 256-byte config
-   (query_size 14336 B), whose matched dims are `nu_1+nu_2 = 20`.
-2. `spiral_pir.cc` then calls `EstimateParams(db_size = index+1, 256)` which
-   picks `(nu_1,nu_2)` **independently** from the tiny SmokeTest DB
-   (e.g. index small → `(4,4)`, `total_n=256`; the runtime test's 1024 →
-   `(5,5)`).
+## Why the fallback is wrong (`src/spiral.cpp` L640 vs L932)
 
-The compiled crypto instance (modulus chain / gadget decomposition baked in by
-`setup_constants()` from the 1M-config defines) is therefore run with
-`nu_1/nu_2` it was not generated for → `check_final` decodes garbage → `0`.
+`multiplyQueryByDatabase` is the first-dimension matmul. The two branches are
+different algorithms, not SIMD-width variants of one:
 
-Secondary suspicion to check during the fix: `QNUMFIRST=1, QNUMREST=0` is a
-single-prime (~2^28) modulus; verify it actually carries the 1M config's
-`nu_2`-fold noise budget — it may be an incomplete copy of the wiki define set.
+- **AVX512 (L640–931):** packed-CRT representation — two residues packed in a
+  64-bit word, extracted via `>> packed_offset_2` + `_mm512_mul_epu32` (low-32×
+  low-32), accumulating `sums_out_n0` / `sums_out_n2` with periodic
+  `% q_intermediate`.
+- **scalar `#else` (L932–997):** naive `lo = v_a`, `hi = v_a>>32` split,
+  `sums_out_n0 += lo*b_lo`, `sums_out_n1 += hi*b_hi`, final `% p_i` / `% b_i`.
+  This does **not** implement the packed_offset_2 / q_intermediate scheme, so
+  the residues come out wrong. Independently, L937 also uses
+  `rand() % dummyWorkingSet` where the AVX512 path (L647) uses
+  `z % dummyWorkingSet` (a second divergence; fixing it alone does not help —
+  verified).
 
-## Fix (needs verification on a buildable host)
+## Fix options
 
-Make the runtime dims match the compiled defines. Two options:
+1. **Recommended / pragmatic — require AVX512 for SpiralPIR.** The Spiral paper
+   targets AVX512 servers; production / GPU hosts have it; on AVX512 the default
+   primihub build already decodes correctly. Make `SpiralPirOperator` advertise
+   AVX512 as required (e.g. `caps.is_real`/availability gated on
+   `__builtin_cpu_supports("avx512f")`, or `backends={AVX512}` only), so it is
+   not presented as correct on AVX2-only hosts like `.50` (a dev box). No upstream
+   patching needed.
+2. **Proper — port the scalar fallback.** Rewrite the L932–997 `#else` to mirror
+   the AVX512 packed-CRT arithmetic exactly (same `packed_offset_2`,
+   `q_intermediate`, `sums_out_n0`/`sums_out_n2` packing and reductions), via a
+   WORKSPACE `patch_cmds` on the spiral pin. Multi-hour upstream-arithmetic work;
+   only needed if SpiralPIR must run correctly on AVX2-only hardware.
 
-- **Quick (v1 / SmokeTest correctness):** pin `EnsureInitialized` to the exact
-  `(nu_1, nu_2)` that `select_params.py 20 256` pairs with the hardcoded
-  defines, instead of using `EstimateParams`'s independent split. Then
-  `do_test` should print `Is correct?: 1`.
-- **Proper (multi-size support):** run `select_params.py <logN> 256` per target
-  size to generate *both* the `-D` define set *and* the matched `(nu_1,nu_2)`,
-  and have the build select the define set + `EstimateParams` return the paired
-  dims (a small generated table keyed by logN). This is exactly what upstream's
-  build flow does.
-
-## Reproduction recipe (on a non-GFW host with a CUDA-free toolchain)
+## Reproduction recipe (standalone, no bazel)
 
 ```
-git clone https://github.com/menonsamir/spiral && cd spiral   # commit 361ee47f
-# get the precomputed optimizer tables the script needs:
-#   exp_lut.json, fdim_lut.json, all_params.pkl  (in-repo / via build-*-lut)
-python3 select_params.py 20 256 --show-output --dry-run   # -> defines + (nu_1,nu_2)
-# confirm the hardcoded BUILD.spiral defines == this output, and note the dims.
-# then in primihub:
-bazel test --config=linux_x86_64 --define=enable_spiral_real=1 \
-  --override_repository=spiral_pir=<clone> --override_repository=hexl=<hexl> \
-  //src/primihub/kernel/pir/tests:spiral_runtime_test --test_output=all
-# iterate until check_final prints "Is correct?: 1".
+# fetch src/*.cpp + include/*.h from menonsamir/spiral @361ee47f (raw.github…)
+# HEXL: reuse a prebuilt libhexl.a (1.2.5) + cpu_features .o (e.g. from .50 cache)
+DEFS="-DTEXP=8 -DTEXPRIGHT=56 -DTCONV=4 -DTGSW=10 -DQPBITS=22 -DPVALUE=256 \
+      -DQNUMFIRST=1 -DQNUMREST=0 -DOUTN=2"
+g++ -std=c++17 -O3 -march=native -fopenmp -include omp.h $DEFS -Iinclude -I<hexl> \
+    src/{spiral,core,constants,poly,util,client,testing}.cpp libhexl.a cpuobj/*.o \
+    -lpthread -o spiral
+OMP_NUM_THREADS=1 ./spiral 5 5 17 a --random-data | grep 'Is correct'   # -> 1
+# add -mno-avx512f to the same line  -> 0   (reproduces the bug)
 ```
 
 ## Evidence trail
-- upstream `src/spiral.cpp`: main() L1228–1344, do_test() L2408, check_final()
-  L1412 (verdict L1494), load_db() L1028 (pt_real planted at IDX_TARGET L1132).
-- upstream `select_params.py`: `param_f` L337, `all_ks` L288, `pred()` L305.
-- primihub: `thirdparty/pir/BUILD.spiral` SPIRAL_DEFINES; `spiral_pir/params.h`
-  `EstimateParams` (kMinNu=4, balanced split); `spiral_pir/spiral_runtime.cc`
-  EnsureInitialized + SmokeTest.
+- `src/spiral.cpp`: `multiplyQueryByDatabase` L628; AVX512 `#if` L640; packed
+  arithmetic L687–708; scalar `#else` L932–997 (rand() L937, lo/hi split L955–975).
+- primihub: `thirdparty/pir/BUILD.spiral` (`disable_avx512` → `-mno-avx512f`),
+  `spiral_pir/spiral_runtime.cc` (EnsureInitialized/SmokeTest — correct).

@@ -46,11 +46,13 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
     return retcode::FAIL;
   }
 
-  // KNOWN ISSUE ("Is correct?: 0"): EstimateParams picks (nu_1,nu_2)
-  // independently, but the compile-time SPIRAL_DEFINES (BUILD.spiral) are a
-  // matched bundle from upstream select_params.py for ONE config -- defines
-  // and dims must agree. Fix: pin dims to the compiled config. Root-cause +
-  // reproduction recipe: docs/pir/spiral-calibration-notes.md.
+  // KNOWN ISSUE ("Is correct?: 0" on .50): ROOT-CAUSED to upstream spiral's
+  // BROKEN non-AVX512 fallback in multiplyQueryByDatabase (spiral.cpp #else
+  // L932-997). SpiralPIR decodes correctly ONLY with __AVX512F__; .50 is
+  // Broadwell (AVX2) so the broken scalar path runs. NOT a primihub param
+  // bug (proven by controlled standalone build). Fix: require AVX512 for
+  // SpiralPIR, or port the scalar fallback. See
+  // docs/pir/spiral-calibration-notes.md.
   // Pick params from the requested index + a small default record size.
   // v1 limitation: SmokeTest's load_db ignores caller-supplied records;
   // the DB is constant-valued. Record size is informational only.
