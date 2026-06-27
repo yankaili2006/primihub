@@ -744,17 +744,14 @@ git_repository(
 # BUILD when implementing OnExecute.
 new_git_repository(
     name = "spiral_pir",
-    remote = "https://github.com/menonsamir/spiral.git",
-    commit = "361ee47f92214d4fcd03c4205c9c2729e8369afb",
-    shallow_since = "1651472347 +0000",
+    remote = "https://gitcode.com/yankaili2006/spiral.git",  # self-maintained fork (github GFW-blocked on .50); AVX2 fix baked in, see docs/pir/spiral-calibration-notes.md
+    commit = "1d9c0f3456f4e5d87c8e7ec09c497f350d02eaa1",
     build_file = "@//thirdparty/pir:BUILD.spiral",
     # Rename upstream main so spiral.cpp can be compiled into spiral_lib
     # without conflicting with primihub-node main; spiral_main_disabled is
     # never called at runtime — see
     # src/primihub/kernel/pir/operator/spiral_pir/spiral_runtime.cc for
     # the testHighRate stub that satisfies link-time references.
-    patches = ["@//thirdparty/pir:spiral_avx2_fix.patch"],
-    patch_args = ["-p1"],
     patch_cmds = [
         "sed -i \"s|^int main(int argc, char \\\\*argv\\\\[\\\\])|int spiral_main_disabled(int argc, char *argv[])|\" src/spiral.cpp",
     ],
