@@ -215,6 +215,50 @@ short-circuited (warm `init_ms = setup_ms = squish_ms = 0`).
 
 Reproduce via `bench/simple_pir_persistence_bench.sh --n-list '...'`.
 
+### `bench/cuda_vs_avx2.sh` (task 2.4 — CUDA backend)
+
+Three-backend microbenchmark of the LWE matrix-vector product
+`answer = A·q mod 2^32` (the inner loop shared by SimplePIR/DoublePIR Answer)
+at DB ≈ 1e8: **scalar CPU vs AVX2 CPU vs CUDA GPU**. Compiles
+`bench/cuda_vs_avx2_bench.cu` with `nvcc` and runs it; each backend's output is
+checked against the scalar reference (`correct` column). On a CPU-only host
+(e.g. `.50`, no GPU) it prints a notice and exits 0 — the CUDA path simply isn't
+measurable there.
+
+```bash
+bench/cuda_vs_avx2.sh [out.json]   # needs nvcc + a GPU (e.g. local RTX 5070 Ti)
+```
+
+#### Baseline on local RTX 5070 Ti (2026-06-27, CUDA 13.2)
+
+DB = 12500 × 8000 = 1.00e8 uint32 (400 MB); answer length 12500.
+
+| backend          | per-answer ms | GMAC/s | vs scalar | correct |
+|------------------|---------------|--------|-----------|---------|
+| scalar           | 34.34         | 2.91   | 1.0×      | ref     |
+| avx2             | 30.42         | 3.29   | 1.1×      | ok      |
+| **cuda (warm)**  | **1.71**      | 58.48  | **20.1×** | ok      |
+| cuda (cold+DB)   | 51.19         | 1.95   | 0.7×      | —       |
+
+One-time DB upload: **49.48 ms** (PCIe H2D of the 400 MB matrix).
+
+Observations:
+* **GPU wins ~20× once the DB is resident** (warm 1.71 ms vs scalar 34.3 / AVX2
+  30.4 ms). The kernel is a plain tiled matvec — correctness-first, untuned — so
+  this is a floor, not a ceiling.
+* **Cold per-query loses to CPU** (51.2 ms) because it pays the ~49 ms PCIe
+  upload every call. GPU only pays off when the database stays device-resident
+  across many queries — which is the realistic Answer-server pattern (hint/DB
+  built once, queried repeatedly).
+* AVX2 is only ~1.1× over scalar here: at 1e8 the working set blows past L3, so
+  this matvec is memory-bound on CPU and SIMD width barely helps — exactly the
+  regime where moving the DB to GPU HBM pays.
+* Result JSON (gitignored, local-only):
+  `bench/results/cuda_vs_avx2_local_2026-06-27.json`.
+
+Follow-up: reuse `pir-acc/SIGMA`'s tuned CUDA NTT + device-resident data to lift
+the warm number further (the current kernels are correctness-first).
+
 ## Result file shapes
 
 ### `pir_selector_sweep_*.json`
