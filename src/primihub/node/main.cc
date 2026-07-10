@@ -87,6 +87,9 @@ void RunServer(primihub::VMNodeInterface* node_service,
 #endif
         // set the max message size to 128M
         builder->SetMaxReceiveMessageSize(128 * 1024 * 1024);
+        // permit frequent client keepalive pings (FL long rounds) -> no GOAWAY too_many_pings
+        builder->AddChannelArgument(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 5000);
+        builder->AddChannelArgument(GRPC_ARG_HTTP2_MAX_PING_STRIKES, 0);
     };
 
     if (host_config.use_tls()) {

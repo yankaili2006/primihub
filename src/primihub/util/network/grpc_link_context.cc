@@ -49,6 +49,11 @@ std::shared_ptr<grpc::Channel> GrpcChannel::buildChannel(
   std::shared_ptr<grpc::ChannelCredentials> creds{nullptr};
   grpc::ChannelArguments channel_args;
   // channel_args.SetMaxReceiveMessageSize(128*1024*1024);
+  // FL/inter-node keepalive: avoid server GOAWAY too_many_pings on long-running FL rounds
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 30000);
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 10000);
+  channel_args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+  channel_args.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
   if (use_tls) {
     auto link_context = this->getLinkContext();
     auto& cert_config = link_context->getCertificateConfig();
