@@ -18,7 +18,12 @@ jobs:
     env:
       REG: registry.cn-beijing.aliyuncs.com/primihub
     steps:
-      - uses: actions/checkout@v3
+      - name: checkout from local mirror (github clone is GFW-throttled on .50)
+        run: |
+          shopt -s dotglob
+          rsync -a --delete --exclude='.git/index.lock' --exclude='bazel-*' \
+            --exclude='_work' /mnt/data1/github/primihub/ ./
+          git rev-parse HEAD 2>/dev/null || true
 
       - name: apply CN build config
         run: bash ci/cn-build/setup.sh
