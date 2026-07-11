@@ -61,7 +61,7 @@ config_setting(
   values = {"define" : "enable_py_task=true"},
 )
 
-LINK_PYTHON_OPTS = ["-L/usr/lib -L/usr/lib/python3.10/config-3.10-x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu  -lcrypt -ldl  -lm -lm "] + ["-lpython3.10"]
+LINK_PYTHON_OPTS = ["-L/usr/lib -L/usr/lib/python3.8/config-3.8-x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu -lcrypt -ldl -lm"] + ["-lpython3.8"]
 
 cc_library(
   name = "python3_lib",
@@ -79,7 +79,7 @@ cc_binary(
   deps = [
     "//src/primihub/task_engine:task_engine_impl",
   ] + select({
-    "py_task_enabled": [":python3_lib",],
+    "py_task_enabled": [":python3_lib", "//src/primihub/pybind_wrapper:linkcontext_embedded",],
     "//conditions:default": []
   }),
 )
@@ -89,7 +89,7 @@ cc_binary(
   deps = [
     "//src/primihub/node:node_impl",
   ] + select({
-    "py_task_enabled": [":python3_lib",],
+    "py_task_enabled": [":python3_lib", "//src/primihub/pybind_wrapper:linkcontext_embedded",],
     "//conditions:default": []
   }),
 )
