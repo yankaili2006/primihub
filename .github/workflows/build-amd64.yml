@@ -1,0 +1,46 @@
+name: build node image (amd64, CN self-hosted)
+
+# Manual trigger. Builds the node (bazel, glibc2.31 focal container) + the
+# runtime image (Dockerfile.release, which setup.py-installs the fixed python
+# package). Runs on the .50 self-hosted runner (has gitee key, OSS distdir,
+# ph-build-focal image, mihomo proxy).
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'push image to aliyun registry'
+        required: false
+        default: 'false'
+
+jobs:
+  build-node-amd64:
+    runs-on: [self-hosted, Linux, X64]
+    env:
+      REG: registry.cn-beijing.aliyuncs.com/primihub
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: apply CN build config
+        run: bash ci/cn-build/setup.sh
+
+      - name: bazel build node (focal glibc2.31 container)
+        run: |
+          docker run --rm --network host \
+            -v "$PWD":/src \
+            -v /tmp/ph_distdir:/distdir \
+            -v "$HOME/.ssh_rw":/root/.ssh_rw:ro \
+            ph-build-focal:cn bash /src/ci/cn-build/build-node.sh
+
+      - name: build runtime image (Dockerfile.release)
+        run: |
+          # Dockerfile.release COPYs both amd64 and arm64 tarballs; provide a stub arm64.
+          [ -f primihub-linux-arm64.tar.gz ] || : > primihub-linux-arm64.tar.gz
+          TAG=ci-amd64-${GITHUB_SHA::8}
+          docker build -f Dockerfile.release -t "$REG/primihub-node:$TAG" -t "$REG/primihub-node:ci-amd64-latest" .
+          echo "IMAGE=$REG/primihub-node:$TAG" >> "$GITHUB_ENV"
+
+      - name: push image (optional)
+        if: ${{ github.event.inputs.push == 'true' }}
+        run: |
+          docker push "$REG/primihub-node:ci-amd64-latest"
+          docker push "$IMAGE"
