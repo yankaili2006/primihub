@@ -1,4 +1,5 @@
 // Copyright [2023] <PrimiHub>.com>
+#include <cstdio>
 #include "src/primihub/util/network/grpc_link_context.h"
 #include <glog/logging.h>
 #include <vector>
@@ -151,7 +152,6 @@ retcode GrpcChannel::send(const std::string& role, const std::string& data) {
 }
 
 retcode GrpcChannel::send(const std::string& role, std::string_view data_sv) {
-  // VLOG(5) << "GrpcChannel::send begin to send, use key: " << role;
   std::vector<rpc::TaskRequest> send_requests;
   buildTaskRequest(role, data_sv, &send_requests);
   auto send_tiemout_ms = this->getLinkContext()->sendTimeout();
@@ -205,7 +205,6 @@ retcode GrpcChannel::send(const std::string& role, std::string_view data_sv) {
       }
     }
   } while (true);
-  // VLOG(5) << "GrpcChannel::send end of execute, use key: " << role;
   return retcode::SUCCESS;
 }
 
@@ -261,7 +260,6 @@ std::string GrpcChannel::forwardRecv(const std::string& role) {
   auto task_info = send_request.mutable_task_info();
   BuildTaskInfo(task_info);
   send_request.set_role(role);
-  // VLOG(5) << "forwardRecv request info: job_id: "
   //         << this->getLinkContext()->job_id()
   //         << " task_id: " << this->getLinkContext()->task_id()
   //         << " request id: " << this->getLinkContext()->request_id()
@@ -294,7 +292,6 @@ std::string GrpcChannel::forwardRecv(const std::string& role) {
         << status.error_code() << ": " << status.error_message();
     return std::string("");
   }
-  // VLOG(5) << "recv data success, data size: " << tmp_buff.size();
   auto time_cost = timer.timeElapse();
   PH_VLOG(5, LogType::kTask)
       << "forwardRecv time cost(ms): " << time_cost;

@@ -120,6 +120,7 @@ int main(int argc, char **argv) {
     });
 
     google::InitGoogleLogging(argv[0]);
+    google::InstallFailureSignalHandler();
     primihub::pir::PirRegistry::EnsureRegistered();
     FLAGS_colorlogtostderr = true;
     FLAGS_alsologtostderr = true;
