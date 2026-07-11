@@ -1,5 +1,14 @@
 import json
 import linkcontext
+
+def _ph_json_default(o):
+    import numpy as _np
+    if isinstance(o, _np.integer): return int(o)
+    if isinstance(o, _np.floating): return float(o)
+    if isinstance(o, _np.ndarray): return o.tolist()
+    if isinstance(o, (bytes, bytearray)): return o.decode()
+    raise TypeError(repr(o) + " is not JSON serializable")
+
 from primihub.utils.logger_util import logger
 from primihub.context import Context
 
@@ -45,7 +54,7 @@ class GrpcClient:
     def send(self, key, val):
         key = self.local_party + '_' + key
         logger.info(f"Start send {key} to {self.remote_party}")
-        self.send_channel.send(key, json.dumps(val).encode())
+        self.send_channel.send(key, json.dumps(val, default=_ph_json_default).encode())
         logger.info(f"End send {key} to {self.remote_party}")
 
     def recv(self, key):

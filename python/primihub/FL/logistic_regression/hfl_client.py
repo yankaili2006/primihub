@@ -56,7 +56,7 @@ class LogisticRegressionClient(BaseModel):
                       selected_column=selected_column,
                       droped_column=id)
         label = self.common_params['label']
-        y = x.pop(label).values
+        y = x.pop(label).values.astype(int)
         x = check_array(x, dtype='numeric')
 
         # client init
@@ -214,7 +214,7 @@ class Plaintext_Client:
             output_dim = 1
 
         self.server_channel.send('output_dim', output_dim)
-        output_dim = self.server_channel.recv('output_dim')
+        output_dim = int(self.server_channel.recv('output_dim'))
         
         # init theta
         if self.model.multiclass:
