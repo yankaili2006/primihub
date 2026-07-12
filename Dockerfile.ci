@@ -87,7 +87,10 @@ WORKDIR /app/python
 # No local proxy in CI; use the aliyun pypi mirror + pytorch cpu index.
 RUN --mount=type=cache,target=/root/.cache/pip \
   python3 -m pip install --retries 10 --timeout 300 --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
-  && python3 -m pip install --retries 10 --timeout 300 --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt \
+  && ( n=0; until [ "$n" -ge 5 ]; do \
+         python3 -m pip install --retries 10 --timeout 300 --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt && break; \
+         n=$((n+1)); echo "pip requirements attempt $n failed (network); retry in 20s"; sleep 20; \
+       done; [ "$n" -lt 5 ] ) \
   && python3 setup.py install
 
 WORKDIR /app
