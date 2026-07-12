@@ -111,9 +111,15 @@ cc_library(
         "//src/primihub/kernel/pir/operator/double_pir:double_pir_operator",
         "//src/primihub/kernel/pir/operator/spiral_pir:spiral_pir_operator",
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
-        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
         "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_pir_operator",
     ] + select({
+        # ypir hard-deps Intel HEXL (@hexl), which is x86/AVX512-only and
+        # fails to compile on aarch64 (cpuinfo_x86.h). Drop it on arm.
+        "//:aarch64": [],
+        "//conditions:default": [
+            "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
+        ],
+    }) + select({
         "//:microsoft-apsi": [":keyword_pir_operator"],
         "//conditions:default": [],
     }),

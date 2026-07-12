@@ -38,6 +38,9 @@ RUN --mount=type=cache,target=/root/.cache/bazel \
   && rm -f third_party/python_headers \
   && ln -sf "$(python3-config --includes | awk '{print $1}' | sed 's/^-I//')" third_party/python_headers \
   && test -d third_party/python_headers/ \
+  && MULTIARCH=$(gcc -print-multiarch) \
+  && PYVER=$(python3 -c 'import sys;print("%d.%d" % sys.version_info[:2])') \
+  && sed -i "s|^LINK_PYTHON_OPTS = .*|LINK_PYTHON_OPTS = [\"-L/usr/lib -L/usr/lib/python${PYVER}/config-${PYVER}-${MULTIARCH} -L/usr/lib/${MULTIARCH} -lcrypt -ldl -lm\"] + [\"-lpython${PYVER}\"]|" BUILD.bazel \
   && if [ "$TARGETARCH" = "arm64" ]; then \
        sed -i 's/--config=linux_x86_64/--config=linux_aarch64/' Makefile; \
      fi \
