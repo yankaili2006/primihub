@@ -1,3 +1,6 @@
 [submodule "pailliercryptolib_python"]
 	path = pailliercryptolib_python
 	url = git@github.com:intel/pailliercryptolib_python.git
+[submodule "hehub"]
+	path = hehub
+	url = git@github.com:primihub/hehub.git

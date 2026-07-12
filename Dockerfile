@@ -33,29 +33,43 @@ ADD . /src
 # Bazel build primihub-node & primihub-cli & paillier shared library
 # Cache mount preserves ~1h Bazel build across image rebuilds
 RUN --mount=type=cache,target=/root/.cache/bazel \
-  bash pre_build.sh \
+  mkdir -p /home/primihub/local_deps \
+  && cp /src/local_deps/* /home/primihub/local_deps/ \
+  && git config --global url."https://github.com/madler/zlib".insteadOf "https://gitee.com/mirrors_madler/zlib" \
+  && git config --global url."https://github.com/microsoft/GSL".insteadOf "https://gitee.com/mirrors_microsoft/GSL" \
+  && git config --global url."https://github.com/facebook/zstd".insteadOf "https://gitee.com/cs-beegfs/zstd" \
+  && git config --global url."https://github.com/primihub/cityhash".insteadOf "https://gitee.com/primihub/cityhash" \
+  && bash pre_build.sh \
   && mv -f WORKSPACE_GITHUB WORKSPACE \
-  && make mysql=y \
-  && tar zcfh bazel-bin.tar.gz bazel-bin/cli \
+  && rm -f third_party/python_headers \
+  && ln -sf "$(python3-config --includes | awk '{print $1}' | sed 's/^-I//')" third_party/python_headers \
+  && test -d third_party/python_headers/ \
+  && PYVER="$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')" \
+  && TRIPLET="$(gcc -dumpmachine)" \
+  && sed -i "s|^LINK_PYTHON_OPTS = .*|LINK_PYTHON_OPTS = [\"-L/usr/lib -L/usr/lib/python${PYVER}/config-${PYVER}-${TRIPLET} -L/usr/lib/${TRIPLET} -lcrypt -ldl -lm\"] + [\"-lpython${PYVER}\"]|" BUILD.bazel \
+  && make release mysql=y \
+  && test -x bazel-bin/node \
+  && tar cfh bazel-bin.tar bazel-bin/cli \
         bazel-bin/node \
         bazel-bin/_solib* \
         bazel-bin/task_main \
         python \
         config \
         example \
-        data 2>/dev/null || true \
+        data \
   && if ls bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null; then \
-       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null || true; \
+       tar rfh bazel-bin.tar bazel-bin/src/primihub/pybind_warpper/*.so; \
      fi \
   && if ls bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null; then \
-       tar zrfh bazel-bin.tar.gz bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null || true; \
-     fi
+       tar rfh bazel-bin.tar bazel-bin/src/primihub/task/pybind_wrapper/*.so; \
+     fi \
+  && gzip -f bazel-bin.tar
 
 FROM ubuntu:20.04 as runner
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt update && apt install -y python3 python3-pip \
+RUN apt update && apt install -y python3 python3-pip libmysqlclient21 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /src/bazel-bin.tar.gz /opt/bazel-bin.tar.gz
@@ -65,7 +79,8 @@ WORKDIR /app
 
 # Copy opt_paillier_c2py.so linkcontext.so to /app/python, this enable setup.py find it.
 RUN tar zxf /opt/bazel-bin.tar.gz \
-  && mkdir log
+  && mkdir log \
+  && test -x bazel-bin/node
 
 RUN ln -s -f bazel-bin/cli primihub-cli
 RUN ln -s -f bazel-bin/node primihub-node
@@ -73,8 +88,9 @@ RUN ln -s -f bazel-bin/node primihub-node
 WORKDIR /app/python
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-  python3 -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
-  && python3 -m pip install --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt \
+  export https_proxy=http://172.17.0.1:7890 http_proxy=http://172.17.0.1:7890 no_proxy=mirrors.aliyun.com,localhost,127.0.0.1; \
+  python3 -m pip install --retries 10 --timeout 300 --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
+  && python3 -m pip install --retries 10 --timeout 300 --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt \
   && python3 setup.py install
 
 

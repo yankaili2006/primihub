@@ -846,6 +846,298 @@ retcode MPCCorrelation::getResult(eMatrix<double> &result) {
   return retcode::SUCCESS;
 }
 
+// Regression Implementation
+retcode MPCRegression::PlainTextDataCompute(
+    std::shared_ptr<primihub::Dataset>& dataset,
+    const std::vector<std::string>& columns,
+    const std::map<std::string, ColumnDtype>& col_dtype,
+    eMatrix<double>* result_data,
+    eMatrix<double>* row_records) {
+
+  auto table = std::get<std::shared_ptr<arrow::Table>>(dataset->data);
+  LOG(INFO) << "Schema of table is:" << table->schema()->ToString(true);
+
+  // For regression, we need at least 2 columns (X and Y)
+  if (columns.size() < 2) {
+    LOG(ERROR) << "Regression requires at least 2 columns (X and Y)";
+    return retcode::FAIL;
+  }
+
+  result_data->resize(6, 1); // sum_x, sum_y, sum_xy, sum_x2, sum_y2, n
+  row_records->resize(2, 1); // data_x_rows, data_y_rows
+
+  // Extract data from first two columns (X = column 0, Y = column 1)
+  std::vector<double> data_x, data_y;
+
+  for (size_t i = 0; i < 2 && i < columns.size(); i++) {
+    auto& col_name = columns[i];
+    auto chunked_array = table->GetColumnByName(col_name);
+    if (chunked_array.get() == nullptr) {
+      LOG(ERROR) << "Can't get column value by column name " << col_name;
+      return retcode::FAIL;
+    }
+
+    for (int chunk_idx = 0; chunk_idx < chunked_array->num_chunks(); chunk_idx++) {
+      auto iter = col_dtype.find(col_name);
+      const ColumnDtype &col_type = iter->second;
+
+      if (col_type == ColumnDtype::INTEGER || col_type == ColumnDtype::LONG) {
+        auto detected_type = table->schema()->GetFieldByName(col_name)->type();
+        if (detected_type->id() == arrow::Type::INT32) {
+          auto array = std::static_pointer_cast<arrow::Int32Array>(
+              chunked_array->chunk(chunk_idx));
+          for (int64_t j = 0; j < array->length(); j++) {
+            if (i == 0) data_x.push_back(array->Value(j));
+            else data_y.push_back(array->Value(j));
+          }
+        } else if (detected_type->id() == arrow::Type::INT64) {
+          auto array = std::static_pointer_cast<arrow::Int64Array>(
+              chunked_array->chunk(chunk_idx));
+          for (int64_t j = 0; j < array->length(); j++) {
+            if (i == 0) data_x.push_back(array->Value(j));
+            else data_y.push_back(array->Value(j));
+          }
+        }
+      } else if (col_type == ColumnDtype::DOUBLE) {
+        auto array = std::static_pointer_cast<arrow::DoubleArray>(
+            chunked_array->chunk(chunk_idx));
+        for (int64_t j = 0; j < array->length(); j++) {
+          if (i == 0) data_x.push_back(array->Value(j));
+          else data_y.push_back(array->Value(j));
+        }
+      }
+    }
+
+    (*row_records)(i, 0) = (i == 0) ? data_x.size() : data_y.size();
+  }
+
+  // Both columns must have the same number of observations
+  size_t n = std::min(data_x.size(), data_y.size());
+  if (n < 3) {
+    LOG(ERROR) << "Regression requires at least 3 observations, got " << n;
+    return retcode::FAIL;
+  }
+
+  // Compute local statistics
+  double sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0, sum_y2 = 0;
+  for (size_t i = 0; i < n; i++) {
+    double x = data_x[i];
+    double y = data_y[i];
+    sum_x += x;
+    sum_y += y;
+    sum_xy += x * y;
+    sum_x2 += x * x;
+    sum_y2 += y * y;
+  }
+
+  // Store intermediate results for MPC computation
+  (*result_data)(0, 0) = sum_x;
+  (*result_data)(1, 0) = sum_y;
+  (*result_data)(2, 0) = sum_xy;
+  (*result_data)(3, 0) = sum_x2;
+  (*result_data)(4, 0) = sum_y2;
+  (*result_data)(5, 0) = static_cast<double>(n);
+
+  LOG(INFO) << "Local regression statistics computed: n=" << n
+            << ", sum_x=" << sum_x << ", sum_y=" << sum_y;
+  return retcode::SUCCESS;
+}
+
+retcode MPCRegression::CipherTextDataCompute(const eMatrix<double>& col_data,
+                                            const std::vector<std::string>& col_name,
+                                            const eMatrix<double>& row_records) {
+  LOG(INFO) << "Starting secure regression computation";
+
+  // Extract local statistics
+  double local_sum_x = col_data(0, 0);
+  double local_sum_y = col_data(1, 0);
+  double local_sum_xy = col_data(2, 0);
+  double local_sum_x2 = col_data(3, 0);
+  double local_sum_y2 = col_data(4, 0);
+  double local_n = col_data(5, 0);
+
+  // Create matrices for MPC operations
+  eMatrix<double> local_stats(6, 1);
+  local_stats(0, 0) = local_sum_x;
+  local_stats(1, 0) = local_sum_y;
+  local_stats(2, 0) = local_sum_xy;
+  local_stats(3, 0) = local_sum_x2;
+  local_stats(4, 0) = local_sum_y2;
+  local_stats(5, 0) = local_n;
+
+  // Secure share local statistics
+  sf64Matrix<D16> sh_stats[3];
+  for (uint8_t i = 0; i < 3; i++)
+    sh_stats[i].resize(6, 1);
+
+  for (uint16_t i = 0; i < 3; i++) {
+    if (i == party_id_)
+      mpc_op_->createShares(local_stats, sh_stats[i]);
+    else
+      mpc_op_->createShares(sh_stats[i]);
+  }
+
+  // Sum statistics across all parties
+  sf64Matrix<D16> sh_total_stats;
+  sh_total_stats.resize(6, 1);
+  sh_total_stats = sh_stats[0] + sh_stats[1] + sh_stats[2];
+
+  // Reveal total statistics
+  eMatrix<double> total_stats;
+  for (uint16_t i = 0; i < 3; i++)
+    if (i == party_id_)
+      total_stats = mpc_op_->reveal(sh_total_stats);
+    else
+      mpc_op_->reveal(sh_total_stats, i);
+
+  // Extract total statistics
+  double total_sum_x = total_stats(0, 0);
+  double total_sum_y = total_stats(1, 0);
+  double total_sum_xy = total_stats(2, 0);
+  double total_sum_x2 = total_stats(3, 0);
+  double total_sum_y2 = total_stats(4, 0);
+  double total_n = total_stats(5, 0);
+
+  // Compute regression coefficients
+  double slope = 0, intercept = 0, r_squared = 0, p_value = 0;
+
+  // slope = (n*sum_xy - sum_x*sum_y) / (n*sum_x2 - sum_x*sum_x)
+  double numerator = total_n * total_sum_xy - total_sum_x * total_sum_y;
+  double denominator = total_n * total_sum_x2 - total_sum_x * total_sum_x;
+
+  if (fabs(denominator) > 1e-10) {
+    slope = numerator / denominator;
+    intercept = (total_sum_y - slope * total_sum_x) / total_n;
+
+    // Compute R-squared
+    double ss_res = 0, ss_tot = 0;
+    double mean_y = total_sum_y / total_n;
+    // Use total statistics to estimate R-squared
+    // ss_res = sum_y2 - 2*slope*sum_xy + slope^2*sum_x2
+    //        - 2*intercept*sum_y + 2*slope*intercept*sum_x + n*intercept^2
+    ss_res = total_sum_y2 - 2 * slope * total_sum_xy + slope * slope * total_sum_x2
+           - 2 * intercept * total_sum_y + 2 * slope * intercept * total_sum_x
+           + total_n * intercept * intercept;
+    ss_tot = total_sum_y2 - (total_sum_y * total_sum_y) / total_n;
+
+    if (ss_tot > 0) {
+      r_squared = 1.0 - ss_res / ss_tot;
+    }
+
+    // Compute p-value for slope
+    if (total_n > 2 && denominator != 0) {
+      double se_slope = sqrt((ss_res / (total_n - 2)) / (total_sum_x2 - total_sum_x * total_sum_x / total_n));
+      if (se_slope > 0) {
+        double t_stat = slope / se_slope;
+        double df = total_n - 2;
+        double abs_t = fabs(t_stat);
+        p_value = 2 * (1 - 0.5 * (1 + erf(abs_t / sqrt(2))));
+      }
+    }
+  }
+
+  // Store results
+  mpc_result_.resize(4, 1);
+  mpc_result_(0, 0) = slope;
+  mpc_result_(1, 0) = intercept;
+  mpc_result_(2, 0) = r_squared;
+  mpc_result_(3, 0) = p_value;
+
+  LOG(INFO) << "Secure regression computed: slope=" << slope
+            << ", intercept=" << intercept
+            << ", R²=" << r_squared << ", p=" << p_value;
+  return retcode::SUCCESS;
+}
+
+retcode MPCRegression::run(std::shared_ptr<primihub::Dataset> &dataset,
+                          const std::vector<std::string> &columns,
+                          const std::map<std::string, ColumnDtype> &col_dtype) {
+  eMatrix<double> col_data;
+  eMatrix<double> rows_per_column;
+
+  auto ret = PlainTextDataCompute(dataset, columns, col_dtype,
+                                  &col_data, &rows_per_column);
+  if (ret != retcode::SUCCESS) {
+    return retcode::FAIL;
+  }
+
+  ret = CipherTextDataCompute(col_data, columns, rows_per_column);
+  return ret;
+}
+
+retcode MPCRegression::getResult(eMatrix<double> &result) {
+  if ((mpc_result_.rows() != result.rows()) ||
+      (mpc_result_.cols() != result.cols())) {
+    result.resize(mpc_result_.rows(), mpc_result_.cols());
+  }
+
+  for (int i = 0; i < result.rows(); i++) {
+    result(i, 0) = mpc_result_(i, 0);
+  }
+
+  return retcode::SUCCESS;
+}
+
+retcode MPCRegression::computeLocalRegression(const eMatrix<double>& data_x,
+                                             const eMatrix<double>& data_y,
+                                             double* slope,
+                                             double* intercept,
+                                             double* r_squared,
+                                             double* p_value) {
+  if (data_x.rows() < 3 || data_y.rows() < 3) {
+    LOG(ERROR) << "Insufficient data for regression";
+    return retcode::FAIL;
+  }
+
+  size_t n = std::min(data_x.rows(), data_y.rows());
+  double sum_x = 0, sum_y = 0, sum_xy = 0, sum_x2 = 0, sum_y2 = 0;
+
+  for (size_t i = 0; i < n; i++) {
+    double x = data_x(i, 0);
+    double y = data_y(i, 0);
+    sum_x += x;
+    sum_y += y;
+    sum_xy += x * y;
+    sum_x2 += x * x;
+    sum_y2 += y * y;
+  }
+
+  double numerator = n * sum_xy - sum_x * sum_y;
+  double denominator = n * sum_x2 - sum_x * sum_x;
+
+  if (fabs(denominator) < 1e-10) {
+    return retcode::FAIL;
+  }
+
+  *slope = numerator / denominator;
+  *intercept = (sum_y - (*slope) * sum_x) / n;
+
+  // R-squared
+  double ss_res = 0, ss_tot = 0;
+  double mean_y = sum_y / n;
+  for (size_t i = 0; i < n; i++) {
+    double y_pred = (*slope) * data_x(i, 0) + (*intercept);
+    ss_res += (data_y(i, 0) - y_pred) * (data_y(i, 0) - y_pred);
+    ss_tot += (data_y(i, 0) - mean_y) * (data_y(i, 0) - mean_y);
+  }
+
+  if (ss_tot > 0) {
+    *r_squared = 1.0 - ss_res / ss_tot;
+  }
+
+  // p-value for slope
+  if (n > 2) {
+    double se_slope = sqrt((ss_res / (n - 2)) / (sum_x2 - sum_x * sum_x / n));
+    if (se_slope > 0) {
+      double t_stat = *slope / se_slope;
+      double abs_t = fabs(t_stat);
+      *p_value = 2 * (1 - 0.5 * (1 + erf(abs_t / sqrt(2))));
+    }
+  }
+
+  return retcode::SUCCESS;
+}
+
 #endif  // MPC_SOCKET_CHANNEL
 
 };  // namespace primihub

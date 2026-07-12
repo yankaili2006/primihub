@@ -165,6 +165,16 @@ retcode MPCStatisticsExecutor::_parseColumnName(const std::string &json_str) {
     type_ = MPCStatisticsType::STAT_MAX;
   } else if (type_object.GetString() == std::string("4")) {
     type_ = MPCStatisticsType::STAT_MIN;
+  } else if (type_object.GetString() == std::string("5")) {
+    type_ = MPCStatisticsType::T_TEST;
+  } else if (type_object.GetString() == std::string("6")) {
+    type_ = MPCStatisticsType::STAT_F_TEST;
+  } else if (type_object.GetString() == std::string("7")) {
+    type_ = MPCStatisticsType::CHI_SQUARE_TEST;
+  } else if (type_object.GetString() == std::string("8")) {
+    type_ = MPCStatisticsType::REGRESSION;
+  } else if (type_object.GetString() == std::string("9")) {
+    type_ = MPCStatisticsType::CORRELATION;
   } else {
     std::stringstream ss;
     ss << "Unknown statistics type " << type_object.GetString() << ".";
@@ -471,8 +481,7 @@ retcode MPCStatisticsExecutor::InitEngine() {
     executor_ = std::make_unique<MPCCorrelation>();
     break;
   case MPCStatisticsType::REGRESSION:
-    // Regression will be handled separately
-    LOG(INFO) << "Regression analysis will be handled by regression executor";
+    executor_ = std::make_unique<MPCRegression>();
     break;
   default: {
     std::stringstream ss;

@@ -20,4 +20,4 @@ class Paillier:
         return [self.public_key.encrypt(i) for i in plain_vector]
 
     def encrypt_matrix(self, plain_matrix):
-        return [[self.private_key.encrypt(i) for i in pv] for pv in plain_matrix]
+        return [[self.public_key.encrypt(i) for i in pv] for pv in plain_matrix]

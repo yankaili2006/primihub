@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 from typing import Optional
-from sklearn.utils import is_scalar_nan
+from primihub.FL.utils.compat import is_scalar_nan
 from sklearn.utils._encode import _unique
 from sklearn.preprocessing._encoders import _BaseEncoder
 from .util import check_channel, check_role

@@ -61,7 +61,8 @@ config_setting(
   values = {"define" : "enable_py_task=true"},
 )
 
-LINK_PYTHON_OPTS = []
+# Python 链接选项按架构 select 多架构三元组(aarch64-linux-gnu vs x86_64-linux-gnu), 复用 :aarch64 config_setting(.bazelrc --define cpu_arch=aarch64). 否则 ARM64 链接 x86_64 python 库路径失败, ph_secure_lib.so 编不出. 单行书写以便 Dockerfile 的 sed 能整行替换(按 build host 架构/python 版本动态生成).
+LINK_PYTHON_OPTS = select({":aarch64": ["-L/usr/lib -L/usr/lib/python3.10/config-3.10-aarch64-linux-gnu -L/usr/lib/aarch64-linux-gnu  -lcrypt -ldl  -lm -lm "], "//conditions:default": ["-L/usr/lib -L/usr/lib/python3.10/config-3.10-x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu  -lcrypt -ldl  -lm -lm "]}) + ["-lpython3.10"]
 
 cc_library(
   name = "python3_lib",

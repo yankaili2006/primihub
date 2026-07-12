@@ -161,3 +161,7 @@ data/result/
 
 # 演示脚本
 demo_primihub.py
+# Local backup files (added 2026-05-28)
+*.bak
+*.bak.*
+*.bak-*

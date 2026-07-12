@@ -10,7 +10,10 @@ class LogisticRegression:
         self.learning_rate = learning_rate
         self.alpha = alpha
 
-        max_y = max(y)
+        if y.ndim == 2:
+            max_y = y.shape[1] - 1
+        else:
+            max_y = int(max(y))
         if max_y == 1:
             self.weight = np.zeros(x.shape[1])
             self.bias = np.zeros(1)
@@ -31,7 +34,7 @@ class LogisticRegression:
 
         positive = x >= 0
         negative = ~positive
-        result = np.empty_like(x, dtype=np.float)
+        result = np.empty_like(x, dtype=float)
         result[positive] = _positive_sigmoid(x[positive])
         result[negative] = _negative_sigmoid(x[negative])
         return result

@@ -69,6 +69,61 @@ cc_test(
 )
 
 cc_test(
+  name = "mpc_ttest_test",
+  srcs = [
+    "statistics_ttest_test.cc"
+  ],
+  deps = DEFAULT_ALGORITHM_LINK_DEPS + [
+    "//src/primihub/algorithm:algorithm_lib",
+    ":mpc_statistics_util_lib",
+  ],
+)
+
+cc_test(
+  name = "mpc_ftest_test",
+  srcs = [
+    "statistics_ftest_test.cc"
+  ],
+  deps = DEFAULT_ALGORITHM_LINK_DEPS + [
+    "//src/primihub/algorithm:algorithm_lib",
+    ":mpc_statistics_util_lib",
+  ],
+)
+
+cc_test(
+  name = "mpc_chisquare_test",
+  srcs = [
+    "statistics_chisquare_test.cc"
+  ],
+  deps = DEFAULT_ALGORITHM_LINK_DEPS + [
+    "//src/primihub/algorithm:algorithm_lib",
+    ":mpc_statistics_util_lib",
+  ],
+)
+
+cc_test(
+  name = "mpc_correlation_test",
+  srcs = [
+    "statistics_correlation_test.cc"
+  ],
+  deps = DEFAULT_ALGORITHM_LINK_DEPS + [
+    "//src/primihub/algorithm:algorithm_lib",
+    ":mpc_statistics_util_lib",
+  ],
+)
+
+cc_test(
+  name = "mpc_regression_test",
+  srcs = [
+    "statistics_regression_test.cc"
+  ],
+  deps = DEFAULT_ALGORITHM_LINK_DEPS + [
+    "//src/primihub/algorithm:algorithm_lib",
+    ":mpc_statistics_util_lib",
+  ],
+)
+
+cc_test(
     name = "maxpool_test",
     srcs = [
         "maxpool_test.cc"
@@ -140,6 +195,38 @@ cc_test(
     name = "aby3_MSB_test",
     srcs = [
         "aby3_MSB_test.cc",
+    ],
+    deps = ABY3_DEPS,
+)
+
+cc_test(
+    name = "aby3_sub_test",
+    srcs = [
+        "aby3_sub_test.cc",
+    ],
+    deps = ABY3_DEPS,
+)
+
+cc_test(
+    name = "aby3_dot_mul_test",
+    srcs = [
+        "aby3_dot_mul_test.cc",
+    ],
+    deps = ABY3_DEPS,
+)
+
+cc_test(
+    name = "aby3_abs_drelu_test",
+    srcs = [
+        "aby3_abs_drelu_test.cc",
+    ],
+    deps = ABY3_DEPS,
+)
+
+cc_test(
+    name = "aby3_pow_quo_test",
+    srcs = [
+        "aby3_pow_quo_test.cc",
     ],
     deps = ABY3_DEPS,
 )

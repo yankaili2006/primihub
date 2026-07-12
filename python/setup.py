@@ -61,6 +61,7 @@ def solib2sitepackage(solib_path=None):
     so_root_path = f"{bazel_bin_path}/src/primihub/task/pybind_wrapper"
     for module_name in module_list:
       module_map[module_name] = f"{so_root_path}/{module_name}"
+    ph_secure_native_installed = False
     for module_name, module_path in module_map.items():
         module_installed = False
         if os.path.isfile(module_path):
@@ -69,15 +70,29 @@ def solib2sitepackage(solib_path=None):
             module_installed = True
         else:
             print("Can't not find file {}, try to find ./{}.".format(module_path, module_name))
-        if module_installed:
-            continue
-        if os.path.isfile("./{}".format(module_name)):
+        if not module_installed and os.path.isfile("./{}".format(module_name)):
             shutil.copyfile("./{}".format(module_name),
                     paths + "/{}".format(module_name))
             print("Install {} finish, file found in './'.".format(module_name))
-        else:
+            module_installed = True
+        if module_name == "ph_secure_lib.so" and module_installed:
+            ph_secure_native_installed = True
+        if not module_installed:
             print("Can't not find file ./{}.".format(module_name))
             print("Ignore {} due to file not found.".format(module_name))
+
+    # 兜底: 原生 ph_secure_lib.so 未能构建/安装时 (历史上 ARM64 因链接路径硬编码编不出),
+    # 安装纯 Python no-op stub (随源码树, 与本 setup.py 同目录的 ph_secure_lib.py),
+    # 保证 `import ph_secure_lib` 成功, 横向联邦学习 Plaintext 路径可正常运行。
+    if not ph_secure_native_installed:
+        stub_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ph_secure_lib.py")
+        if os.path.isfile(stub_src):
+            shutil.copyfile(stub_src, "{}/ph_secure_lib.py".format(paths))
+            print("Native ph_secure_lib.so missing; installed pure-Python stub "
+                  "ph_secure_lib.py (HFL Plaintext works; VFL/secure-mode需原生.so).")
+        else:
+            print("WARN: ph_secure_lib.so missing and stub {} not found.".format(stub_src))
+
     system_name = platform.uname().system
     if system_name == 'Linux':
       deps_libs = ["librelic.so"]
@@ -87,11 +102,12 @@ def solib2sitepackage(solib_path=None):
               shutil.copyfile(lib_path, "{}/{}".format(paths, dep_lib))
           else:
               print("Ignore {} due to file not found.".format(dep_lib))
-      # chrpath -r [new_rpath] [lib_name]
-      # chrpath -r paths ph_secure_lib.so
-      sys_cmd = f"chrpath -r {paths} {paths}/ph_secure_lib.so"
-      print(sys_cmd)
-      os.system(sys_cmd)
+      # chrpath 仅对原生 .so 有意义; 装了 stub (.py) 时跳过, 否则 chrpath 会失败。
+      if ph_secure_native_installed:
+          # chrpath -r [new_rpath] [lib_name]
+          sys_cmd = f"chrpath -r {paths} {paths}/ph_secure_lib.so"
+          print(sys_cmd)
+          os.system(sys_cmd)
 
 def clean_proto():
     os.chdir("../")
