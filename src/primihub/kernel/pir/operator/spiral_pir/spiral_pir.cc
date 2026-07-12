@@ -31,6 +31,7 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
   // (root-caused via a controlled standalone build -- see
   // docs/pir/spiral-calibration-notes.md). Fail loudly on AVX2-only hosts
   // (e.g. Broadwell .50) rather than silently return incorrect results.
+#if defined(__x86_64__) || defined(_M_X64)
   __builtin_cpu_init();
   if (!__builtin_cpu_supports("avx2")) {
     LOG(ERROR) << "SpiralPirOperator: requires an AVX512F-capable CPU; "
@@ -39,6 +40,13 @@ retcode SpiralPirOperator::OnExecute(const PirDataType& input,
                   "See docs/pir/spiral-calibration-notes.md.";
     return retcode::FAIL;
   }
+#else
+  // __builtin_cpu_supports is x86-only. SpiralPIR needs AVX512 (x86), which
+  // this architecture lacks, so fail cleanly rather than fail to compile.
+  LOG(ERROR) << "SpiralPirOperator: requires an AVX512F-capable x86 CPU; "
+                "not supported on this architecture.";
+  return retcode::FAIL;
+#endif
 
   // v1 same-process simulation contract: input is one entry whose key is
   // a stringified PIR index ("0", "1", ...). All other keys are ignored
