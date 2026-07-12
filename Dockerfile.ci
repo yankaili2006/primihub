@@ -45,7 +45,10 @@ RUN --mount=type=cache,target=/root/.cache/bazel \
        sed -i 's/--config=linux_x86_64/--config=linux_aarch64/' Makefile; \
      fi \
   && sed -i 's/--local_ram_resources=12288/--local_ram_resources=7168/' Makefile \
-  && make release mysql=y \
+  && ( n=0; until [ "$n" -ge 4 ]; do \
+         make release mysql=y && break; \
+         n=$((n+1)); echo "make release attempt $n failed (likely transient WORKSPACE fetch); retry in 30s"; sleep 30; \
+       done; [ "$n" -lt 4 ] ) \
   && test -x bazel-bin/node \
   && tar cfh bazel-bin.tar bazel-bin/cli \
         bazel-bin/node \
