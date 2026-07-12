@@ -1,0 +1,102 @@
+# CI multi-arch build Dockerfile for primihub-node.
+# Parameterised by the buildx-provided TARGETARCH so a single file builds
+# both linux/amd64 (config=linux_x86_64) and linux/arm64 (config=linux_aarch64).
+# Differences vs ./Dockerfile: picks the bazel config per arch, relies on
+# pre_build.sh for arch-correct LINK_PYTHON_OPTS (no hardcoded x86 sed), and
+# drops the local 172.17.0.1:7890 proxy from the runner stage (breaks in CI).
+FROM ubuntu:20.04 as builder
+
+ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG TARGETARCH
+
+# Install dependencies (gcc-8 toolchain is only available on focal/20.04)
+RUN  apt update \
+  && apt install -y python3 python3-dev gcc-8 g++-8 python-dev libgmp-dev python3-pip tzdata cmake libmysqlclient-dev chrpath \
+  && apt install -y automake ca-certificates git libtool m4 patch pkg-config unzip make wget curl zip ninja-build npm \
+  && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8 \
+  && rm -rf /var/lib/apt/lists/*
+
+# install bazelisk (reads .bazelversion -> bazel 5.0.0)
+RUN npm install -g @bazel/bazelisk
+
+WORKDIR /src
+ADD . /src
+
+# Bazel build primihub-node & primihub-cli & shared libraries.
+# Cache mount preserves the ~1h Bazel build across image rebuilds.
+RUN --mount=type=cache,target=/root/.cache/bazel \
+  mkdir -p /home/primihub/local_deps \
+  && cp /src/local_deps/* /home/primihub/local_deps/ \
+  && git config --global url."https://github.com/madler/zlib".insteadOf "https://gitee.com/mirrors_madler/zlib" \
+  && git config --global url."https://github.com/microsoft/GSL".insteadOf "https://gitee.com/mirrors_microsoft/GSL" \
+  && git config --global url."https://github.com/facebook/zstd".insteadOf "https://gitee.com/cs-beegfs/zstd" \
+  && git config --global url."https://github.com/primihub/cityhash".insteadOf "https://gitee.com/primihub/cityhash" \
+  && bash pre_build.sh \
+  && mv -f WORKSPACE_GITHUB WORKSPACE \
+  && rm -f third_party/python_headers \
+  && ln -sf "$(python3-config --includes | awk '{print $1}' | sed 's/^-I//')" third_party/python_headers \
+  && test -d third_party/python_headers/ \
+  && MULTIARCH=$(gcc -print-multiarch) \
+  && PYVER=$(python3 -c 'import sys;print("%d.%d" % sys.version_info[:2])') \
+  && sed -i "s|^LINK_PYTHON_OPTS = .*|LINK_PYTHON_OPTS = [\"-L/usr/lib -L/usr/lib/python${PYVER}/config-${PYVER}-${MULTIARCH} -L/usr/lib/${MULTIARCH} -lcrypt -ldl -lm\"] + [\"-lpython${PYVER}\"]|" BUILD.bazel \
+  && if [ "$TARGETARCH" = "arm64" ]; then \
+       sed -i 's/--config=linux_x86_64/--config=linux_aarch64/' Makefile; \
+     fi \
+  && sed -i 's/--local_ram_resources=12288/--local_ram_resources=7168/' Makefile \
+  && ( n=0; until [ "$n" -ge 4 ]; do \
+         make release mysql=y && break; \
+         n=$((n+1)); echo "make release attempt $n failed (likely transient WORKSPACE fetch); retry in 30s"; sleep 30; \
+       done; [ "$n" -lt 4 ] ) \
+  && test -x bazel-bin/node \
+  && tar cfh bazel-bin.tar bazel-bin/cli \
+        bazel-bin/node \
+        bazel-bin/_solib* \
+        bazel-bin/task_main \
+        python \
+        config \
+        example \
+        data \
+  && if ls bazel-bin/src/primihub/pybind_warpper/*.so 2>/dev/null; then \
+       tar rfh bazel-bin.tar bazel-bin/src/primihub/pybind_warpper/*.so; \
+     fi \
+  && if ls bazel-bin/src/primihub/task/pybind_wrapper/*.so 2>/dev/null; then \
+       tar rfh bazel-bin.tar bazel-bin/src/primihub/task/pybind_wrapper/*.so; \
+     fi \
+  && gzip -f bazel-bin.tar
+
+FROM ubuntu:20.04 as runner
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update && apt install -y python3 python3-pip libmysqlclient21 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /src/bazel-bin.tar.gz /opt/bazel-bin.tar.gz
+COPY --from=builder /src/src/primihub/protos/ /app/src/primihub/protos/
+
+WORKDIR /app
+
+RUN tar zxf /opt/bazel-bin.tar.gz \
+  && mkdir log \
+  && test -x bazel-bin/node
+
+RUN ln -s -f bazel-bin/cli primihub-cli
+RUN ln -s -f bazel-bin/node primihub-node
+
+WORKDIR /app/python
+
+# No local proxy in CI; use the aliyun pypi mirror + pytorch cpu index.
+RUN --mount=type=cache,target=/root/.cache/pip \
+  python3 -m pip install --retries 10 --timeout 300 --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ \
+  && ( n=0; until [ "$n" -ge 5 ]; do \
+         python3 -m pip install --retries 10 --timeout 300 --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt && break; \
+         n=$((n+1)); echo "pip requirements attempt $n failed (network); retry in 20s"; sleep 20; \
+       done; [ "$n" -lt 5 ] ) \
+  && python3 setup.py install
+
+WORKDIR /app
+
+# gRPC server port
+EXPOSE 50050

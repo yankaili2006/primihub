@@ -3,302 +3,82 @@ name: primihub release actions
 on:
   push:
     tags: [ '*' ]
-  # 手动触发: 仅跑 build-on-ubuntu-arm64 验证 ph_secure_lib.so 是否在 ARM64 编出,
-  # 不发布镜像、不建 Release(其余 job 都被 refs/tags/ 门控, 仅 tag push 才跑全量).
   workflow_dispatch:
 
 env:
-  REGISTRY: docker.io
+  REGISTRY: registry.cn-beijing.aliyuncs.com
   IMAGE_NAME: primihub/primihub-node
 
 jobs:
-  build-on-ubuntu-amd64:
-    runs-on: [self-hosted, Linux, X64]
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # 仅 tag push; workflow_dispatch 跳过
-    steps:
-      - uses: actions/checkout@v3
-      - name: bazel build
-        run: |
-          # cc_binary
-          bash pre_build.sh
-          make release mysql=y protos=y
-
-          # 断言原生 MPC pybind 库已构建(否则联邦学习 secure 路径会缺 ph_secure_lib)
-          test -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
-            || { echo "ERROR: ph_secure_lib.so 未构建 (检查 LINK_PYTHON_OPTS 架构/python 链接路径)"; exit 1; }
-
-          #copy generated py pb to python dir
-          cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
-          cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python
-          cp -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so python
-          cp -f bazel-bin/src/primihub/protos/*.py \
-              python/primihub/client/ph_grpc/src/primihub/protos
-
-          tar zcf primihub-linux-amd64.tar.gz bazel-bin/cli \
-             bazel-bin/node \
-             primihub-cli \
-             primihub-node \
-             bazel-bin/task_main \
-             bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so \
-             bazel-bin/src/primihub/pybind_wrapper/linkcontext.so \
-             bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
-             start_server.sh \
-             stop_server.sh  \
-             client_run.sh  \
-             python \
-             config \
-             example \
-             data
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: primihub-linux-amd64
-          path: ./primihub-linux-amd64.tar.gz
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-            files: |
-              ./primihub-linux-amd64.tar.gz
-
-  build-on-ubuntu-arm64:
-    runs-on: [self-hosted, Linux, ARM64]
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # tag release 用自建 runner; 手动 dispatch 改用 verify-arm64-hosted(GitHub 托管 ARM)
-    steps:
-      - uses: actions/checkout@v3
-      - name: bazel build
-        run: |
-          # cc_binary
-          bash pre_build.sh
-          make release protos=y
-
-          # 断言 ARM64 上原生 MPC pybind 库已构建成功(本提交修复了 x86_64 硬编码的链接路径)
-          test -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
-            || { echo "ERROR: ph_secure_lib.so 未在 ARM64 构建出 (检查 BUILD.bazel LINK_PYTHON_OPTS 的 aarch64 select / Makefile --config=linux_aarch64)"; exit 1; }
-
-          cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
-          cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python
-          cp -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so python
-          cp -f bazel-bin/src/primihub/protos/*.py \
-              python/primihub/client/ph_grpc/src/primihub/protos
-
-          tar zcf primihub-linux-arm64.tar.gz bazel-bin/cli \
-             bazel-bin/node \
-             primihub-cli \
-             primihub-node \
-             bazel-bin/task_main \
-             bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so \
-             bazel-bin/src/primihub/pybind_wrapper/linkcontext.so \
-             bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
-             start_server.sh \
-             stop_server.sh  \
-             client_run.sh  \
-             python \
-             config \
-             example \
-             data
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: primihub-linux-arm64
-          path: ./primihub-linux-arm64.tar.gz
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-            files: |
-              ./primihub-linux-arm64.tar.gz
-
-  # 手动 dispatch 专用: 在 GitHub 托管 ARM64 runner(ubuntu-24.04-arm, 公共仓库免费)上,
-  # 用项目自带 Dockerfile builder 阶段(ubuntu20.04+gcc-8+bazelisk, 含 arch-aware python sed)
-  # 原生构建并断言 ph_secure_lib.so 为 aarch64 ELF —— 验证 ARM64 源码修复真实生效,
-  # 不依赖自建 runner、不发布任何产物。
-  verify-arm64-hosted:
-    runs-on: ubuntu-24.04-arm
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /opt/hostedtoolcache /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup 2>/dev/null || true
-          docker system prune -af || true
-          df -h /
-      - name: Build ph_secure_lib.so on native ARM64 via Dockerfile builder + assert
-        run: |
-          set -euo pipefail
-          echo "::group::docker build (builder stage, linux/arm64 native)"
-          DOCKER_BUILDKIT=1 docker build --platform linux/arm64 --target builder -t ph-arm-builder -f Dockerfile .
-          echo "::endgroup::"
-          cid=$(docker create ph-arm-builder)
-          docker cp "$cid":/src/bazel-bin.tar.gz ./bazel-bin.tar.gz
-          docker rm "$cid"
-          echo "=== 断言 ph_secure_lib.so 已在 ARM64 构建产出 ==="
-          tar tzf bazel-bin.tar.gz | grep 'task/pybind_wrapper/ph_secure_lib.so' \
-            || { echo "ERROR: ph_secure_lib.so 未在 ARM64 构建产出 (检查 Makefile --config=linux_aarch64 / Dockerfile 动态 python sed)"; exit 1; }
-          mkdir -p _verify
-          tar xzf bazel-bin.tar.gz -C _verify bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so
-          echo "--- file(1) on the produced .so ---"
-          file _verify/bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so
-          file _verify/bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so | grep -qiE 'aarch64|ARM aarch64' \
-            && echo "✅ confirmed aarch64 ELF ph_secure_lib.so —— ARM64 源码构建已验证生效"
-          cp ./bazel-bin.tar.gz ./primihub-linux-arm64-bazelbin.tar.gz
-      - name: Upload arm64 bazel-bin artifact (evidence)
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: primihub-linux-arm64-bazelbin
-          path: ./primihub-linux-arm64-bazelbin.tar.gz
-          if-no-files-found: warn
-
-  build-on-mac-amd64:
-    runs-on: macos-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # 仅 tag push; workflow_dispatch 跳过
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup bazelisk
-        uses: bazelbuild/setup-bazelisk@v2
-      - name: Install make
-        run: brew install make
-      - name: Install setuptools
-        run: python3 -m pip install setuptools
-      - name: set PYTHON LINK_OPTS
-        run: ./pre_build.sh
-        shell: bash
-
-      - name: bazel build
-        run: |
-          # cc_binary
-          make
-
-          cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
-          cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python
-          cp -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so python
-          #cp -f bazel-bin/src/primihub/protos/*.py \
-          #    python/primihub/client/ph_grpc/src/primihub/protos
-
-          tar zcf primihub-darwin-amd64.tar.gz bazel-bin/cli \
-            bazel-bin/node \
-            primihub-cli \
-            primihub-node \
-            bazel-bin/task_main \
-            bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so \
-            bazel-bin/src/primihub/pybind_wrapper/linkcontext.so \
-            bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
-            start_server.sh \
-            stop_server.sh  \
-            client_run.sh  \
-            python \
-            config \
-            example \
-            data
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-            files: |
-              ./primihub-darwin-amd64.tar.gz
-
-  build-on-mac-arm64:
-    runs-on: [self-hosted, ARM64, macOS]
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # 仅 tag push; workflow_dispatch 跳过
-    steps:
-      - uses: actions/checkout@v3
-      - name: bazel build
-        run: |
-          # cc_binary
-          bash pre_build.sh
-          make protos=y
-
-          cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python
-          cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python
-          cp -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so python
-          cp -f bazel-bin/src/primihub/protos/*.py \
-              python/primihub/client/ph_grpc/src/primihub/protos
-
-          tar zcf primihub-darwin-arm64.tar.gz bazel-bin/cli \
-              bazel-bin/node \
-              primihub-cli \
-              primihub-node \
-              bazel-bin/task_main \
-              bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so \
-              bazel-bin/src/primihub/pybind_wrapper/linkcontext.so \
-              start_server.sh \
-              stop_server.sh  \
-              client_run.sh  \
-              python \
-              config \
-              example \
-              data
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-            files: |
-              ./primihub-darwin-arm64.tar.gz
-
-
-  docker-image-build-and-publish:
+  build-amd64:
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') }}  # 仅 tag push 才发布镜像; workflow_dispatch 跳过
-    needs:
-      - build-on-ubuntu-amd64
-      - build-on-ubuntu-arm64
-
-    # permissions:
-    #   contents: read
-    #   packages: write
-    #   id-token: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Docker Hub
-        # if: github.event_name != 'pull_request'
-        uses: docker/login-action@v2
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h /
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Extract metadata (tags, labels) for Docker
-      # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Download amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: primihub-linux-amd64
-
-      - name: Download arm64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: primihub-linux-arm64
-
-      # Build and push Docker image with Buildx
-      # https://github.com/docker/build-push-action
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v2
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Build & push amd64
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.release
-          # push: ${{ github.event_name != 'pull_request' }}
+          file: ./Dockerfile.ci
+          platforms: linux/amd64
           push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-amd64
+          cache-from: type=gha,scope=node-amd64
+          cache-to: type=gha,mode=max,scope=node-amd64
+
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h /
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Build & push arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.ci
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-arm64
+          cache-from: type=gha,scope=node-arm64
+          cache-to: type=gha,mode=max,scope=node-arm64
+
+  manifest:
+    needs: [ build-amd64, build-arm64 ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Create multi-arch manifest
+        run: |
+          IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          TAG=${{ github.ref_name }}
+          docker buildx imagetools create -t $IMG:$TAG $IMG:$TAG-amd64 $IMG:$TAG-arm64
+          docker buildx imagetools inspect $IMG:$TAG
