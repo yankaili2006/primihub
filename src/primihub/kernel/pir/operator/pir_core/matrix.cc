@@ -17,6 +17,19 @@
 
 #include <glog/logging.h>
 
+#ifdef PIR_CORE_CUDA
+#include <cstdlib>
+// GPU matmul (C = A*B mod 2^32), validated in double_pir/cuda. Reused here as
+// the shared Matrix::Mul/MulVec accelerator (Simple/Double/YPIR all route their
+// LWE matmuls through Matrix). Forward-declared to avoid a header dep cycle.
+namespace primihub { namespace pir { namespace doublepir { namespace cuda {
+bool CudaAvailable();
+void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
+                        const std::uint32_t* b, std::size_t rows,
+                        std::size_t inner, std::size_t cols);
+}}}}  // namespace primihub::pir::doublepir::cuda
+#endif
+
 #ifdef PIR_PIR_CORE_REAL
 extern "C" {
 typedef uint32_t Elem;
@@ -34,6 +47,28 @@ void transpose(Elem* out, const Elem* in, size_t rows, size_t cols);
 #endif  // PIR_PIR_CORE_REAL
 
 namespace primihub::pir::core {
+
+#ifdef PIR_CORE_CUDA
+namespace {
+// Route a mod-2^32 matmul to the GPU when it is present and the problem is big
+// enough that H2D/D2H copy is amortized (~4M multiply-accumulates). Env hooks:
+//   PIR_CORE_CUDA_FORCE=1   -> always GPU (correctness-parity tests / forced bench)
+//   PIR_CORE_CUDA_DISABLE=1 -> always CPU
+bool UseCudaMatmul(uint64_t flops) {
+  static const int mode = []() -> int {
+    if (const char* f = std::getenv("PIR_CORE_CUDA_FORCE"); f && f[0] == '1')
+      return 1;
+    if (const char* d = std::getenv("PIR_CORE_CUDA_DISABLE"); d && d[0] == '1')
+      return -1;
+    return 0;
+  }();
+  if (mode == -1) return false;
+  if (!primihub::pir::doublepir::cuda::CudaAvailable()) return false;
+  if (mode == 1) return true;
+  return flops >= (1ull << 22);
+}
+}  // namespace
+#endif
 
 #ifdef PIR_PIR_CORE_REAL
 const bool kPirCoreKernelsVendored = true;
@@ -349,6 +384,14 @@ retcode Matrix::MulVec(const Matrix& b, Matrix* out, std::string* err) const {
   return retcode::FAIL;
 #else
   *out = Matrix(rows_, 1);
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_)) {
+    primihub::pir::doublepir::cuda::LweMatMulMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_), 1);
+    return retcode::SUCCESS;
+  }
+#endif
   matMulVec(out->mutable_data(), data_.data(), b.data(),
             static_cast<size_t>(rows_), static_cast<size_t>(cols_));
   return retcode::SUCCESS;
@@ -377,6 +420,15 @@ retcode Matrix::Mul(const Matrix& b, Matrix* out, std::string* err) const {
   return retcode::FAIL;
 #else
   *out = Matrix(rows_, b.cols_);
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_ * b.cols_)) {
+    primihub::pir::doublepir::cuda::LweMatMulMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_),
+        static_cast<size_t>(b.cols_));
+    return retcode::SUCCESS;
+  }
+#endif
   matMul(out->mutable_data(), data_.data(), b.data(),
          static_cast<size_t>(rows_), static_cast<size_t>(cols_),
          static_cast<size_t>(b.cols_));
