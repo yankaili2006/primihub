@@ -93,21 +93,6 @@ void WriteNotVendoredError(std::string* err) {
 
 }  // namespace
 
-uint32_t Matrix::Get(uint64_t i, uint64_t j) const {
-  if (i >= rows_ || j >= cols_) {
-    LOG(FATAL) << "Matrix::Get out of bounds: (" << i << ", " << j
-               << ") for shape (" << rows_ << ", " << cols_ << ")";
-  }
-  return data_[i * cols_ + j];
-}
-
-void Matrix::Set(uint64_t i, uint64_t j, uint32_t value) {
-  if (i >= rows_ || j >= cols_) {
-    LOG(FATAL) << "Matrix::Set out of bounds: (" << i << ", " << j
-               << ") for shape (" << rows_ << ", " << cols_ << ")";
-  }
-  data_[i * cols_ + j] = value;
-}
 
 Matrix Matrix::UniformRandom(uint64_t rows, uint64_t cols, uint32_t logmod) {
   Matrix m(rows, cols);
@@ -531,13 +516,17 @@ Matrix Matrix::SelectRows(uint64_t offset, uint64_t num_rows) const {
     LOG(FATAL) << "Matrix::SelectRows offset=" << offset << " num_rows="
                << num_rows << " > rows_=" << rows_;
   }
-  Matrix out(num_rows, cols_);
+  Matrix out;
+  out.rows_ = num_rows;
+  out.cols_ = cols_;
   if (num_rows == 0) {
     return out;
   }
-  std::copy(data_.begin() + offset * cols_,
-            data_.begin() + (offset + num_rows) * cols_,
-            out.data_.begin());
+  // Construct the row block directly from the source range: one allocation +
+  // copy, skipping the zero-fill that Matrix(num_rows, cols_) does and that the
+  // copy immediately overwrites (was ~1/3 of per-query Recover time).
+  out.data_.assign(data_.begin() + offset * cols_,
+                   data_.begin() + (offset + num_rows) * cols_);
   return out;
 }
 
