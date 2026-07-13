@@ -511,6 +511,29 @@ retcode Matrix::Transpose(Matrix* out, std::string* err) const {
 }
 
 
+Matrix Matrix::VConcatRows(const Matrix& a, uint64_t offA, uint64_t nA,
+                           const Matrix& b, uint64_t offB, uint64_t nB) {
+  if (a.cols_ != b.cols_) {
+    LOG(FATAL) << "Matrix::VConcatRows cols mismatch: a.cols=" << a.cols_
+               << " b.cols=" << b.cols_;
+  }
+  if (offA + nA > a.rows_ || offB + nB > b.rows_) {
+    LOG(FATAL) << "Matrix::VConcatRows out of bounds";
+  }
+  const uint64_t cols = a.cols_;
+  Matrix out;
+  out.rows_ = nA + nB;
+  out.cols_ = cols;
+  // One allocation for the full result; the two inserts fill reserved capacity
+  // with no zero-fill and no reallocation.
+  out.data_.reserve((nA + nB) * cols);
+  out.data_.insert(out.data_.end(), a.data_.begin() + offA * cols,
+                   a.data_.begin() + (offA + nA) * cols);
+  out.data_.insert(out.data_.end(), b.data_.begin() + offB * cols,
+                   b.data_.begin() + (offB + nB) * cols);
+  return out;
+}
+
 Matrix Matrix::SelectRows(uint64_t offset, uint64_t num_rows) const {
   if (offset + num_rows > rows_) {
     LOG(FATAL) << "Matrix::SelectRows offset=" << offset << " num_rows="

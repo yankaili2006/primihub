@@ -110,6 +110,14 @@ class Matrix {
   void ScalarSub(uint32_t value);
   void ReduceMod(uint32_t modulus);
 
+  // Vertically concatenate two row ranges of (possibly different) matrices
+  // that share the same column count, into one freshly-allocated matrix:
+  // rows [offA, offA+nA) of `a` stacked over rows [offB, offB+nB) of `b`.
+  // Single allocation (reserve + two inserts) -- no zero-fill and no realloc,
+  // unlike SelectRows(...).Concat(SelectRows(...)). Hot in DoublePIR Recover.
+  static Matrix VConcatRows(const Matrix& a, uint64_t offA, uint64_t nA,
+                            const Matrix& b, uint64_t offB, uint64_t nB);
+
   // Drops the last `n` rows. Used by simplepir's MulVecPacked padding
   // workaround (it allocates Rows+8 then drops 8 back). Cheap — only
   // shrinks the underlying vector + updates rows_.
