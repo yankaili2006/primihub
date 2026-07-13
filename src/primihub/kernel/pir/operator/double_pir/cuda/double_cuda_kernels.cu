@@ -118,4 +118,51 @@ void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
   cudaFree(d_c);
 }
 
+
+// Packed squished-DB matrix-vector (basis=10, squishing=3). Warp-per-row,
+// coalesced row loads, warp shuffle-reduce. Mirrors matMulVecPacked semantics:
+// out[i] = sum_j sum_{s<3} ((a[i*cols+j]>>10s)&1023) * b[3j+s], mod 2^32.
+__global__ void PackedMatVecKernel(std::uint32_t* out, const std::uint32_t* a,
+                                   const std::uint32_t* b, std::size_t rows,
+                                   std::size_t cols) {
+  const unsigned lane = threadIdx.x & 31u;
+  const std::size_t wpb = blockDim.x >> 5;
+  const std::size_t warp_id =
+      static_cast<std::size_t>(blockIdx.x) * wpb + (threadIdx.x >> 5);
+  const std::size_t total = static_cast<std::size_t>(gridDim.x) * wpb;
+  constexpr std::uint32_t kMask = 1023u;  // (1<<BASIS)-1
+  for (std::size_t row = warp_id; row < rows; row += total) {
+    const std::uint32_t* arow = a + row * cols;
+    std::uint32_t acc = 0;
+    for (std::size_t j = lane; j < cols; j += 32) {
+      const std::uint32_t db = arow[j];
+      acc += (db & kMask) * b[3 * j] +
+             ((db >> 10) & kMask) * b[3 * j + 1] +
+             ((db >> 20) & kMask) * b[3 * j + 2];  // wraps mod 2^32
+    }
+    for (int off = 16; off > 0; off >>= 1)
+      acc += __shfl_down_sync(0xffffffffu, acc, off);
+    if (lane == 0) out[row] = acc;
+  }
+}
+
+void PackedMatVecMod2Pow32(std::uint32_t* out, const std::uint32_t* a,
+                           const std::uint32_t* b, std::size_t rows,
+                           std::size_t cols) {
+  const std::size_t a_n = rows * cols, b_n = 3 * cols;
+  std::uint32_t *d_a, *d_b, *d_out;
+  cudaMalloc(&d_a, a_n * sizeof(std::uint32_t));
+  cudaMalloc(&d_b, b_n * sizeof(std::uint32_t));
+  cudaMalloc(&d_out, rows * sizeof(std::uint32_t));
+  cudaMemcpy(d_a, a, a_n * sizeof(std::uint32_t), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_b, b, b_n * sizeof(std::uint32_t), cudaMemcpyHostToDevice);
+  const int t = 256, wpb = t / 32;
+  long want = long((rows + wpb - 1) / wpb);
+  const int blocks = int(want > 65535 ? 65535 : (want < 1 ? 1 : want));
+  PackedMatVecKernel<<<blocks, t>>>(d_out, d_a, d_b, rows, cols);
+  cudaDeviceSynchronize();
+  cudaMemcpy(out, d_out, rows * sizeof(std::uint32_t), cudaMemcpyDeviceToHost);
+  cudaFree(d_a); cudaFree(d_b); cudaFree(d_out);
+}
+
 }  // namespace primihub::pir::doublepir::cuda

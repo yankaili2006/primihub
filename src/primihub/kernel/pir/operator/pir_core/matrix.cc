@@ -27,6 +27,9 @@ bool CudaAvailable();
 void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
                         const std::uint32_t* b, std::size_t rows,
                         std::size_t inner, std::size_t cols);
+void PackedMatVecMod2Pow32(std::uint32_t* out, const std::uint32_t* a,
+                           const std::uint32_t* b, std::size_t rows,
+                           std::size_t cols);
 }}}}  // namespace primihub::pir::doublepir::cuda
 #endif
 
@@ -485,6 +488,15 @@ retcode Matrix::MulVecPacked(const Matrix& b, uint64_t basis,
   WriteNotVendoredError(err);
   return retcode::FAIL;
 #else
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_ * squishing)) {
+    *out = Matrix(rows_, 1);
+    primihub::pir::doublepir::cuda::PackedMatVecMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_));
+    return retcode::SUCCESS;
+  }
+#endif
   // Kernel writes rows_+8 elements (SIMD tail padding); allocate
   // accordingly then DropLastRows(8) to surface the proper L x 1.
   Matrix temp(rows_ + 8, 1);
