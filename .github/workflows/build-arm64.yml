@@ -97,8 +97,8 @@ jobs:
       - name: push image (optional)
         if: ${{ github.event.inputs.push == 'true' }}
         env:
-          ACR_USER: ${{ secrets.ACR_USER }}
-          ACR_PASS: ${{ secrets.ACR_PASS }}
+          ACR_USER: ${{ secrets.ACR_USERNAME }}
+          ACR_PASS: ${{ secrets.ACR_PASSWORD }}
         run: |
           if [ -n "$ACR_USER" ]; then
             echo "$ACR_PASS" | docker login "$REG" -u "$ACR_USER" --password-stdin
