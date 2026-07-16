@@ -1,0 +1,79 @@
+name: build node image (arm64, GitHub-hosted)
+
+# Manual trigger. Builds the primihub node (bazel, --config=linux_aarch64) on a
+# native GitHub-hosted arm64 runner (ubuntu-24.04-arm, outside GFW so deps fetch
+# directly), then the runtime image via Dockerfile.release.
+#
+# Purpose: ship commit d57875b "fix(grpc): FL/inter-node gRPC keepalive to stop
+# too_many_pings GOAWAY hang" into a deployable arm64 node image. The offline
+# ArmVerify node binary (primihub-node:2026.07.15) predates that fix, so 2-party
+# PSI/FL hangs (state stuck at 2 / IN_OPERATION) when inter-node gRPC pings get
+# GOAWAY'd. A fresh arm64 build embeds the keepalive tolerance on both sides
+# (grpc_link_context.cc client + node/main.cc server).
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'push image to aliyun registry'
+        required: false
+        default: 'false'
+
+jobs:
+  build-node-arm64:
+    runs-on: ubuntu-24.04-arm
+    env:
+      REG: registry.cn-beijing.aliyuncs.com/primihub
+      USE_BAZEL_VERSION: '5.0.0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install toolchain (gcc-8 to match amd64 build)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-8 g++-8 build-essential python3 python3-pip
+          curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-arm64 \
+            -o /usr/local/bin/bazelisk && sudo chmod +x /usr/local/bin/bazelisk
+
+      - name: bazel build node (linux_aarch64)
+        env:
+          CC: /usr/bin/gcc-8
+          CXX: /usr/bin/g++-8
+        run: |
+          bazelisk build --config=linux_aarch64 --define enable_py_task=true \
+            :node :cli //:task_main \
+            //src/primihub/pybind_wrapper:linkcontext \
+            //src/primihub/pybind_wrapper:opt_paillier_c2py \
+            //src/primihub/task/pybind_wrapper:ph_secure_lib
+          cp -f bazel-bin/src/primihub/pybind_wrapper/linkcontext.so python/ || true
+          cp -f bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so python/ || true
+          cp -f bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so python/ || true
+          cp -f bazel-bin/src/primihub/protos/*.py python/primihub/client/ph_grpc/src/primihub/protos/ 2>/dev/null || true
+          ln -sf bazel-bin/node primihub-node
+          ln -sf bazel-bin/cli primihub-cli
+          tar zcf primihub-linux-arm64.tar.gz bazel-bin/cli bazel-bin/node primihub-cli primihub-node \
+            bazel-bin/task_main \
+            bazel-bin/src/primihub/pybind_wrapper/opt_paillier_c2py.so \
+            bazel-bin/src/primihub/pybind_wrapper/linkcontext.so \
+            bazel-bin/src/primihub/task/pybind_wrapper/ph_secure_lib.so \
+            start_server.sh stop_server.sh client_run.sh python config example data
+          echo "BUILD OK; tarball bytes: $(stat -c%s primihub-linux-arm64.tar.gz)"
+
+      - name: upload arm64 tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: primihub-linux-arm64
+          path: primihub-linux-arm64.tar.gz
+
+      - name: build runtime image (Dockerfile.release)
+        run: |
+          # Dockerfile.release COPYs both arch tarballs and picks by dpkg arch; stub amd64.
+          [ -f primihub-linux-amd64.tar.gz ] || : > primihub-linux-amd64.tar.gz
+          TAG=ci-arm64-${GITHUB_SHA::8}
+          docker build -f Dockerfile.release -t "$REG/primihub-node:$TAG" -t "$REG/primihub-node:ci-arm64-latest" .
+          echo "IMAGE=$REG/primihub-node:$TAG" >> "$GITHUB_ENV"
+
+      - name: push image (optional)
+        if: ${{ github.event.inputs.push == 'true' }}
+        run: |
+          docker push "$REG/primihub-node:ci-arm64-latest"
+          docker push "$IMAGE"
