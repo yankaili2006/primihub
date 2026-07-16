@@ -897,6 +897,13 @@ static const bool has_avx512vbmi2 = false;
 }  // namespace intel
 #endif
 HEXLEOF""",
+        # Several HEXL headers reachable from the compiled native .cpp (via unguarded
+        # `#include "...-avx512.hpp"`) do `#include <immintrin.h>` unconditionally. That
+        # x86 intrinsics header does not exist on arm64. Every AVX512 body in those files
+        # is already `#ifdef HEXL_HAS_AVX512DQ`-guarded (undefined here), so arch-guarding
+        # just the immintrin.h include turns them into no-ops on arm64 while leaving x86
+        # untouched.
+        """grep -rlZ '#include <immintrin.h>' hexl | xargs -0 sed -i 's@^#include <immintrin.h>@#if defined(__x86_64__) || defined(__i386__)\\n#include <immintrin.h>\\n#endif@'""",
     ],
     sha256 = "3692e6e6183dbc49253e51e86c3e52e7affcac925f57db0949dbb4d34b558a9a",
     strip_prefix = "hexl-1.2.5",
