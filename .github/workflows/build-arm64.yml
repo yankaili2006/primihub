@@ -31,12 +31,16 @@ jobs:
           docker run --rm -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             set -e
             export LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive USE_BAZEL_VERSION=5.0.0
+            # ports.ubuntu.com is flaky from CI; GitHub runners are on Azure -> use the
+            # co-located azure.ports.ubuntu.com mirror (fast + reliable).
+            sed -i "s|http://ports.ubuntu.com/ubuntu-ports|http://azure.ports.ubuntu.com/ubuntu-ports|g" /etc/apt/sources.list
             for i in 1 2 3 4 5; do
               apt-get update && apt-get install -y --fix-missing python3 python3-dev python2 python2-dev gcc-8 g++-8 \
                 libgmp-dev python3-pip tzdata cmake libmysqlclient-dev chrpath automake ca-certificates git libtool \
                 m4 patch pkg-config unzip make wget curl zip ninja-build xz-utils && break
-              echo "apt attempt $i failed (transient ports.ubuntu.com); retrying in 15s"; sleep 15
+              echo "apt attempt $i failed; retrying in 15s"; sleep 15
             done
+            command -v gcc-8 >/dev/null || { echo "FATAL: gcc-8 not installed after retries"; exit 1; }
             [ -e /usr/bin/python2 ] || ln -sf /usr/bin/python2.7 /usr/bin/python2
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
             curl -fsSL https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-arm64 -o /usr/local/bin/bazelisk && chmod +x /usr/local/bin/bazelisk
