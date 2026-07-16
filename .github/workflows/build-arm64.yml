@@ -43,10 +43,19 @@ jobs:
             # symlinks it; we do just that, skipping pre_build.sh which clobbers a good BUILD.bazel)
             PYINC=$(python3-config --includes | awk "{print \$1}" | sed "s/^-I//")
             ( cd third_party && rm -f python_headers && ln -s "$PYINC" python_headers )
-            [ -f WORKSPACE.orig ] || mv WORKSPACE WORKSPACE.orig
-            sed -e "s|https://primihub.oss-cn-beijing.aliyuncs.com/tools/gmp-6.2.1.tar.xz|file:///tmp/gmp_extracted/gmp-6.2.1.tar.xz|" \
-                -e "s|file:///home/primihub/local_deps/private-join-and-compute-master.zip|https://primihub.oss-cn-beijing.aliyuncs.com/tools/private-join-and-compute-master.zip|" \
-                WORKSPACE.orig > WORKSPACE
+            # Use the portable CN build config (OSS + github mirrors) instead of the default
+            # WORKSPACE (which has dev-machine file:/// paths). Convert gitee SSH -> HTTPS so no
+            # gitee deploy key is needed on the GitHub runner.
+            cp ci/cn-build/WORKSPACE.cn WORKSPACE
+            cp ci/cn-build/repository_deps.cn.bzl bazel/repository_deps.bzl
+            [ -f ci/cn-build/WORKSPACE_GITHUB.cn ] && cp ci/cn-build/WORKSPACE_GITHUB.cn WORKSPACE_GITHUB || true
+            for f in WORKSPACE WORKSPACE_GITHUB bazel/repository_deps.bzl; do
+              [ -f "$f" ] && sed -i \
+                -e "s|git@gitee.com:|https://gitee.com/|g" \
+                -e "s|https://primihub.oss-cn-beijing.aliyuncs.com/tools/gmp-6.2.1.tar.xz|file:///tmp/gmp_extracted/gmp-6.2.1.tar.xz|g" \
+                "$f"
+            done
+            mkdir -p /tmp/ph_distdir
             bazelisk build --config=linux_aarch64 --define enable_py_task=true \
               :node :cli //:task_main \
               //src/primihub/pybind_wrapper:linkcontext \
