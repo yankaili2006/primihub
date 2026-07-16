@@ -44,7 +44,9 @@ jobs:
             PYINC=$(python3-config --includes | awk "{print \$1}" | sed "s/^-I//")
             ( cd third_party && rm -f python_headers && ln -s "$PYINC" python_headers )
             [ -f WORKSPACE.orig ] || mv WORKSPACE WORKSPACE.orig
-            sed "s|https://primihub.oss-cn-beijing.aliyuncs.com/tools/gmp-6.2.1.tar.xz|file:///tmp/gmp_extracted/gmp-6.2.1.tar.xz|" WORKSPACE.orig > WORKSPACE
+            sed -e "s|https://primihub.oss-cn-beijing.aliyuncs.com/tools/gmp-6.2.1.tar.xz|file:///tmp/gmp_extracted/gmp-6.2.1.tar.xz|" \
+                -e "s|file:///home/primihub/local_deps/private-join-and-compute-master.zip|https://primihub.oss-cn-beijing.aliyuncs.com/tools/private-join-and-compute-master.zip|" \
+                WORKSPACE.orig > WORKSPACE
             bazelisk build --config=linux_aarch64 --define enable_py_task=true \
               :node :cli //:task_main \
               //src/primihub/pybind_wrapper:linkcontext \
