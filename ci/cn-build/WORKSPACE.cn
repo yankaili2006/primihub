@@ -592,14 +592,16 @@ http_archive(
     ],
 )
 
-# APSI
-git_repository(
+# APSI — http_archive (not git_repository) so the exact commit tarball is fetched.
+# git_repository does a SHALLOW clone of the default branch and can't reach a commit on a
+# feature branch, silently using the old BUILD. This commit (25f52236, branch
+# ci/arm64-apsi-genrule) adds a genrule to common/apsi/BUILD generating config.h from
+# config.h.in (APSI 0.8.2, C++17) + removes the committed config.h — the bazel-native fix
+# for the .gitignore'd cmake-generated config.h.
+http_archive(
     name = "mircrosoft_apsi",
-    # ci/arm64-apsi-genrule: config.h is .gitignore'd (cmake-generated) so a clean bazel
-    # git_repository lacked it. This commit adds a genrule to common/apsi/BUILD that
-    # generates config.h from config.h.in (APSI 0.8.2, C++17) — the bazel-native fix.
-    commit = "25f522366259f9f81d4ab793c26ac6a97fa7f447",
-    remote = "https://github.com/primihub/APSI.git",
+    urls = ["https://github.com/primihub/APSI/archive/25f522366259f9f81d4ab793c26ac6a97fa7f447.tar.gz"],
+    strip_prefix = "APSI-25f522366259f9f81d4ab793c26ac6a97fa7f447",
 )
 
 load("@mircrosoft_apsi//bazel:repositories.bzl", "apsi_dependencies")
