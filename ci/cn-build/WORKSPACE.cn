@@ -539,6 +539,19 @@ git_repository(
    init_submodules = False,
 )
 
+# Override mircrosoft_apsi BEFORE psi_preload/psi_deps (first definition wins in this
+# WORKSPACE). The psi machinery would otherwise pull the original APSI whose .gitignore'd
+# cmake-generated config.h is absent in a clean checkout -> "missing input file config.h".
+# Commit 25f52236 (branch ci/arm64-apsi-genrule) adds a genrule to common/apsi/BUILD that
+# generates config.h from config.h.in (APSI 0.8.2, C++17) + removes the committed config.h.
+# http_archive (not git_repository) so the exact feature-branch commit tarball is fetched
+# (git_repository shallow-clones the default branch and misses feature-branch commits).
+http_archive(
+    name = "mircrosoft_apsi",
+    urls = ["https://github.com/primihub/APSI/archive/25f522366259f9f81d4ab793c26ac6a97fa7f447.tar.gz"],
+    strip_prefix = "APSI-25f522366259f9f81d4ab793c26ac6a97fa7f447",
+)
+
 load("@org_openmined_psi//private_set_intersection:preload.bzl", "psi_preload")
 
 psi_preload()
@@ -549,17 +562,6 @@ http_archive(
     strip_prefix = "private-join-and-compute-master",
     url = "file:///home/primihub/local_deps/private-join-and-compute-master.zip",
     sha256 = "f8cbd621aa404ace22b6ba1f578804b5f444433d3965274d13724db3b2760a24",
-)
-
-# Override mircrosoft_apsi BEFORE psi_deps (first definition wins here). psi_deps would
-# otherwise pull the original APSI whose .gitignore'd cmake-generated config.h is absent in
-# a clean checkout. Commit 25f52236 (branch ci/arm64-apsi-genrule) adds a genrule to
-# common/apsi/BUILD generating config.h from config.h.in (APSI 0.8.2, C++17). http_archive
-# (not git_repository) so the exact feature-branch commit tarball is fetched.
-http_archive(
-    name = "mircrosoft_apsi",
-    urls = ["https://github.com/primihub/APSI/archive/25f522366259f9f81d4ab793c26ac6a97fa7f447.tar.gz"],
-    strip_prefix = "APSI-25f522366259f9f81d4ab793c26ac6a97fa7f447",
 )
 
 load("@org_openmined_psi//private_set_intersection:deps.bzl", "psi_deps")
