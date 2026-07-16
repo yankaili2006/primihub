@@ -32,9 +32,10 @@ jobs:
             set -e
             export LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive USE_BAZEL_VERSION=5.0.0
             apt-get update
-            apt-get install -y python3 python3-dev gcc-8 g++-8 libgmp-dev python3-pip tzdata cmake \
+            apt-get install -y python3 python3-dev python2 python2-dev gcc-8 g++-8 libgmp-dev python3-pip tzdata cmake \
               libmysqlclient-dev chrpath automake ca-certificates git libtool m4 patch pkg-config \
               unzip make wget curl zip ninja-build npm xz-utils
+            [ -e /usr/bin/python2 ] || ln -sf /usr/bin/python2.7 /usr/bin/python2
             update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
             npm install -g @bazel/bazelisk
             mkdir -p /tmp/gmp_extracted && tar xf gmp-6.2.1.tar.xz -C /tmp/gmp_extracted/
