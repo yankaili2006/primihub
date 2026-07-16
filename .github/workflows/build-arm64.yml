@@ -53,6 +53,8 @@ jobs:
               [ -f "$f" ] && sed -i \
                 -e "s|git@gitee.com:|https://gitee.com/|g" \
                 -e "s|https://primihub.oss-cn-beijing.aliyuncs.com/tools/gmp-6.2.1.tar.xz|file:///tmp/gmp_extracted/gmp-6.2.1.tar.xz|g" \
+                -e "s|file:///home/primihub/local_deps/private-join-and-compute-master.zip|https://primihub.oss-cn-beijing.aliyuncs.com/tools/private-join-and-compute-master.zip|g" \
+                -e "s|f8cbd621aa404ace22b6ba1f578804b5f444433d3965274d13724db3b2760a24|ddd13c10c6ad3e4a5e488180ebb930ad5ed6a1d2416d7e7b2b07695c73e2fa50|g" \
                 "$f"
             done
             mkdir -p /tmp/ph_distdir
