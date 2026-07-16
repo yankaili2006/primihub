@@ -598,6 +598,12 @@ git_repository(
     #commit = "0b192b2df72a136900b8c06fdd0caff8b1d4ce8d",
     commit = "0b192b2df72a136900b8c06fdd0caff8b1d4ce8d",
     remote = "git@gitee.com:primihub/APSI.git",
+    # config.h is .gitignore'd in the APSI fork (cmake generates it), so a clean
+    # git_repository checkout lacks it -> "missing input file config.h". Regenerate
+    # from config.h.in (APSI 0.8.2, C++17) via patch_cmds so the bazel build has it.
+    patch_cmds = [
+        "sed -e 's/@APSI_VERSION@/0.8.2/g' -e 's/@APSI_VERSION_MAJOR@/0/g' -e 's/@APSI_VERSION_MINOR@/8/g' -e 's/@APSI_VERSION_PATCH@/2/g' -e 's|#cmakedefine APSI_USE_CXX17|#define APSI_USE_CXX17|g' -e 's|^#cmakedefine|// #cmakedefine|g' common/apsi/config.h.in > common/apsi/config.h",
+    ],
 )
 
 load("@mircrosoft_apsi//bazel:repositories.bzl", "apsi_dependencies")
