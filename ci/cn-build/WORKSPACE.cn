@@ -598,7 +598,7 @@ git_repository(
     # ci/arm64-apsi-genrule: config.h is .gitignore'd (cmake-generated) so a clean bazel
     # git_repository lacked it. This commit adds a genrule to common/apsi/BUILD that
     # generates config.h from config.h.in (APSI 0.8.2, C++17) — the bazel-native fix.
-    commit = "f25c86a6ef6d92b18675334b0ad71bde49ac639a",
+    commit = "25f522366259f9f81d4ab793c26ac6a97fa7f447",
     remote = "https://github.com/primihub/APSI.git",
 )
 
