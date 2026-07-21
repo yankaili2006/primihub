@@ -1,7 +1,18 @@
 version: '3'
+
+# The docker daemon injects http_proxy=127.0.0.1:7890 into every container; grpc obeys it
+# and tunnels node<->meta traffic through a proxy that isn't there -> "failed to connect to
+# all addresses". Clear the proxy env so grpc connects directly on the compose network.
+x-no-proxy: &no-proxy
+  http_proxy: ""
+  https_proxy: ""
+  HTTP_PROXY: ""
+  HTTPS_PROXY: ""
+  no_grpc_proxy: "*"
 x-node-base: &node-base
   image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
   restart: "always"
+  environment: *no-proxy
   volumes:
     - ./data:/app/data
   entrypoint:
@@ -12,6 +23,7 @@ x-node-base: &node-base
 x-meta-base: &meta-base
   image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
   restart: "always"
+  environment: *no-proxy
   entrypoint:
     - "/bin/bash"
     - "-c"

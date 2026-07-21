@@ -1,0 +1,268 @@
+/*
+ * Copyright (c) 2026 by PrimiHub
+ * Licensed under the Apache License, Version 2.0
+ *
+ * ypir_regev_test -- random_rng / noise raw constructors. Verifies RNG
+ * consumption order + reduction against a parallel ChaChaRng, determinism,
+ * and that noise samples come from the DiscreteGaussian.
+ */
+#include "src/primihub/kernel/pir/operator/ypir/ypir_regev.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+
+#include <gtest/gtest.h>
+
+#include "src/primihub/kernel/pir/operator/ypir/ypir_chacha.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_discrete_gaussian.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_params.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_gadget.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_modulus_switch.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir_poly_ops.h"
+
+namespace primihub::pir::ypir {
+namespace {
+
+constexpr std::uint64_t kQ0 = 268369921ull, kQ1 = 249561089ull;
+
+Params P8b() {  // binary expansion gadget (large t_exp_left -> bits_per=1,
+                // tiny key-switch noise) so the multi-fold pack stays exact
+  return Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 60, 2, 3, true,
+                      1, 1, 1, 0, 0);
+}
+
+Params P8() {
+  return Params::Init(8, {kQ0, kQ1}, 6.4, 1, 256, 28, 4, 2, 2, 3, true,
+                      1, 1, 1, 0, 0);
+}
+
+std::array<std::uint8_t, 32> Seed(std::uint8_t b) {
+  std::array<std::uint8_t, 32> s{};
+  for (auto& x : s) x = b;
+  return s;
+}
+
+TEST(YpirRegevTest, RandomRngRaw_ConsumesNextU64PerCoeffReduced) {
+  auto p = P8();
+  auto rng = ChaChaRng::FromSeed(Seed(7));
+  auto rng_ref = ChaChaRng::FromSeed(Seed(7));
+  auto a = RandomRngRaw(p, 2, 3, rng);
+  EXPECT_EQ(a.rows, 2u);
+  EXPECT_EQ(a.cols, 3u);
+  ASSERT_EQ(a.data.size(), 2u * 3u * 8u);
+  for (std::size_t r = 0; r < 2; ++r)
+    for (std::size_t c = 0; c < 3; ++c)
+      for (std::size_t z = 0; z < 8; ++z) {
+        const std::uint64_t expect = rng_ref.NextU64() % p.modulus;
+        EXPECT_EQ(a.data[(r * 3 + c) * 8 + z], expect);
+      }
+  for (auto v : a.data) EXPECT_LT(v, p.modulus);
+}
+
+TEST(YpirRegevTest, RandomRngRaw_Deterministic) {
+  auto p = P8();
+  auto r1 = ChaChaRng::FromSeed(Seed(9));
+  auto r2 = ChaChaRng::FromSeed(Seed(9));
+  EXPECT_EQ(RandomRngRaw(p, 1, 1, r1).data, RandomRngRaw(p, 1, 1, r2).data);
+}
+
+TEST(YpirRegevTest, NoiseRaw_MatchesDiscreteGaussianSamples) {
+  auto p = P8();
+  const auto dg = DiscreteGaussian::Init(6.4);
+  auto rng = ChaChaRng::FromSeed(Seed(3));
+  auto rng_ref = ChaChaRng::FromSeed(Seed(3));
+  auto e = NoiseRaw(p, 1, 2, dg, rng);
+  ASSERT_EQ(e.data.size(), 1u * 2u * 8u);
+  for (std::size_t z = 0; z < e.data.size(); ++z) {
+    const std::uint64_t sv = rng_ref.NextU64();
+    EXPECT_EQ(e.data[z], dg.Sample(p.modulus, sv));
+  }
+}
+
+TEST(YpirRegevTest, GetRegSample_DecryptsToNoiseExactly) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);  // any sk: identity is exact
+  auto rng = ChaChaRng::FromSeed(Seed(2));      // noise stream
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));  // uniform-a stream
+  const PolyMatrixNTT samp = GetRegSample(ctx, dg, sk, rng, rng_pub);
+  ASSERT_EQ(samp.rows, 2u);
+  ASSERT_EQ(samp.cols, 1u);
+  // reproduce e from a parallel noise rng (same seed/order)
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));
+  const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+  // decrypt: phase = p_row0 * sk + p_row1, then FromNtt
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+  std::copy(samp.Poly(0, 0, cc_pl), samp.Poly(0, 0, cc_pl) + cc_pl,
+            row0.Poly(0, 0, cc_pl));
+  std::copy(samp.Poly(1, 0, cc_pl), samp.Poly(1, 0, cc_pl) + cc_pl,
+            row1.Poly(0, 0, cc_pl));
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  const PolyMatrixNTT phase_ntt = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+  const PolyMatrixRaw phase = ctx.FromNtt(phase_ntt);
+  EXPECT_EQ(phase.data, e_ref.data);  // exact: (-a)*s + (s*a + e) = e
+}
+
+TEST(YpirRegevTest, GetFreshRegPublicKey_EachColumnDecryptsToNoise) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  const std::size_t m = 3;
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const PolyMatrixNTT pk = GetFreshRegPublicKey(ctx, dg, sk, m, rng, rng_pub);
+  ASSERT_EQ(pk.rows, 2u);
+  ASSERT_EQ(pk.cols, m);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));  // parallel noise stream
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  for (std::size_t i = 0; i < m; ++i) {
+    const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+    PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+    std::copy(pk.Poly(0, i, cc_pl), pk.Poly(0, i, cc_pl) + cc_pl,
+              row0.Poly(0, 0, cc_pl));
+    std::copy(pk.Poly(1, i, cc_pl), pk.Poly(1, i, cc_pl) + cc_pl,
+              row1.Poly(0, 0, cc_pl));
+    const PolyMatrixNTT phase = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+    EXPECT_EQ(ctx.FromNtt(phase).data, e_ref.data) << "col " << i;
+  }
+}
+
+TEST(YpirRegevTest, RawGenerateExpansionParams_KeySwitchDecryptIdentity) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  const std::size_t num_exp = 2, m_exp = 2;
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const auto w =
+      RawGenerateExpansionParams(ctx, dg, sk, num_exp, m_exp, rng, rng_pub);
+  ASSERT_EQ(w.size(), num_exp);
+  const PolyMatrixNTT sk_ntt = ctx.ToNtt(sk);
+  const PolyMatrixNTT g_exp_ntt = ctx.ToNtt(BuildGadget(p, 1, m_exp));
+  auto rng_noise_ref = ChaChaRng::FromSeed(Seed(2));  // parallel noise stream
+  const std::size_t cc_pl = p.crt_count * p.poly_len;
+  for (std::size_t i = 0; i < num_exp; ++i) {
+    ASSERT_EQ(w[i].rows, 2u);
+    ASSERT_EQ(w[i].cols, m_exp);
+    const std::size_t t = (p.poly_len >> i) + 1;
+    const PolyMatrixNTT prod =
+        MultiplyNtt(p, ctx.ToNtt(Automorph(p, sk, t)), g_exp_ntt);  // 1 x m_exp
+    for (std::size_t j = 0; j < m_exp; ++j) {
+      const PolyMatrixRaw e_ref = NoiseRaw(p, 1, 1, dg, rng_noise_ref);
+      PolyMatrixNTT row0 = ctx.ZeroNtt(1, 1), row1 = ctx.ZeroNtt(1, 1);
+      std::copy(w[i].Poly(0, j, cc_pl), w[i].Poly(0, j, cc_pl) + cc_pl,
+                row0.Poly(0, 0, cc_pl));
+      std::copy(w[i].Poly(1, j, cc_pl), w[i].Poly(1, j, cc_pl) + cc_pl,
+                row1.Poly(0, 0, cc_pl));
+      const PolyMatrixNTT phase = AddNtt(p, MultiplyNtt(p, row0, sk_ntt), row1);
+      PolyMatrixNTT prodj = ctx.ZeroNtt(1, 1);
+      std::copy(prod.Poly(0, j, cc_pl), prod.Poly(0, j, cc_pl) + cc_pl,
+                prodj.Poly(0, 0, cc_pl));
+      const PolyMatrixNTT diff = AddNtt(p, phase, NegateNtt(p, prodj));
+      EXPECT_EQ(ctx.FromNtt(diff).data, e_ref.data) << "i" << i << " j" << j;
+    }
+  }
+}
+
+TEST(YpirRegevTest, RegevEncryptDecrypt_RoundTrip) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(1));
+  const PolyMatrixRaw sk = RandomRngRaw(p, 1, 1, sk_rng);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 37u + 5u) % p.pt_modulus;  // arbitrary plaintext < pt
+  auto rng = ChaChaRng::FromSeed(Seed(2));
+  auto rng_pub = ChaChaRng::FromSeed(Seed(3));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, rng, rng_pub);
+  ASSERT_EQ(ct.rows, 2u);
+  ASSERT_EQ(ct.cols, 1u);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, ct);
+  EXPECT_EQ(dec.data, m.data);  // exact round-trip (noise << Delta/2)
+}
+
+TEST(YpirRegevTest, HomomorphicAutomorph_E2E) {
+  NttContext ctx(P8());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  const std::size_t t_exp = static_cast<std::size_t>(p.modulus_log2);
+  // small (gaussian) secret, as real YPIR uses -- needed so the dropped
+  // 2^0 gadget digit (automorph(sk)*digit0) stays tiny vs Delta/2.
+  auto sk_rng = ChaChaRng::FromSeed(Seed(11));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);
+  auto ep_rng = ChaChaRng::FromSeed(Seed(12));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(13));
+  const std::size_t num_exp = 3;  // i=0,1,2 -> t=9,5,3 for poly_len 8
+  const auto eps =
+      RawGenerateExpansionParams(ctx, dg, sk, num_exp, t_exp, ep_rng, ep_rng_pub);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 53u + 7u) % p.pt_modulus;
+  const std::size_t i = 1;
+  const std::size_t t = (p.poly_len >> i) + 1;  // 5
+  auto enc_rng = ChaChaRng::FromSeed(Seed(14));
+  auto enc_rng_pub = ChaChaRng::FromSeed(Seed(15));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, enc_rng, enc_rng_pub);
+  const PolyMatrixNTT ct2 = HomomorphicAutomorph(ctx, t, t_exp, ct, eps[i]);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, ct2);
+  // expected = decode(automorph(encode(m))): same Rescale path, noise drops out
+  PolyMatrixRaw dm = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    dm.data[z] = Rescale(m.data[z], p.pt_modulus, p.modulus);
+  const PolyMatrixRaw auto_dm = Automorph(p, dm, t);
+  PolyMatrixRaw expected = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    expected.data[z] = Rescale(auto_dm.data[z], p.modulus, p.pt_modulus);
+  EXPECT_EQ(dec.data, expected.data);
+}
+
+TEST(YpirRegevTest, PackSingleLwe_FoldEquivalence) {
+  NttContext ctx(P8b());
+  const Params& p = ctx.params();
+  const auto dg = DiscreteGaussian::Init(p.noise_width);
+  auto sk_rng = ChaChaRng::FromSeed(Seed(21));
+  const PolyMatrixRaw sk = NoiseRaw(p, 1, 1, dg, sk_rng);  // small secret
+  auto ep_rng = ChaChaRng::FromSeed(Seed(22));
+  auto ep_rng_pub = ChaChaRng::FromSeed(Seed(23));
+  const auto eps = RawGenerateExpansionParams(ctx, dg, sk, p.poly_len_log2,
+                                              p.t_exp_left, ep_rng, ep_rng_pub);
+  PolyMatrixRaw m;
+  m.rows = 1; m.cols = 1; m.data.resize(p.poly_len);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    m.data[z] = (z * 29u + 13u) % p.pt_modulus;
+  auto enc_rng = ChaChaRng::FromSeed(Seed(24));
+  auto enc_rng_pub = ChaChaRng::FromSeed(Seed(25));
+  const PolyMatrixNTT ct = RegevEncrypt(ctx, dg, sk, m, enc_rng, enc_rng_pub);
+  const PolyMatrixNTT packed = PackSingleLwe(ctx, eps, ct);
+  const PolyMatrixRaw dec = RegevDecrypt(ctx, sk, packed);
+  // expected: the same automorphism fold on the plaintext encoding in R_q
+  PolyMatrixRaw dm = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    dm.data[z] = Rescale(m.data[z], p.pt_modulus, p.modulus);
+  PolyMatrixNTT acc = ctx.ToNtt(dm);
+  for (std::size_t i = 0; i < p.poly_len_log2; ++i) {
+    const std::size_t t = (p.poly_len >> i) + 1;
+    acc = AddNtt(p, acc, ctx.ToNtt(Automorph(p, ctx.FromNtt(acc), t)));
+  }
+  const PolyMatrixRaw acc_raw = ctx.FromNtt(acc);
+  PolyMatrixRaw expected = ctx.ZeroRaw(1, 1);
+  for (std::size_t z = 0; z < p.poly_len; ++z)
+    expected.data[z] = Rescale(acc_raw.data[z], p.modulus, p.pt_modulus);
+  EXPECT_EQ(dec.data, expected.data);
+}
+
+}  // namespace
+}  // namespace primihub::pir::ypir

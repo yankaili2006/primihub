@@ -1,6 +1,7 @@
 #include "src/primihub/kernel/pir/operator/id_pir.h"
 #include <glog/logging.h>
 #include <sstream>
+#include "src/primihub/kernel/pir/operator/registry.h"
 
 namespace primihub::pir {
 
@@ -72,5 +73,30 @@ retcode IdPirOperator::ServerSendRecv(const PirDataType& input, PirDataType* res
   }
   return retcode::SUCCESS;
 }
+
+namespace {
+// IdPirOperator is a plaintext ID-lookup passthrough; it provides no FHE-based
+// PIR privacy. Registered under "id_pir" so legacy PirType::ID_PIR routes here
+// via the factory shim. Real SealPIR will register separately under "seal_pir"
+// when the pir-acc/ module is migrated.
+PirCapabilities IdPirCaps() {
+  PirCapabilities caps;
+  caps.query_types = {QueryType::Index};
+  caps.min_servers = 1;
+  caps.max_servers = 1;
+  caps.needs_preprocess = false;
+  caps.hint_per_database = false;
+  caps.threat_model = ThreatModel::SemiHonest;
+  caps.perf_class = PerfClass::Ms;
+  caps.recommended_max_db_size = 1000000;  // plain lookup; trivial scale
+  caps.backends = {Backend::CPU};
+  caps.typical_query_comm_bytes = 0;  // proportional to query size
+  caps.typical_hint_size_bytes = 0;
+  caps.is_real = true;  // real SealPIR / passthrough impl
+  return caps;
+}
+
+PirRegistrar<IdPirOperator> id_pir_registrar_("id_pir", IdPirCaps());
+}  // namespace
 
 }  // namespace primihub::pir

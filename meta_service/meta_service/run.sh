@@ -18,7 +18,7 @@ for ((i=0; i<$PARTY_COUNT; i++)); do
         fi
     done
 
-    java -jar fusion-simple.jar \
+    java -jar meta-server.jar \
         --server.port=$SERVER_PORT \
         --grpc.server.port=$GRPC_SERVER_PORT \
         --db.path=$DB_PATH \

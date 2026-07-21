@@ -1,0 +1,104 @@
+# Bazel BUILD wrapper for menonsamir/spiral (USENIX'22 SpiralPIR).
+#
+# This file is loaded by WORKSPACE via:
+#   new_git_repository(
+#       name = "spiral_pir",
+#       remote = "https://github.com/menonsamir/spiral.git",
+#       commit = "361ee47f92214d4fcd03c4205c9c2729e8369afb",
+#       build_file = "@//thirdparty/pir:BUILD.spiral",
+#       shallow_since = "1651472347 +0000",
+#   )
+#
+# UPSTREAM CHARACTERISTICS that shape this wrapper:
+#   * C++17, originally clang++-12 + cmake, -O3 -march=native
+#   * src/spiral.cpp also contains a `main()` for the standalone benchmark
+#     binary — explicitly excluded here so the library is linkable
+#   * src/testing.cpp is the standalone tester, also kept out of the
+#     library target; intentionally exposed as a separate cc_binary so
+#     that primihub's bench/ scripts can drive it without rebuilding
+#   * `#include "hexl/ntt/ntt.hpp"` — depends on Intel HExL. Wire that up
+#     when implementing src/primihub/kernel/pir/operator/spiral_pir.cc;
+#     listing it in deps here keeps the contract visible
+#   * Headers use `using namespace std;` and declare globals at namespace
+#     scope. To avoid leaking these into primihub TUs, the primihub
+#     wrapper (kernel/pir/operator/spiral_pir/) should #include this
+#     library through a thin facade .cc that hides spiral.h
+#
+# AVX2/AVX512 are enabled by default (matches upstream CMake); pass
+# --define=disable_spiral_avx512=1 to drop AVX512 if targeting older CPUs.
+
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Translation units shared by both the library and the standalone binary.
+# Excludes spiral.cpp (has main) and testing.cpp (standalone tester).
+SPIRAL_CORE_SRCS = [
+    # Compiled with main()->spiral_main_disabled (see WORKSPACE_GITHUB
+    # patch_cmds). Needed for setup_constants/generate_gadgets symbols
+    # which upstream defines here without exposing in spiral.h.
+    "src/spiral.cpp",
+    "src/core.cpp",
+    "src/constants.cpp",
+    "src/poly.cpp",
+    "src/util.cpp",
+    "src/client.cpp",
+]
+
+SPIRAL_CORE_HDRS = glob(["include/*.h"])
+
+SPIRAL_COPTS = [
+    "-std=c++17",
+    "-O3",
+    "-march=native",
+    "-Wno-deprecated-declarations",
+    "-Wno-unused-variable",
+    "-Wno-unused-function",
+    "-Wno-unused-parameter",
+    "-Wno-sign-compare",
+]
+
+# Compile-time params for the v1 "wiki" config (matches Menon & Wu USENIX'22 §6
+# Table 1 row for 1M-record / 256-byte items, query_size = 14336 bytes).
+# Spiral hardcodes these via add_compile_definitions in upstream CMakeLists;
+# we mirror them here as `defines` (not `copts`) so consumers that #include
+# spiral.h get the same macros — without these, values.h fails to declare
+# p_db / arb_qprime / out_n. Switching to a different scheme requires a
+# different SPIRAL_DEFINES set.
+SPIRAL_DEFINES = [
+    "TEXP=8",
+    "TEXPRIGHT=56",
+    "TCONV=4",
+    "TGSW=10",
+    "QPBITS=22",
+    "PVALUE=256",
+    "QNUMFIRST=1",
+    "QNUMREST=0",
+    "OUTN=2",
+]
+
+config_setting(
+    name = "disable_avx512",
+    define_values = {"disable_spiral_avx512": "1"},
+)
+
+# Library form, suitable for embedding inside primihub's
+# SpiralPirOperator. Skips main()/testing translation units.
+cc_library(
+    name = "spiral_lib",
+    srcs = SPIRAL_CORE_SRCS,
+    hdrs = SPIRAL_CORE_HDRS,
+    includes = ["include"],
+    defines = SPIRAL_DEFINES,
+    copts = SPIRAL_COPTS + select({
+        ":disable_avx512": ["-mno-avx512f"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        # Intel HExL — see upstream include/spiral.h. Project must add
+        # @hexl // to WORKSPACE before this target builds.
+        "@hexl//:hexl",
+    ],
+    linkstatic = True,
+)
+
