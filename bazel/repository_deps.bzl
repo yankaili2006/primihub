@@ -124,7 +124,7 @@ def primihub_deps_cn():
       #sha256 = "6a5f67874af66b239b709c572ac1a5a00fdb1b29beaf13c3e6f79b1ba10dc7c4",
       strip_prefix = "upb-0.0.2-dp",
       urls = [
-          "file:///Users/primihub/github/primihub/local_deps/upb.tar.gz",
+          "https://github.com/primihub/upb/archive/refs/tags/v0.0.2-dp.tar.gz",
       ],
     )
   if "snappy" not in native.existing_rules():
