@@ -1,0 +1,23 @@
+# ph-build-focal — primihub node 的构建**环境**镜像 (focal/glibc2.31 + gcc-8 + bazelisk)。
+# ci/cn-build/build-node.sh 在本镜像内跑真正的 bazel 构建 (docker run ... ph-build-focal:cn ...)。
+# 只装工具链, 不 build node —— 与 Dockerfile.ci 的 builder 环境层一致, 单独成像便于存 ACR 复用。
+#
+# 构建: docker build -f Dockerfile.ph-build-focal -t ph-build-focal:cn .
+# 存档: docker tag ph-build-focal:cn registry.cn-beijing.aliyuncs.com/primihub/ph-build-focal:cn && docker push 之
+# 目的: workflow 从 ACR 拉取本镜像, runner 无需预置, 根治 "docker.io/ph-build-focal 403" (见 memory)。
+FROM ubuntu:20.04
+
+ENV LANG=C.UTF-8
+ENV DEBIAN_FRONTEND=noninteractive
+
+# gcc-8 工具链仅 focal/20.04 提供; 与 Dockerfile.ci builder 环境层保持一致。
+RUN apt update \
+  && apt install -y python3 python3-dev gcc-8 g++-8 python-dev libgmp-dev python3-pip tzdata cmake libmysqlclient-dev chrpath \
+  && apt install -y automake ca-certificates git libtool m4 patch pkg-config unzip make wget curl zip ninja-build npm \
+  && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8 \
+  && rm -rf /var/lib/apt/lists/*
+
+# bazelisk 读 .bazelversion -> bazel 5.0.0 (build-node.sh 设 USE_BAZEL_VERSION=5.0.0)
+RUN npm install -g @bazel/bazelisk
+
+WORKDIR /src

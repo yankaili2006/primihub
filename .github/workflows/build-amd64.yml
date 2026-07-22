@@ -28,6 +28,21 @@ jobs:
       - name: apply CN build config
         run: bash ci/cn-build/setup.sh
 
+      - name: ensure ph-build-focal:cn (ACR 优先, 缺则本地构建并回推)
+        run: |
+          # 根治 "docker.io/ph-build-focal:cn 403"(runner 无预置镜像时默认走 daocloud):
+          # 本地有则用; 否则从 ACR 拉; 拉不到则从 Dockerfile.ph-build-focal 构建并回推 ACR(自愈)。
+          if docker image inspect ph-build-focal:cn >/dev/null 2>&1; then
+            echo "ph-build-focal:cn 本地已存在"
+          elif docker pull "$REG/ph-build-focal:cn"; then
+            docker tag "$REG/ph-build-focal:cn" ph-build-focal:cn
+            echo "从 ACR 拉取 ph-build-focal:cn"
+          else
+            echo "ACR 无, 本地构建并回推 ACR"
+            docker build -f Dockerfile.ph-build-focal -t ph-build-focal:cn -t "$REG/ph-build-focal:cn" .
+            docker push "$REG/ph-build-focal:cn" || true
+          fi
+
       - name: bazel build node (focal glibc2.31 container)
         run: |
           docker run --rm --network host \
