@@ -6,7 +6,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository", "new_git_r
 git_repository(
   name = "com_github_bazel_rules_3rdparty",
   commit = "67ac7942969ee2224732a9b50b17180390c4fc97",
-  remote = "git@gitee.com:primihub/bazel-rules-thirdparty.git",
+  remote = "https://gitee.com/primihub/bazel-rules-thirdparty.git",
 )
 
 http_archive(
@@ -41,7 +41,7 @@ http_archive(
 git_repository(
     name = "com_github_nelhage_rules_boost",
     commit = "81945736a62fa8490d2ab6bb31705bb04ce4bb6c",
-    remote = "git@gitee.com:primihub/rules_boost.git",
+    remote = "https://gitee.com/primihub/rules_boost.git",
     shallow_since = "1677906695 +0800",
 )
 
@@ -99,14 +99,14 @@ new_git_repository(
         """sed -i.bak 's/value_byte_size/value_byte_size)/g' cpp/src/parquet/column_reader.cc""",
     ],
     branch = "release-4.0.0",
-    remote = "git@gitee.com:primihub/arrow.git",
+    remote = "https://gitee.com/primihub/arrow.git",
 )
 
 
 # grpc with openssl
 git_repository(
     name = "com_github_grpc_grpc",
-    remote = "git@gitee.com:primihub/grpc.git",
+    remote = "https://gitee.com/primihub/grpc.git",
     commit = "8838117b07a4faac3a6baaf645a490987b2a12b1",
 )
 
@@ -149,7 +149,7 @@ http_archive(
 # Abseil C++ libraries
 git_repository(
     name = "com_google_absl",
-    remote = "git@gitee.com:mirrors/abseil-cpp.git",
+    remote = "https://gitee.com/mirrors/abseil-cpp.git",
     commit = "0f3bb466b868b523cf1dc9b2aaaed65c77b28862",
     shallow_since = "1603283562 -0400",
 )
@@ -380,7 +380,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 new_git_repository(
     name = "fmt",
     build_file = "@com_github_bazel_rules_3rdparty//:fmt.BUILD",
-    remote = "git@gitee.com:mirrors/fmt.git",
+    remote = "https://gitee.com/mirrors/fmt.git",
     tag = "6.1.2",
 )
 
@@ -389,14 +389,14 @@ new_git_repository(
 new_git_repository(
     name = "com_openmpc_soralog",
     build_file = "@com_github_bazel_rules_3rdparty//:soralog.BUILD",
-    remote = "git@gitee.com:primihub/soralog.git",
+    remote = "https://gitee.com/primihub/soralog.git",
     branch = "master",
 )
 
 #yaml-cpp, need by libp2p
 git_repository(
     name = "com_github_jbeder_yaml_cpp",
-    remote = "git@gitee.com:mirrors/yaml-cpp.git",
+    remote = "https://gitee.com/mirrors/yaml-cpp.git",
     tag = "yaml-cpp-0.7.0",
 )
 
@@ -423,7 +423,7 @@ http_archive(
 new_git_repository(
   name = "com_github_primihub_seal_40",
   build_file = "@com_github_bazel_rules_3rdparty//:BUILD.seal",
-  remote = "git@gitee.com:primihub/SEAL.git",
+  remote = "https://gitee.com/primihub/SEAL.git",
   branch = "change_submodule_resource",
   #branch = "change_submodule_resource",
   patch_cmds = [
@@ -458,7 +458,7 @@ git_repository(
   name = "osu_libpsi",
   #commit = "dcbab133a09579efebc1662a11eeab01b055eb86",
   commit = "dcbab133a09579efebc1662a11eeab01b055eb86",
-  remote = "git@gitee.com:primihub/libPSI.git",
+  remote = "https://gitee.com/primihub/libPSI.git",
 )
 
 
@@ -466,14 +466,14 @@ git_repository(
   name = "ladnir_cryptoTools",
   # commit = "53026be7bf1f12cb572c3d8ef9c7ee1a21742360",
   commit = "53026be7bf1f12cb572c3d8ef9c7ee1a21742360",
-  remote = "git@gitee.com:primihub/cryptoTools.git",
+  remote = "https://gitee.com/primihub/cryptoTools.git",
 )
 
 git_repository(
   name = "com_github_ladnir_aby3",
   # commit = "cd2a8893c85a7e99a9ef84715370c2ca1f2d7dd0",
   commit = "cd2a8893c85a7e99a9ef84715370c2ca1f2d7dd0",
-  remote = "git@gitee.com:primihub/aby3.git",
+  remote = "https://gitee.com/primihub/aby3.git",
 )
 
 # libote
@@ -481,7 +481,7 @@ git_repository(
   name = "osu_libote",
   # commit = "d797f316d94b2931505f1862515b6e161a24cacb",
   commit = "d797f316d94b2931505f1862515b6e161a24cacb",
-  remote = "git@gitee.com:primihub/libOTe.git",
+  remote = "https://gitee.com/primihub/libOTe.git",
 )
 
 
@@ -489,14 +489,14 @@ new_git_repository(
     name = "github_ntl",
     build_file = "@com_github_bazel_rules_3rdparty//:ntl.BUILD",
     commit = "6b23216ce6b24dd04446122c2200b6f031621965",
-    remote = "git@gitee.com:primihub/ntl.git",
+    remote = "https://gitee.com/primihub/ntl.git",
     # shallow_since = "1591047380 -0700",
 )
 
 new_git_repository(
     name = "toolkit_relic",
     build_file = "@com_github_bazel_rules_3rdparty//:BUILD.relic",
-    remote = "git@gitee.com:primihub/relic.git",
+    remote = "https://gitee.com/primihub/relic.git",
     commit = "d7dcb22846e32172bb94111823bd3358ec9a49aa",
 )
 
@@ -534,7 +534,7 @@ http_archive(
 
 git_repository(
    name = "org_openmined_psi",
-   remote = "git@gitee.com:primihub/PSI.git",
+   remote = "https://gitee.com/primihub/PSI.git",
    branch = "master",
    init_submodules = False,
 )
@@ -561,7 +561,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
    name = "org_openmined_pir",
-   remote = "git@gitee.com:primihub/PIR.git",
+   remote = "https://gitee.com/primihub/PIR.git",
    branch = "master",
    init_submodules = False,
 )
@@ -614,14 +614,14 @@ new_git_repository(
     name = "com_microsoft_kuku",
     build_file = "@com_github_bazel_rules_3rdparty//:BUILD.kuku",
     branch = "2.1.0",
-    remote = "git@gitee.com:primihub/Kuku.git",
+    remote = "https://gitee.com/primihub/Kuku.git",
 )
 
 # needed by PIR keyword_pir
 git_repository(
     name = "com_google_cityhash",
     commit = "adb5e125065dfefbf06d61439c14405745a0c81a",
-    remote = "git@gitee.com:primihub/cityhash.git",
+    remote = "https://gitee.com/primihub/cityhash.git",
 )
 
 # needed by APSI
@@ -661,7 +661,7 @@ git_repository(
   name = "com_github_base64_cpp",
   # commit = "294208257517a97dd42911cac9f1d4da2a57d316",
   commit = "294208257517a97dd42911cac9f1d4da2a57d316",
-  remote = "git@gitee.com:primihub/cpp-base64.git",
+  remote = "https://gitee.com/primihub/cpp-base64.git",
 )
 
 http_archive(
@@ -695,7 +695,7 @@ cc_library(
 git_repository(
   name = "served",
   commit = "757172e1d8aa7e273e800ce8ec91974c90a2a8b1",
-  remote = "git@gitee.com:primihub/served.git",
+  remote = "https://gitee.com/primihub/served.git",
 )
 
 http_archive(
@@ -711,26 +711,26 @@ new_git_repository(
   name = "curl",
   build_file = "@com_github_bazel_rules_3rdparty//:curl.BUILD",
   tag = "curl-7_73_0",
-  remote = "git@gitee.com:primihub/curl.git",
+  remote = "https://gitee.com/primihub/curl.git",
 )
 
 git_repository(
   name = "tee_engine",
   commit = "a3c617083face2e0cac7489cc713e1e03e63b11c",
-  remote = "git@gitee.com:primihub/primihub_tee.git",
+  remote = "https://gitee.com/primihub/primihub_tee.git",
 )
 
 new_git_repository(
   name = "poco",
   build_file = "@com_github_bazel_rules_3rdparty//:poco.BUILD",
   tag = "poco-1.12.4-release",
-  remote = "git@gitee.com:mirrors/poco.git",
+  remote = "https://gitee.com/mirrors/poco.git",
 )
 
 git_repository(
   name = "ph_communication",
   commit = "84108f9340ee177617950b08c97062590381c66b",
-  remote = "git@gitee.com:primihub/communication.git",
+  remote = "https://gitee.com/primihub/communication.git",
 )
 
 # ---------------------------------------------------------------------------
