@@ -8,6 +8,10 @@ git config --global http.proxy http://127.0.0.1:7890
 git config --global https.proxy http://127.0.0.1:7890
 git config --global http.lowSpeedLimit 0
 cd /src
+# WORKSPACE.cn 用 file:///home/primihub/local_deps/*.zip 引若干本地依赖(private_join_and_compute 等,
+# 见 line ~547)。ph-build-focal 容器里该目录不存在, 需从挂载的 /src/local_deps 拷入(与 Dockerfile.ci 一致),
+# 否则 bazel 报 'private-join-and-compute-master.zip No such file or directory'。
+mkdir -p /home/primihub/local_deps && cp -f /src/local_deps/* /home/primihub/local_deps/ 2>/dev/null || true
 # node binary embeds linkcontext (PYBIND11_EMBEDDED_MODULE) via :node; also build the .so + others
 bazelisk build --config=linux_x86_64 --define enable_py_task=true --distdir=/distdir \
   :node :cli //:task_main \
