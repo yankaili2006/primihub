@@ -592,12 +592,18 @@ http_archive(
     ],
 )
 
-# APSI
-git_repository(
+# APSI — mircrosoft_apsi is defined ONLY here (the main WORKSPACE); psi_deps() does NOT
+# redefine it, so there is no last-def-wins concern. http_archive (not git_repository) so
+# the exact feature-branch commit tarball is fetched (git_repository shallow-clones the
+# default branch, missing feature-branch commits). Commit 65b1507 (branch
+# ci/arm64-apsi-genrule) ships a real pre-expanded config.h (APSI 0.8.2, C++17) committed
+# as a SOURCE header (force-added past .gitignore **/config.h). The earlier genrule
+# approach (25f52236) failed: bazel never wired the genrule output into version_lib's
+# include_prefix virtual-header symlink action, so config.h stayed missing at 1796/1831.
+http_archive(
     name = "mircrosoft_apsi",
-    #commit = "0b192b2df72a136900b8c06fdd0caff8b1d4ce8d",
-    commit = "0b192b2df72a136900b8c06fdd0caff8b1d4ce8d",
-    remote = "git@gitee.com:primihub/APSI.git",
+    urls = ["https://github.com/primihub/APSI/archive/65b15076d95f9cfe1c1f53f2dc9f3dd43daeb724.tar.gz"],
+    strip_prefix = "APSI-65b15076d95f9cfe1c1f53f2dc9f3dd43daeb724",
 )
 
 load("@mircrosoft_apsi//bazel:repositories.bzl", "apsi_dependencies")

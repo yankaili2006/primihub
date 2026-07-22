@@ -60,6 +60,9 @@ cc_library(
     defines = select({
         ":enable_real": ["PIR_PIR_CORE_REAL=1"],
         "//conditions:default": [],
+    }) + select({
+        "//src/primihub/kernel/pir/operator/backend:enable_cuda": ["PIR_CORE_CUDA=1"],
+        "//conditions:default": [],
     }),
     deps = [
         "//src/primihub/common:common_defination",
@@ -67,6 +70,11 @@ cc_library(
         "//src/primihub/kernel/pir/operator/pir_core:lwe_params",
     ] + select({
         ":enable_real": ["@simplepir//:simplepir_c_kernels"],
+        "//conditions:default": [],
+    }) + select({
+        "//src/primihub/kernel/pir/operator/backend:enable_cuda": [
+            "//src/primihub/kernel/pir/operator/double_pir/cuda:double_cuda_kernels",
+        ],
         "//conditions:default": [],
     }),
 )

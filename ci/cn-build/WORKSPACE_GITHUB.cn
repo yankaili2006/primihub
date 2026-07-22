@@ -592,12 +592,18 @@ http_archive(
     ],
 )
 
-# APSI
-git_repository(
+# APSI — this is the file bazel ACTUALLY reads: WORKSPACE is a symlink to
+# WORKSPACE_GITHUB, and the CI copies WORKSPACE_GITHUB.cn over WORKSPACE_GITHUB
+# AFTER copying WORKSPACE.cn over WORKSPACE (which the symlink redirects into
+# WORKSPACE_GITHUB), so WORKSPACE_GITHUB.cn wins. http_archive (not git_repository)
+# fetches the exact commit 65b1507 (branch ci/arm64-apsi-genrule) which ships a real
+# pre-expanded config.h (APSI 0.8.2, C++17) committed as a SOURCE header (force-added
+# past .gitignore **/config.h). A git_repository shallow-clone here got a tree whose
+# config.h is gitignored/absent -> "missing input file config.h" in version_lib.
+http_archive(
     name = "mircrosoft_apsi",
-    #branch = "bazel_version",
-    commit = "5a19c3228d9e6c6fab7936c2e7f9728f27789ce3",
-    remote = "https://gitcode.com/yankaili2006/phdep-mircrosoft_apsi.git",
+    urls = ["https://github.com/primihub/APSI/archive/65b15076d95f9cfe1c1f53f2dc9f3dd43daeb724.tar.gz"],
+    strip_prefix = "APSI-65b15076d95f9cfe1c1f53f2dc9f3dd43daeb724",
 )
 
 load("@mircrosoft_apsi//bazel:repositories.bzl", "apsi_dependencies")
@@ -853,7 +859,52 @@ http_archive(
 http_archive(
     name = "hexl",
     build_file = "//thirdparty/pir:BUILD.hexl",
-    patch_cmds = ["printf '#pragma once\\n#define HEXL_USE_GNU\\n#define HEXL_UNUSED(x) (void)(x)\\n' > hexl/include/hexl/util/defines.hpp"],
+    patch_cmds = [
+        "printf '#pragma once\\n#define HEXL_USE_GNU\\n#define HEXL_UNUSED(x) (void)(x)\\n' > hexl/include/hexl/util/defines.hpp",
+        # Intel HEXL's cpu-features.hpp unconditionally #includes "cpuinfo_x86.h"
+        # (from @cpu_features), which does not exist for an aarch64 cpu_features
+        # build -> fatal error on arm64. Rewrite it arch-conditionally: x86 keeps
+        # real AVX512 runtime detection; arm64 stubs has_avx512* to false (BUILD.hexl
+        # already excludes every *avx512*.cpp, so no AVX512 symbols are compiled).
+        """cat > hexl/util/cpu-features.hpp <<'HEXLEOF'
+#pragma once
+#include <cstdlib>
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
+#include "cpuinfo_x86.h"  // NOLINT(build/include_subdir)
+namespace intel {
+namespace hexl {
+static const bool disable_avx512dq =
+    (std::getenv("HEXL_DISABLE_AVX512DQ") != nullptr);
+static const bool disable_avx512ifma =
+    disable_avx512dq || (std::getenv("HEXL_DISABLE_AVX512IFMA") != nullptr);
+static const bool disable_avx512vbmi2 =
+    disable_avx512dq || (std::getenv("HEXL_DISABLE_AVX512VBMI2") != nullptr);
+static const cpu_features::X86Features features =
+    cpu_features::GetX86Info().features;
+static const bool has_avx512dq = features.avx512f && features.avx512dq &&
+                                 features.avx512vl && !disable_avx512dq;
+static const bool has_avx512ifma = features.avx512ifma && !disable_avx512ifma;
+static const bool has_avx512vbmi2 = features.avx512vbmi2 && !disable_avx512vbmi2;
+}  // namespace hexl
+}  // namespace intel
+#else
+namespace intel {
+namespace hexl {
+static const bool has_avx512dq = false;
+static const bool has_avx512ifma = false;
+static const bool has_avx512vbmi2 = false;
+}  // namespace hexl
+}  // namespace intel
+#endif
+HEXLEOF""",
+        # Several HEXL headers reachable from the compiled native .cpp (via unguarded
+        # `#include "...-avx512.hpp"`) do `#include <immintrin.h>` unconditionally. That
+        # x86 intrinsics header does not exist on arm64. Every AVX512 body in those files
+        # is already `#ifdef HEXL_HAS_AVX512DQ`-guarded (undefined here), so arch-guarding
+        # just the immintrin.h include turns them into no-ops on arm64 while leaving x86
+        # untouched.
+        """grep -rlZ '#include <immintrin.h>' hexl | xargs -0 sed -i 's@^#include <immintrin.h>@#if defined(__x86_64__) || defined(__i386__)\\n#include <immintrin.h>\\n#endif@'""",
+    ],
     sha256 = "3692e6e6183dbc49253e51e86c3e52e7affcac925f57db0949dbb4d34b558a9a",
     strip_prefix = "hexl-1.2.5",
     urls = ["https://github.com/intel/hexl/archive/refs/tags/v1.2.5.tar.gz"],

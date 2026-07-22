@@ -17,6 +17,22 @@
 
 #include <glog/logging.h>
 
+#ifdef PIR_CORE_CUDA
+#include <cstdlib>
+// GPU matmul (C = A*B mod 2^32), validated in double_pir/cuda. Reused here as
+// the shared Matrix::Mul/MulVec accelerator (Simple/Double/YPIR all route their
+// LWE matmuls through Matrix). Forward-declared to avoid a header dep cycle.
+namespace primihub { namespace pir { namespace doublepir { namespace cuda {
+bool CudaAvailable();
+void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
+                        const std::uint32_t* b, std::size_t rows,
+                        std::size_t inner, std::size_t cols);
+void PackedMatVecMod2Pow32(std::uint32_t* out, const std::uint32_t* a,
+                           const std::uint32_t* b, std::size_t rows,
+                           std::size_t cols);
+}}}}  // namespace primihub::pir::doublepir::cuda
+#endif
+
 #ifdef PIR_PIR_CORE_REAL
 extern "C" {
 typedef uint32_t Elem;
@@ -34,6 +50,28 @@ void transpose(Elem* out, const Elem* in, size_t rows, size_t cols);
 #endif  // PIR_PIR_CORE_REAL
 
 namespace primihub::pir::core {
+
+#ifdef PIR_CORE_CUDA
+namespace {
+// Route a mod-2^32 matmul to the GPU when it is present and the problem is big
+// enough that H2D/D2H copy is amortized (~4M multiply-accumulates). Env hooks:
+//   PIR_CORE_CUDA_FORCE=1   -> always GPU (correctness-parity tests / forced bench)
+//   PIR_CORE_CUDA_DISABLE=1 -> always CPU
+bool UseCudaMatmul(uint64_t flops) {
+  static const int mode = []() -> int {
+    if (const char* f = std::getenv("PIR_CORE_CUDA_FORCE"); f && f[0] == '1')
+      return 1;
+    if (const char* d = std::getenv("PIR_CORE_CUDA_DISABLE"); d && d[0] == '1')
+      return -1;
+    return 0;
+  }();
+  if (mode == -1) return false;
+  if (!primihub::pir::doublepir::cuda::CudaAvailable()) return false;
+  if (mode == 1) return true;
+  return flops >= (1ull << 22);
+}
+}  // namespace
+#endif
 
 #ifdef PIR_PIR_CORE_REAL
 const bool kPirCoreKernelsVendored = true;
@@ -55,21 +93,6 @@ void WriteNotVendoredError(std::string* err) {
 
 }  // namespace
 
-uint32_t Matrix::Get(uint64_t i, uint64_t j) const {
-  if (i >= rows_ || j >= cols_) {
-    LOG(FATAL) << "Matrix::Get out of bounds: (" << i << ", " << j
-               << ") for shape (" << rows_ << ", " << cols_ << ")";
-  }
-  return data_[i * cols_ + j];
-}
-
-void Matrix::Set(uint64_t i, uint64_t j, uint32_t value) {
-  if (i >= rows_ || j >= cols_) {
-    LOG(FATAL) << "Matrix::Set out of bounds: (" << i << ", " << j
-               << ") for shape (" << rows_ << ", " << cols_ << ")";
-  }
-  data_[i * cols_ + j] = value;
-}
 
 Matrix Matrix::UniformRandom(uint64_t rows, uint64_t cols, uint32_t logmod) {
   Matrix m(rows, cols);
@@ -349,6 +372,14 @@ retcode Matrix::MulVec(const Matrix& b, Matrix* out, std::string* err) const {
   return retcode::FAIL;
 #else
   *out = Matrix(rows_, 1);
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_)) {
+    primihub::pir::doublepir::cuda::LweMatMulMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_), 1);
+    return retcode::SUCCESS;
+  }
+#endif
   matMulVec(out->mutable_data(), data_.data(), b.data(),
             static_cast<size_t>(rows_), static_cast<size_t>(cols_));
   return retcode::SUCCESS;
@@ -377,6 +408,15 @@ retcode Matrix::Mul(const Matrix& b, Matrix* out, std::string* err) const {
   return retcode::FAIL;
 #else
   *out = Matrix(rows_, b.cols_);
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_ * b.cols_)) {
+    primihub::pir::doublepir::cuda::LweMatMulMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_),
+        static_cast<size_t>(b.cols_));
+    return retcode::SUCCESS;
+  }
+#endif
   matMul(out->mutable_data(), data_.data(), b.data(),
          static_cast<size_t>(rows_), static_cast<size_t>(cols_),
          static_cast<size_t>(b.cols_));
@@ -433,6 +473,15 @@ retcode Matrix::MulVecPacked(const Matrix& b, uint64_t basis,
   WriteNotVendoredError(err);
   return retcode::FAIL;
 #else
+#ifdef PIR_CORE_CUDA
+  if (UseCudaMatmul(static_cast<uint64_t>(rows_) * cols_ * squishing)) {
+    *out = Matrix(rows_, 1);
+    primihub::pir::doublepir::cuda::PackedMatVecMod2Pow32(
+        out->mutable_data(), data_.data(), b.data(),
+        static_cast<size_t>(rows_), static_cast<size_t>(cols_));
+    return retcode::SUCCESS;
+  }
+#endif
   // Kernel writes rows_+8 elements (SIMD tail padding); allocate
   // accordingly then DropLastRows(8) to surface the proper L x 1.
   Matrix temp(rows_ + 8, 1);
@@ -462,18 +511,45 @@ retcode Matrix::Transpose(Matrix* out, std::string* err) const {
 }
 
 
+Matrix Matrix::VConcatRows(const Matrix& a, uint64_t offA, uint64_t nA,
+                           const Matrix& b, uint64_t offB, uint64_t nB) {
+  if (a.cols_ != b.cols_) {
+    LOG(FATAL) << "Matrix::VConcatRows cols mismatch: a.cols=" << a.cols_
+               << " b.cols=" << b.cols_;
+  }
+  if (offA + nA > a.rows_ || offB + nB > b.rows_) {
+    LOG(FATAL) << "Matrix::VConcatRows out of bounds";
+  }
+  const uint64_t cols = a.cols_;
+  Matrix out;
+  out.rows_ = nA + nB;
+  out.cols_ = cols;
+  // One allocation for the full result; the two inserts fill reserved capacity
+  // with no zero-fill and no reallocation.
+  out.data_.reserve((nA + nB) * cols);
+  out.data_.insert(out.data_.end(), a.data_.begin() + offA * cols,
+                   a.data_.begin() + (offA + nA) * cols);
+  out.data_.insert(out.data_.end(), b.data_.begin() + offB * cols,
+                   b.data_.begin() + (offB + nB) * cols);
+  return out;
+}
+
 Matrix Matrix::SelectRows(uint64_t offset, uint64_t num_rows) const {
   if (offset + num_rows > rows_) {
     LOG(FATAL) << "Matrix::SelectRows offset=" << offset << " num_rows="
                << num_rows << " > rows_=" << rows_;
   }
-  Matrix out(num_rows, cols_);
+  Matrix out;
+  out.rows_ = num_rows;
+  out.cols_ = cols_;
   if (num_rows == 0) {
     return out;
   }
-  std::copy(data_.begin() + offset * cols_,
-            data_.begin() + (offset + num_rows) * cols_,
-            out.data_.begin());
+  // Construct the row block directly from the source range: one allocation +
+  // copy, skipping the zero-fill that Matrix(num_rows, cols_) does and that the
+  // copy immediately overwrites (was ~1/3 of per-query Recover time).
+  out.data_.assign(data_.begin() + offset * cols_,
+                   data_.begin() + (offset + num_rows) * cols_);
   return out;
 }
 

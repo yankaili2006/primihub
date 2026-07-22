@@ -39,7 +39,7 @@ genrule(
         "double_cuda_kernels.h",
     ],
     outs = ["double_cuda_kernels.pic.o"],
-    cmd = "nvcc -O2 -std=c++17 --compiler-options -fPIC -c " +
+    cmd = "nvcc -O2 -std=c++17 -arch=sm_120 --compiler-options -fPIC -c " +
           "$(location double_cuda_kernels.cu) " +
           "-I$$(dirname $(location double_cuda_kernels.h)) -o $@",
     tags = [

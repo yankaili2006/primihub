@@ -517,7 +517,8 @@ retcode DoublePirProtocol::Recover(
   vals.reserve(info.ne);
   for (uint64_t ne_idx = 0; ne_idx < per_col; ++ne_idx) {
     const core::Matrix& a2 = answers2[2 * ne_idx];
-    core::Matrix h2 = answers2[2 * ne_idx + 1];  // local copy: we ScalarAdd it.
+    const core::Matrix& h2 =
+        answers2[2 * ne_idx + 1];  // read-only after VConcat refactor.
     const core::Matrix& secret2 = secrets2[ne_idx];
 
     // Sanity check: a2 must have N*delta*X rows, h2 must have delta*X rows.
@@ -538,20 +539,18 @@ retcode DoublePirProtocol::Recover(
       return fail(oss.str());
     }
 
-    h2.ScalarAdd(static_cast<uint32_t>(val2));
-
+    // h2 gets +val2 as part of `state` below (per j-slice), matching upstream.
     for (uint64_t j = 0; j < info.x; ++j) {
-      // state = a2[j * N*delta : (j+1)*N*delta, 0:1]   ; state += val2
-      core::Matrix state =
-          a2.SelectRows(j * params.n * delta, params.n * delta);
+      // state = [ a2[j*N*delta : (j+1)*N*delta] ; h2[j*delta : (j+1)*delta] ]
+      // then += val2 on both blocks. One allocation, no realloc / no zero-fill
+      // (was SelectRows + ScalarAdd + Concat: ~1/3 of per-query Recover time).
+      core::Matrix state = core::Matrix::VConcatRows(
+          a2, j * params.n * delta, params.n * delta, h2, j * delta, delta);
       state.ScalarAdd(static_cast<uint32_t>(val2));
-      // state.Concat(h2[j*delta : (j+1)*delta, :])  → shape (N+1)*delta x 1
-      state.Concat(h2.SelectRows(j * delta, delta));
 
-      // hint = H2_msg[j*N*delta : (j+1)*N*delta, 0:N]
-      core::Matrix hint =
-          H2_msg.SelectRows(j * params.n * delta, params.n * delta);
-      hint.Concat(h1.SelectRows(j * delta, delta));
+      // hint = [ H2_msg[j*N*delta : (j+1)*N*delta] ; h1[j*delta : (j+1)*delta] ]
+      core::Matrix hint = core::Matrix::VConcatRows(
+          H2_msg, j * params.n * delta, params.n * delta, h1, j * delta, delta);
       // hint shape: (N+1)*delta x N.
 
       // interm = hint * secret2 ; state -= interm

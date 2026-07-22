@@ -31,6 +31,15 @@ void LweMatMulMod2Pow32(std::uint32_t* c, const std::uint32_t* a,
                         const std::uint32_t* b, std::size_t rows,
                         std::size_t inner, std::size_t cols);
 
+// Packed matrix-vector for the SimplePIR/DoublePIR squished-DB Answer hot path
+// (basis=10, squishing=3). `a` is rows x cols row-major uint32; each element
+// packs 3 sub-values ((a>>10*s)&1023, s=0,1,2). `b` is the length-(3*cols)
+// query. out[i] = sum_j sum_s ((a[i*cols+j]>>10s)&1023) * b[3j+s], mod 2^32.
+// GPU analogue of the AVX2 matMulVecPacked; out length = rows.
+void PackedMatVecMod2Pow32(std::uint32_t* out, const std::uint32_t* a,
+                           const std::uint32_t* b, std::size_t rows,
+                           std::size_t cols);
+
 }  // namespace primihub::pir::doublepir::cuda
 
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_DOUBLE_PIR_CUDA_DOUBLE_CUDA_KERNELS_H_

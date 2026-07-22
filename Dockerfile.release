@@ -22,8 +22,9 @@ WORKDIR /app/python
 RUN python3 -m pip install --upgrade pip \
   && python3 -m pip install -r requirements.txt \
   && if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
-     wget https://primihub.oss-cn-beijing.aliyuncs.com/dev/tenseal-0.3.14-cp38-cp38-linux_aarch64.whl \
-     && pip install tenseal-0.3.14-cp38-cp38-linux_aarch64.whl; \
+     (wget -q https://primihub.oss-cn-beijing.aliyuncs.com/dev/tenseal-0.3.14-cp38-cp38-linux_aarch64.whl \
+      && pip install tenseal-0.3.14-cp38-cp38-linux_aarch64.whl) \
+     || echo "WARN: arm64 tenseal wheel unavailable (OSS 403); FL homomorphic-encryption python tasks will lack tenseal, node/PSI/PIR unaffected"; \
      fi \
   && python3 setup.py install \
   && rm -rf /root/.cache/pip/

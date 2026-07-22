@@ -8,10 +8,9 @@ git config --global http.proxy http://127.0.0.1:7890
 git config --global https.proxy http://127.0.0.1:7890
 git config --global http.lowSpeedLimit 0
 cd /src
-bash pre_build.sh || true
 # node binary embeds linkcontext (PYBIND11_EMBEDDED_MODULE) via :node; also build the .so + others
 bazelisk build --config=linux_x86_64 --define enable_py_task=true --distdir=/distdir \
-  :node :cli //src/primihub/task_engine:task_main \
+  :node :cli //:task_main \
   //src/primihub/pybind_wrapper:linkcontext \
   //src/primihub/pybind_wrapper:opt_paillier_c2py \
   //src/primihub/task/pybind_wrapper:ph_secure_lib
