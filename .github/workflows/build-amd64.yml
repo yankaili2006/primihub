@@ -45,9 +45,15 @@ jobs:
 
       - name: bazel build node (focal glibc2.31 container)
         run: |
+          # 持久化 bazel cache(含已下载的外部依赖 archive + 编译产物)跨构建复用:
+          # docker run --rm 每次新容器无缓存 → 每次重下 ~28 个 github tarball, 任一 flaky
+          # (Premature EOF/超时, .50 经 GFW)即整体失败。挂载持久目录后, 下载/编译只需成功一次即缓存,
+          # 重试增量收敛到绿, 之后飞快。根治 no-cache 构建对 flaky 下载的脆弱性。
+          mkdir -p /tmp/ph_bazel_cache
           docker run --rm --network host \
             -v "$PWD":/src \
             -v /tmp/ph_distdir:/distdir \
+            -v /tmp/ph_bazel_cache:/root/.cache/bazel \
             -v "$HOME/.ssh_rw":/root/.ssh_rw:ro \
             ph-build-focal:cn bash /src/ci/cn-build/build-node.sh
 
