@@ -165,3 +165,6 @@ demo_primihub.py
 *.bak
 *.bak.*
 *.bak-*
+
+# local env override (REGISTRY/TAG for compose) — machine-specific
+.env

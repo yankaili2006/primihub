@@ -2,6 +2,13 @@ version: '3'
 x-node-base: &node-base
   image: ${REGISTRY:-docker.io}/primihub/primihub-node:${TAG:-latest}
   restart: "always"
+  environment:
+    - "http_proxy="
+    - "https_proxy="
+    - "HTTP_PROXY="
+    - "HTTPS_PROXY="
+    - "no_proxy=localhost,127.0.0.1,primihub-node0,primihub-node1,primihub-node2,primihub-meta0,primihub-meta1,primihub-meta2"
+    - "NO_PROXY=localhost,127.0.0.1,primihub-node0,primihub-node1,primihub-node2,primihub-meta0,primihub-meta1,primihub-meta2"
   volumes:
     - ./data:/app/data
   entrypoint:
@@ -12,6 +19,13 @@ x-node-base: &node-base
 x-meta-base: &meta-base
   image: ${REGISTRY:-docker.io}/primihub/primihub-meta:${TAG:-latest}
   restart: "always"
+  environment:
+    - "http_proxy="
+    - "https_proxy="
+    - "HTTP_PROXY="
+    - "HTTPS_PROXY="
+    - "no_proxy=localhost,127.0.0.1,primihub-node0,primihub-node1,primihub-node2,primihub-meta0,primihub-meta1,primihub-meta2"
+    - "NO_PROXY=localhost,127.0.0.1,primihub-node0,primihub-node1,primihub-node2,primihub-meta0,primihub-meta1,primihub-meta2"
   entrypoint:
     - "/bin/bash"
     - "-c"
