@@ -401,6 +401,17 @@ cc_test(
 )
 
 cc_test(
+    name = "pirana_pir_test",
+    srcs = ["pirana_pir_test.cc"],
+    deps = [
+        "//src/primihub/kernel/pir/operator/pirana_pir:pirana_pir_operator",
+        "@com_google_googletest//:gtest_main",
+    ],
+    # SEAL keygen + NTT DB encode + homomorphic eval; not instant.
+    size = "medium",
+)
+
+cc_test(
     name = "frodo_api_test",
     srcs = ["frodo_api_test.cc"],
     deps = [

@@ -281,10 +281,17 @@ retcode PiranaPirOperator::OnExecute(const PirDataType& input,
     }
 
     // ---- Unpack to raw bytes ----
+    // Truncate each recovered payload to the original blob length at its
+    // query index: the BFV slot packing zero-pads every row to the uniform
+    // payload_size, but callers expect back exactly what they put in.
     std::vector<std::string> recovered;
     recovered.reserve(recovered_slots.size());
-    for (auto& slots : recovered_slots) {
-      recovered.push_back(UnpackPayload(slots, payload_size));
+    for (std::size_t i = 0; i < recovered_slots.size(); ++i) {
+      const std::string& full =
+          UnpackPayload(recovered_slots[i], payload_size);
+      const std::size_t want =
+          indices[i] < blobs.size() ? blobs[indices[i]].size() : payload_size;
+      recovered.push_back(full.substr(0, want));
     }
     (*result)[kOutRecovered] = std::move(recovered);
     return retcode::SUCCESS;
