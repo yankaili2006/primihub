@@ -1,0 +1,58 @@
+# Bazel BUILD wrapper for ahenzinger/tiptoe (SOSP 2023).
+#
+# This file is loaded by WORKSPACE via:
+#   new_git_repository(
+#       name = "tiptoe",
+#       remote = "https://github.com/ahenzinger/tiptoe.git",
+#       commit = "ba7cae43ab8686328897aabd3b7f861622d8ac8a",
+#       build_file = "@//thirdparty/pir:BUILD.tiptoe",
+#       shallow_since = "1696180302 -0400",
+#   )
+#
+# UPSTREAM LANGUAGE INVENTORY:
+#   * search/*.go (main.go + protocol/, embeddings/, packing/, config/,
+#       corpus/, database/, utils/)
+#       100% Go module github.com/ahenzinger/tiptoe. Implements the
+#       Tiptoe private web-search protocol on top of SimplePIR.
+#   * dim-reduce/, embedding/, cluster/, tf-idf/, perf-eval/,
+#       quality-eval/
+#       Auxiliary tooling (data prep, dimensionality reduction, paper
+#       benchmarks). Not part of the runtime library.
+#   * NO C / C++ / asm sources at all. The Go module pulls in two
+#       upstream deps:
+#         * github.com/ahenzinger/underhood — Tiptoe's BFV-on-SimplePIR
+#             cryptosystem (Go bindings to Microsoft SEAL via cgo)
+#         * github.com/henrycg/simplepir — a SimplePIR fork (NOT the
+#             ahenzinger/simplepir already pinned via BUILD.simplepir;
+#             same algorithm, different Go API surface)
+#
+# IMPLICATION FOR PRIMIHUB TIPTOE OPERATOR (task 7.4 cc):
+#   * No C surface to wrap, so this BUILD file is documentation-only —
+#     it pins the commit for reproducibility and exposes no library
+#     targets.
+#   * The C++ port estimate is larger than FrodoPIR: Tiptoe needs the
+#     full SimplePIR transcript (~400 LOC, already estimated under
+#     5.5) PLUS the underhood BFV-on-SimplePIR transformation (~500
+#     LOC) PLUS SEAL integration for the BFV layer. Realistic scope:
+#     2 weeks of focused C++ work on top of task 5.5 landing.
+#
+# REJECTED INTEGRATION PATHS (same logic as BUILD.simplepir):
+#   * rules_go + cgo c-archive: would also need rules_go's SEAL via
+#     cgo (underhood), doubling the integration cost.
+#   * host-go genrule: unhermetic, breaks reproducible builds.
+#   * Drop the algorithm: Tiptoe is the only PIR-based system that
+#     scales to web search (360M docs @ 56.9 MiB / 2.7 s end-to-end)
+#     so we keep it on the roadmap as a stretch goal.
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Empty placeholder so primihub BUILD files can write
+# `deps = ["@tiptoe//:tiptoe_native"]` and bazel resolves the target.
+# Compiles to nothing; the algorithm lives in the primihub C++ port
+# that will materialize when task 7.4 cc lands.
+cc_library(
+    name = "tiptoe_native",
+    srcs = [],
+)

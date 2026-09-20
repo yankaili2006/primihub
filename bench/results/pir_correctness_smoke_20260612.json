@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-06-12T11:13:54Z",
+  "binary_path": "bazel-out/k8-fastbuild/bin/src/primihub/cli/pir_inspect/pir_inspect",
+  "binary_sha256": "9e0e8c1038f0319f1d7ea57e4dfcbd261470c9986d7c947fb794343de0888e24",
+  "results": [
+    {"algorithm":"apsi","status":"SKIP","reason":"set PIR_SMOKE_RUN_TASK=1 to attempt real cli run"},
+    {"algorithm":"double_pir","status":"SKIP","reason":"SIMPLEPIR_UPSTREAM= is not a directory"},
+    {"algorithm":"frodo_pir","status":"PASS","reason":""},
+    {"algorithm":"id_pir","status":"SKIP","reason":"set PIR_SMOKE_RUN_TASK=1 to attempt real cli run"},
+    {"algorithm":"simple_pir","status":"SKIP","reason":"SIMPLEPIR_UPSTREAM= is not a directory"},
+    {"algorithm":"spiral","status":"SKIP-stub","reason":"OnExecute returns FAIL by design (kIsSkeleton=true); real crypto pending"},
+    {"algorithm":"ypir","status":"SKIP-stub","reason":"OnExecute returns FAIL by design (kIsSkeleton=true); real crypto pending"}
+  ]
+}

@@ -95,7 +95,7 @@ class Plaintext_DPSGD_Server:
         Output_Dims = self.client_channel.recv_all('output_dim')
 
         # set final output dim
-        output_dim = max(Output_Dims)
+        output_dim = int(max(Output_Dims))
         if output_dim == 1:
             self.multiclass = False
         else:

@@ -36,3 +36,15 @@ py_library(
     name = "opt_paillier_c2py",
     data = ["opt_paillier_c2py.so"],
 )
+
+cc_library(
+    name = "linkcontext_embedded",
+    srcs = ["network/link_context_embedded.cc"],
+    deps = [
+        "@pybind11//:pybind11",
+        "//:python3_lib",
+        "//src/primihub/util:util_lib",
+        "//src/primihub/util/network:communication_lib",
+    ],
+    alwayslink = 1,
+)

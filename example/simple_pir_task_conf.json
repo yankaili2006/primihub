@@ -1,0 +1,51 @@
+{
+  "task_type": "PIR_TASK",
+  "task_name": "simple_pir_task",
+  "task_lang": "proto",
+  "task_code": {
+    "code_file_path": "",
+    "code": ""
+  },
+  "params": {
+    "algorithm": {
+      "description": "PIR algorithm registry name (multi-algo framework)",
+      "type": "STRING",
+      "value": "simple_pir"
+    },
+    "pirType": {
+      "description": "legacy enum (ignored when params.algorithm is set); kept for proto_compat",
+      "type": "INT32",
+      "value": 0
+    },
+    "preferred_backend": {
+      "description": "cpu | avx2 | cuda | auto",
+      "type": "STRING",
+      "value": "auto"
+    },
+    "assume_non_colluding": {
+      "description": "SimplePIR is single-server — non-collusion does not apply; leave 0",
+      "type": "INT32",
+      "value": 0
+    },
+    "hint_path": {
+      "description": "persistent hint cache file (PSHC envelope; auto-save+load)",
+      "type": "STRING",
+      "value": "/var/cache/primihub/simple_pir_hint.bin"
+    },
+    "queryIndices": {
+      "description": "decimal row indices to retrieve from the dataset",
+      "type": "STRING",
+      "value": ["0", "27", "63"]
+    },
+    "outputFullFilename": {
+      "description": "path for client save query result",
+      "type": "STRING",
+      "value": "data/result/simple_pir_result.csv"
+    }
+  },
+  "party_datasets": {
+    "SERVER": {
+      "SERVER": "FILL_IN_DATASET_ID"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# Per-run bench JSONs are not committed by default — the schema is the
+# canonical input; individual runs land here for local diffs and CI
+# artifacts. Commit a sweep snapshot manually when it represents a new
+# 'known good' that future diffs should baseline against.
+results/

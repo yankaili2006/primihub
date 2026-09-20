@@ -20,7 +20,7 @@ proxy_server:
 meta_service:
   mode: "grpc"
   ip: "127.0.0.1"
-  port: 9099
+  port: 7977
   use_tls: false
 
 datasets:

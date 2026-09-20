@@ -31,6 +31,7 @@
 #include "src/primihub/common/config/server_config.h"
 #include "src/primihub/service/dataset/service.h"
 #include "src/primihub/service/dataset/meta_service/factory.h"
+#include "src/primihub/kernel/pir/operator/registry.h"
 #ifdef SGX
 #include "sgx/ra/service.h"
 #endif
@@ -86,6 +87,9 @@ void RunServer(primihub::VMNodeInterface* node_service,
 #endif
         // set the max message size to 128M
         builder->SetMaxReceiveMessageSize(128 * 1024 * 1024);
+        // permit frequent client keepalive pings (FL long rounds) -> no GOAWAY too_many_pings
+        builder->AddChannelArgument(GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS, 5000);
+        builder->AddChannelArgument(GRPC_ARG_HTTP2_MAX_PING_STRIKES, 0);
     };
 
     if (host_config.use_tls()) {
@@ -116,6 +120,8 @@ int main(int argc, char **argv) {
     });
 
     google::InitGoogleLogging(argv[0]);
+    google::InstallFailureSignalHandler();
+    primihub::pir::PirRegistry::EnsureRegistered();
     FLAGS_colorlogtostderr = true;
     FLAGS_alsologtostderr = true;
     FLAGS_log_dir = "./log";

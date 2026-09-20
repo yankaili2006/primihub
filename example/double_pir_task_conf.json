@@ -1,0 +1,56 @@
+{
+  "task_type": "PIR_TASK",
+  "task_name": "double_pir_single_process_task",
+  "task_lang": "proto",
+  "task_code": {
+    "code_file_path": "",
+    "code": ""
+  },
+  "params": {
+    "algorithm": {
+      "description": "PIR algorithm registry name (multi-algo framework)",
+      "type": "STRING",
+      "value": "double_pir"
+    },
+    "pirType": {
+      "description": "legacy enum (ignored when params.algorithm is set); kept for proto_compat",
+      "type": "INT32",
+      "value": 0
+    },
+    "preferred_backend": {
+      "description": "cpu | avx2 | cuda | auto",
+      "type": "STRING",
+      "value": "auto"
+    },
+    "assume_non_colluding": {
+      "description": "single-process demo — set 0 since there is only one server here",
+      "type": "INT32",
+      "value": 0
+    },
+    "hint_path": {
+      "description": "persistent hint cache file (PHHC envelope; auto-save+load)",
+      "type": "STRING",
+      "value": "/var/cache/primihub/double_pir_hint.bin"
+    },
+    "hint_role": {
+      "description": "empty (single-process) | primary | secondary — see docs/pir/multi-algo-guide.md",
+      "type": "STRING",
+      "value": ""
+    },
+    "queryIndices": {
+      "description": "decimal row indices to retrieve from the dataset",
+      "type": "STRING",
+      "value": ["0", "27", "63"]
+    },
+    "outputFullFilename": {
+      "description": "path for client save query result",
+      "type": "STRING",
+      "value": "data/result/double_pir_result.csv"
+    }
+  },
+  "party_datasets": {
+    "SERVER": {
+      "SERVER": "FILL_IN_DATASET_ID"
+    }
+  }
+}

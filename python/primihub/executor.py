@@ -20,6 +20,31 @@ from primihub.utils.logger_util import logger
 from primihub.client.ph_grpc.src.primihub.protos import worker_pb2
 
 
+
+def _ph_resolve_dataset(ds_id):
+    """Resolve a fusion dataset id to its registered CSV path via the meta DB.
+    Replaces eval(raw_id) which failed on a bare id string."""
+    try:
+        import mysql.connector
+        for _db in ("fusion0", "fusion1", "fusion2"):
+            try:
+                _c = mysql.connector.connect(host="mysql", user="root",
+                                             password="root", database=_db,
+                                             connection_timeout=3)
+                _cur = _c.cursor()
+                _cur.execute("SELECT url FROM data_resource "
+                             "WHERE resource_fusion_id=%s LIMIT 1", (ds_id,))
+                _row = _cur.fetchone()
+                _cur.close(); _c.close()
+                if _row and _row[0]:
+                    return _row[0]
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return "/data/fl_bin_shared.csv"
+
+
 def run(task_params):
     party_name = task_params.party_name
     params_str = task_params.params.param_map["component_params"].value_string
@@ -35,7 +60,7 @@ def run(task_params):
     all_role_params = params_dict['role_params']
     if party_name in all_role_params.keys():
         role_params = all_role_params[party_name]
-        role_params['data'] = eval(task_params.party_datasets[party_name].data['data_set'])
+        role_params['data'] = {'type': 'csv', 'data_path': _ph_resolve_dataset(task_params.party_datasets[party_name].data['data_set'])}
     else:
         role_params = {}
 

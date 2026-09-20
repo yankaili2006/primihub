@@ -3,34 +3,34 @@
 #define SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_FACTORY_H_
 #include <glog/logging.h>
 #include <memory>
+#include <string>
 #include "src/primihub/kernel/pir/common.h"
-#include "src/primihub/kernel/pir/operator/id_pir.h"
-#ifdef MICROSOFT_APSI
-#include "src/primihub/kernel/pir/operator/keyword_pir.h"
-#endif
+#include "src/primihub/kernel/pir/operator/base_pir.h"
+#include "src/primihub/kernel/pir/operator/registry.h"
+
 namespace primihub::pir {
+
+// Backward-compatible factory. New callers SHOULD use
+// PirRegistry::Instance().Create("<algo>", options) directly; this shim
+// translates legacy PirType enums into algorithm name lookups.
 class Factory {
  public:
   static std::unique_ptr<BasePirOperator> Create(PirType pir_type,
       const Options& options) {
-    std::unique_ptr<BasePirOperator> operator_ptr{nullptr};
-    switch (pir_type) {
-    case PirType::ID_PIR:
-      operator_ptr = std::make_unique<IdPirOperator>(options);
-      break;
-    case PirType::KEY_PIR:
-#ifdef MICROSOFT_APSI
-      operator_ptr = std::make_unique<KeywordPirOperator>(options);
-#else
-      LOG(ERROR) << "KEY_PIR not supported: Microsoft APSI is disabled";
-#endif
-      break;
-    default:
-      LOG(ERROR) << "unknown pir operator: " << static_cast<int>(pir_type);
-      break;
+    const std::string algo = LegacyNameFor(pir_type);
+    if (algo.empty()) {
+      LOG(ERROR) << "unknown legacy PirType: " << static_cast<int>(pir_type);
+      return nullptr;
     }
-    return operator_ptr;
+    auto op = PirRegistry::Instance().Create(algo, options);
+    if (!op) {
+      LOG(ERROR) << "legacy PirType " << ToString(pir_type)
+                 << " (algo '" << algo << "') not available; "
+                 << "check that the algorithm was linked into the binary";
+    }
+    return op;
   }
 };
+
 }  // namespace primihub::pir
 #endif  // SRC_PRIMIHUB_KERNEL_PIR_OPERATOR_FACTORY_H_

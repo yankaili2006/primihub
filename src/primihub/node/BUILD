@@ -28,6 +28,13 @@ cc_library(
     "//src/primihub/task/language:language_parser_factory",
     "//src/primihub/task/semantic:task_semantic_parser",
     "//src/primihub/service/dataset/meta_service:meta_service_factory",
+    # PIR multi-algo registry aggregator (task 1.9 — :pir pulls in
+    # registry + all default-enabled algorithm operators so their
+    # alwayslink registrars fire at process start). main.cc calls
+    # PirRegistry::EnsureRegistered() to drain the pending list.
+    # Adding a new algorithm is a one-line change in the :pir target
+    # at src/primihub/kernel/pir/operator/BUILD.
+    "//src/primihub/kernel/pir/operator:pir",
     "@com_github_glog_glog//:glog",
     "@com_github_grpc_grpc//:grpc++",
     "@com_google_absl//absl/flags:flag",

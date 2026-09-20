@@ -1,0 +1,1 @@
+{"op":"lwe_matvec_mod2p32","db_entries":1e8,"gpu":"NVIDIA GeForce RTX 5070 Ti","per_answer_ms":{"scalar":48.35,"avx2":32.40,"cuda_warm":1.71,"cuda_cold":51.82},"db_upload_ms":50.11}

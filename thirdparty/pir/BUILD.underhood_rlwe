@@ -1,0 +1,32 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# ahenzinger/underhood `rlwe/` — the BFV-on-SimplePIR (LHE) crypto core for the
+# Tiptoe port (openspec change primihub-pir-cuda-tiptoe, task 1.1b). This is the
+# only part of underhood primihub uses: the C++ layer over Microsoft SEAL
+# (extern "C" surface in rlwe/rlwe.h, impl rlwe/rlwe.cpp, SEAL glue rlwe.hpp).
+# The Go (rlwe.go) is just cgo bindings primihub does not need.
+#
+# Surface: BFV context (n=2048, p=65537, logq=38), plaintext/ciphertext ops,
+# NTT, multiply_plain, add, set_inner_product (the homomorphic dot product
+# Tiptoe relies on), symmetric encrypt / decrypt / squished-encrypt, and
+# (de)serialization.
+#
+# NOTE: SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF —
+# multiply_plain can produce a transparent ciphertext. Validated standalone
+# against SEAL 4.1 (BFV inner-product + serialize roundtrip PASS).
+#
+# Pulled in only under --define=enable_tiptoe_real=1 (needs the SEAL toolchain,
+# which is GFW-blocked on .50 via the APSI seal pin); the default build never
+# references @underhood.
+cc_library(
+    name = "rlwe",
+    srcs = ["rlwe/rlwe.cpp"],
+    hdrs = [
+        "rlwe/rlwe.h",
+        "rlwe/rlwe.hpp",
+    ],
+    includes = ["rlwe"],
+    deps = ["@com_github_primihub_seal_40//:seal"],
+)

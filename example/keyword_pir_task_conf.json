@@ -30,8 +30,14 @@
       "type": "OBJECT",
       "value": {
         "SERVER": {
-          "key_columns": [0,1],
-          "label_columns": [2,3]
+          "key_columns": [
+            0,
+            1
+          ],
+          "label_columns": [
+            2,
+            3
+          ]
         },
         "CLIENT": {
           "key_columns": []
@@ -42,6 +48,19 @@
   "party_datasets": {
     "SERVER": {
       "SERVER": "keyword_pir_server_data"
+    },
+    "CLIENT": {}
+  },
+  "party_info": {
+    "SERVER": {
+      "ip": "127.0.0.1",
+      "port": 50051,
+      "use_tls": false
+    },
+    "CLIENT": {
+      "ip": "127.0.0.1",
+      "port": 50050,
+      "use_tls": false
     }
   }
 }

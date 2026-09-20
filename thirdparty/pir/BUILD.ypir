@@ -1,0 +1,68 @@
+# Bazel BUILD wrapper for menonsamir/ypir (USENIX Security 2024).
+#
+# This file is loaded by WORKSPACE via:
+#   new_git_repository(
+#       name = "ypir",
+#       remote = "https://github.com/menonsamir/ypir.git",
+#       commit = "a73e550a469605c2fa23945a4d96c20fb2f4a839",
+#       build_file = "@//thirdparty/pir:BUILD.ypir",
+#       shallow_since = "1743542300 -0700",
+#   )
+#
+# UPSTREAM LANGUAGE INVENTORY (drives the wrapper shape):
+#   * src/matmul.cpp
+#       Hand-written C++ matrix multiplication kernels with SIMD-tuned
+#       variants (matMulVecPacked / matMulVecPacked2 /
+#       trueMatMulVecPacked4 / matMulVecPacked4 / matMulVecPacked6 /
+#       trueMatMulVecPacked8 / matMulVecPacked8). Derived from
+#       ahenzinger/simplepir's pir.c with packed-base layouts +
+#       AVX2/AVX-512 intrinsics. All entry points are `extern "C"` so
+#       they are stable to link from primihub's C++ side. SAFE to wrap
+#       as a cc_library — exported below.
+#   * src/*.rs (client.rs, server.rs, scheme.rs, kernel.rs, lwe.rs,
+#       packing.rs, params.rs, ...)
+#       Rust crate `ypir`. Implements the YPIR algorithm core (hint
+#       lifecycle, query/answer, packing). NOT wrapped — primihub's
+#       cc-only WORKSPACE intentionally avoids rules_rust.
+#   * src/bin/
+#       Standalone Rust binaries (benchmarking, end-to-end harness).
+#       Not relevant to the primihub library wrapper.
+#
+# IMPLICATION FOR PRIMIHUB YPIR OPERATOR (task 7.3 cc):
+#   The C++ YpirOperator must port the Rust algorithmic layer to call
+#   the C++ matmul kernels exposed below. The kernels themselves are
+#   the upstream paper's hot path, so the port preserves YPIR's
+#   ~1 GB/s server-side throughput claim by re-using them verbatim.
+#   The lighter LWE / packing math (lwe.rs ~150 LOC, packing.rs ~250
+#   LOC) is a manageable C++ port; spiral-rs (a YPIR dependency) is
+#   excluded — primihub already wraps menonsamir/spiral directly in
+#   //thirdparty/pir:BUILD.spiral.
+#
+# NO PUBLIC HEADER:
+#   matmul.cpp declares its entry points inside an `extern "C" { ... }`
+#   block but the upstream has no .h header for them. The cc_library
+#   exposes the symbols at link time; primihub's ypir_pir.cc must
+#   declare the extern signatures itself (or maintain a wrapper
+#   header inside the operator directory). Keeping the wrapper
+#   header-less avoids drifting copies of the signature list.
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# YPIR matrix kernels. Uses AVX2/AVX-512 intrinsics via -march=native
+# upstream; we intentionally drop -march=native at the wrapper level so
+# CI hosts without a recent CPU can still compile. The primihub BUILD
+# can opt back in via copts when the target host is known.
+cc_library(
+    name = "ypir_matmul_kernels",
+    srcs = ["src/matmul.cpp"],
+    copts = [
+        "-O3",
+        "-std=c++11",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-unused-function",
+        "-Wno-sign-compare",
+    ],
+)

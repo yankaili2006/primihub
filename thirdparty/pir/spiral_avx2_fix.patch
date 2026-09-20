@@ -1,0 +1,33 @@
+--- a/src/spiral.cpp
++++ b/src/spiral.cpp
+@@ -751,8 +751,8 @@
+         for (size_t z = 0; z < poly_len; z++) {
+             size_t idx_a_base = z * (2*dim0*n1_padded);
+             size_t idx_b_base = z * (num_per * n2 * dim0 * n0);
+-            if (random_data) idx_b_base = 0;//(rand() % 64) * (num_per * n2 * dim0 * n0);
+-            if (random_data) idx_a_base = 0;//(rand() % 64) * (num_per * n2 * dim0 * n0);
++            if (random_data) idx_b_base = (z % dummyWorkingSet) * (num_per * n2 * dim0 * n0);
++            // idx_a_base stays z * (2*dim0*n1_padded) (was wrongly zeroed)
+             // if (true) {//(z % 256 == 0) {
+             //     b_inp = _mm256_stream_load_si256((__m256i const*)(&database[(z%4) * 4]));
+             //     a1 = _mm256_stream_load_si256((__m256i const *) &reorientedCiphertexts[(z%4) * 4]);
+@@ -766,6 +766,10 @@
+                     size_t uroll_max = max_summed_pa_or_b_in_u64;
+                     size_t inner_limit = uroll_max;
+                     size_t outer_limit = dim0 * 2 / inner_limit;
++                    if (dim0 * 2 < max_summed_pa_or_b_in_u64) {
++                        inner_limit = dim0 * 2;
++                        outer_limit = 1;
++                    }
+ 
+                     __uint128_t sums_out_n0_u64_acc[3] = { 0, 0, 0 };
+                     __uint128_t sums_out_n2_u64_acc[3] = { 0, 0, 0 };
+@@ -934,7 +938,7 @@
+         for (size_t z = 0; z < poly_len; z++) {
+             size_t idx_a_base = z * (2*dim0*n1_padded);
+             size_t idx_b_base = z * (num_per * n2 * dim0 * n0);
+-            if (random_data) idx_b_base = (rand() % dummyWorkingSet) * (num_per * n2 * dim0 * n0);
++            if (random_data) idx_b_base = (z % dummyWorkingSet) * (num_per * n2 * dim0 * n0);
+ 
+             for (size_t i = 0; i < num_per; i++) {
+                 for (size_t c = 0; c < n2; c++) {
