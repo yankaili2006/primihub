@@ -113,6 +113,9 @@ cc_library(
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
         "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
         "//src/primihub/kernel/pir/operator/tiptoe_pir:tiptoe_pir_operator",
+        # PIRANA (eprint 2022/1401) — unconditionally registered, deps
+        # (@pirana → SEAL/Kuku) already in the default WORKSPACE.
+        "//src/primihub/kernel/pir/operator/pirana_pir:pirana_pir_operator",
     ] + select({
         "//:microsoft-apsi": [":keyword_pir_operator"],
         "//conditions:default": [],

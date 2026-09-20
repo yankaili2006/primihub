@@ -858,3 +858,16 @@ http_archive(
     strip_prefix = "hexl-1.2.5",
     urls = ["https://github.com/intel/hexl/archive/refs/tags/v1.2.5.tar.gz"],
 )
+
+# ---- PIRANA (zju-abclab/PIRANA, eprint 2022/1401) ----
+# Faster multi-query PIR via constant-weight codes (SEAL 4.0 + Kuku 2.1).
+# Sources are vendored at thirdparty/pir/pirana/ (copied from the
+# external/PIRANA submodule checkout; upstream is a CMake demo binary, so a
+# local_repository with a hand-written BUILD target is used instead of
+# new_git_repository — keeps the primihub build hermetic without re-fetching).
+# Pulled into the default build via //src/primihub/kernel/pir/operator:pir
+# (pirana_pir_operator, alwayslink registrar — no build flag needed).
+local_repository(
+    name = "pirana",
+    path = "thirdparty/pir/pirana",
+)
