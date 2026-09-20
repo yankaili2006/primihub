@@ -13,6 +13,7 @@ cc_binary(
         "//src/primihub/kernel/pir/operator/frodo_pir:frodo_pir_operator",
         "//src/primihub/kernel/pir/operator:id_pir_operator",
         "//src/primihub/kernel/pir/operator/pirana_pir:pirana_pir_operator",
+        "//src/primihub/kernel/pir/operator/ypir:ypir_operator",
         "@com_github_glog_glog//:glog",
     ],
 )

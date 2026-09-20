@@ -30,6 +30,7 @@
 #include "src/primihub/kernel/pir/operator/frodo_pir/frodo_pir.h"
 #include "src/primihub/kernel/pir/operator/id_pir.h"
 #include "src/primihub/kernel/pir/operator/pirana_pir/pirana_pir.h"
+#include "src/primihub/kernel/pir/operator/ypir/ypir.h"
 #include "src/primihub/kernel/pir/operator/registry.h"
 
 namespace {
@@ -171,6 +172,40 @@ int main(int argc, char** argv) {
     }
     std::printf("%-12s %12s %15s %15.1f\n", "frodo_pir", ok ? "ok" : "FAIL",
                 "-", ok ? best : -1.0);
+  }
+
+  // ---- ypir (base64 single-byte elements; YPIR v1 pt_modulus=256) ----
+  // Different element contract: 1 byte/element, so run its own DB size.
+  if (which == "all" || which == "ypir") {
+    const std::size_t yn = 4096;  // 4096 single-byte elements
+    std::vector<std::string> elems;
+    elems.reserve(yn);
+    static const char* kAlpha =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for (std::size_t i = 0; i < yn; ++i) {
+      const unsigned char b = static_cast<unsigned char>((i * 31u + 5u) & 0xFFu);
+      // base64 of a single byte: 2 chars + '=='
+      std::string e;
+      e += kAlpha[(b >> 2) & 63];
+      e += kAlpha[(b & 3) << 4];
+      e += "==";
+      elems.push_back(e);
+    }
+    primihub::pir::YpirOperator op(MinimalOptions("ypir_bench"));
+    double best = 1e18;
+    bool ok = false;
+    for (int it = 0; it < iters; ++it) {
+      PirDataType in;
+      in["db_content"] = elems;
+      in["query_indices"] = {"1365"};
+      auto t = TimeOnExecute("ypir", &op, in);
+      if (t.ok) {
+        best = std::min(best, t.total_ms);
+        ok = true;
+      }
+    }
+    std::printf("%-12s %12s %15s %15.1f   (db: 4096x1B)\n", "ypir",
+                ok ? "ok" : "FAIL", "-", ok ? best : -1.0);
   }
 
   // ---- id_pir (plaintext passthrough baseline) ----
