@@ -64,12 +64,15 @@ class Server {
   // primihub integration hook: replace the (random) test DB with a
   // caller-supplied one and (re-)encode to NTT form. Call after
   // construction; encode_* helpers assert on _set_db which this sets.
+  // NOTE: only num_query decides the encode path here — the 2-arg
+  // PirParms ctor leaves _is_compress uninitialized, so reading it for
+  // single-query parms is UB (bit the bench with a stray assert).
   void load_external_db(std::vector<std::vector<uint64_t>> db) {
     _raw_db = std::move(db);
     assert(_raw_db.size() == _pir_parms.get_num_payloads() &&
            "external DB row count must match num_payloads");
     _set_db = true;
-    if (_pir_parms.get_num_query() > 1 || _pir_parms.get_is_compress()) {
+    if (_pir_parms.get_num_query() > 1) {
       if (_pir_parms.get_is_compress()) {
         batch_encode_to_ntt_db_with_compress();
       } else {
