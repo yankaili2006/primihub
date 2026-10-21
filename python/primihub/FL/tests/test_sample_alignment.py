@@ -105,3 +105,47 @@ def test_predictions_keep_source_rows_and_ids(psi):
     assert result.pred_y.tolist() == [int(p > .5) for p in probabilities]
     assert not result.isna().any().any()
     assert result.unused.tolist() == (["d", "c", "a"] if psi else ["a", "b", "c", "d"])
+
+
+def data_loader_class():
+    path = FL_ROOT / "utils/dataset.py"
+    parsed = ast.parse(path.read_text())
+    cls = next(n for n in parsed.body if isinstance(n, ast.ClassDef) and n.name == "DataLoader")
+    namespace = {"np": np}
+    exec(compile(ast.Module(body=[cls], type_ignores=[]), str(path), "exec"), namespace)
+    return namespace["DataLoader"]
+
+
+@pytest.mark.parametrize("seed", [0, 17])
+def test_party_batches_stay_aligned_across_epochs_and_other_tasks(seed):
+    loader = data_loader_class()
+    data = np.arange(23)
+    host = loader(data, label=data + 100, batch_size=7, seed=seed)
+    guest = loader(data, batch_size=7, seed=seed)
+    orders = []
+    for _ in range(3):
+        host_batches = list(host)
+        np.random.random(100)
+        list(loader(data, batch_size=5, seed=99))
+        guest_batches = list(guest)
+        for (x, y), z in zip(host_batches, guest_batches, strict=True):
+            np.testing.assert_array_equal(x, z)
+            np.testing.assert_array_equal(y, x + 100)
+        order = np.concatenate(guest_batches)
+        np.testing.assert_array_equal(np.sort(order), data)
+        orders.append(order)
+    assert not np.array_equal(orders[0], orders[1])
+
+
+def test_loader_does_not_modify_global_random_state():
+    before = np.random.get_state()
+    list(data_loader_class()(np.arange(20), batch_size=6, seed=17))
+    after = np.random.get_state()
+    assert before[0] == after[0] and before[2:] == after[2:]
+    np.testing.assert_array_equal(before[1], after[1])
+
+
+def test_unshuffled_loader_keeps_input_order_and_partial_batch():
+    batches = list(data_loader_class()(np.arange(10), batch_size=4, shuffle=False, seed=0))
+    assert [len(batch) for batch in batches] == [4, 4, 2]
+    np.testing.assert_array_equal(np.concatenate(batches), np.arange(10))

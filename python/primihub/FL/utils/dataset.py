@@ -128,8 +128,9 @@ class DataLoader:
         self.n_samples = self.__len__()
         self.indices = np.arange(self.n_samples)
         self.start = 0
-        if seed:
-            np.random.seed(seed)
+        # Each party needs the same shuffle, including seed=0. Keep the RNG
+        # local so unrelated tasks cannot change a federated batch order.
+        self.rng = np.random.RandomState(seed)
 
     def __len__(self):
         return len(self.dataset)
@@ -143,7 +144,7 @@ class DataLoader:
     def __next__(self):
         if self.start == 0:
             if self.shuffle:
-                np.random.shuffle(self.indices)
+                self.rng.shuffle(self.indices)
 
         start = self.start
         end = start + self.batch_size
