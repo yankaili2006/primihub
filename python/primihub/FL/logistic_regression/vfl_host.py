@@ -149,6 +149,7 @@ class LogisticRegressionHost(BaseModel):
         psi_protocol = self.common_params.get("psi")
         if isinstance(psi_protocol, str):
             x = sample_alignment(x, id, self.roles, psi_protocol)
+            origin_data = origin_data.set_index(id, drop=False).loc[x[id]].reset_index(drop=True)
         if id in x.columns:
             x.pop(id)
         label = modelFile['label']
@@ -177,7 +178,7 @@ class LogisticRegressionHost(BaseModel):
             'pred_y': pred_y
         })
         
-        data_result = pd.concat([origin_data, result], axis=1)
+        data_result = pd.concat([origin_data.reset_index(drop=True), result], axis=1)
         save_csv_file(data_result, self.role_params['predict_path'])
 
 

@@ -4,12 +4,13 @@ from primihub.MPC.psi import TwoPartyPsi, PsiType, DataType
 
 def sample_alignment(X, id, roles, protocol: str):
     input = X[id]
+    if input.isna().any() or input.duplicated().any():
+        raise ValueError("PSI alignment requires unique, non-null identifiers")
 
     roles = roles.copy()
     host = roles["host"]
     guest = roles["guest"]
-    if not isinstance(guest, list):
-        guest = [guest]
+    guest = list(guest) if isinstance(guest, list) else [guest]
 
     if len(guest) > 1:
         raise RuntimeError("The current PSI only support two parties.")
@@ -45,4 +46,6 @@ def sample_alignment(X, id, roles, protocol: str):
         protocol=protocol,
         data_type=data_type,
     )
-    return X[input.isin(intersection)]
+    # PSI returns a set, while federated model operations use positional rows.
+    # Both parties must use the same order and a fresh index after filtering.
+    return X[input.isin(intersection)].sort_values(id, kind="mergesort").reset_index(drop=True)
