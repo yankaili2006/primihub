@@ -134,8 +134,7 @@ TEST_F(BasePsiTest, BroadcastCallsChannelSend) {
   node1.ip_ = "127.0.0.1";
   node1.port_ = 50051;
 
-  auto mock_channel2 = std::make_shared<MockChannel>();
-  EXPECT_CALL(*mock_channel2, send_view("default", ::testing::_))
+  EXPECT_CALL(mock_ctx_, Send_str("default", node1, ::testing::_))
       .Times(1)
       .WillOnce(Return(primihub::retcode::SUCCESS));
 
@@ -143,9 +142,6 @@ TEST_F(BasePsiTest, BroadcastCallsChannelSend) {
   opts.link_ctx_ref = &mock_ctx_;
   opts.self_party = PARTY_CLIENT;
   opts.party_info[PARTY_SERVER] = node1;
-
-  EXPECT_CALL(mock_ctx_, getChannel(::testing::An<const primihub::Node&>()))
-      .WillRepeatedly(Return(mock_channel2));
 
   TestablePsiOperator op(opts);
   std::vector<std::string> result = {"result1", "result2"};
